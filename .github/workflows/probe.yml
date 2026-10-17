@@ -1,0 +1,66 @@
+# 1.21.11 실제 코드 구조를 뽑아 ci/probe-1.21.11 브랜치에 올립니다 (개발용)
+name: Probe 1.21.11 API
+on:
+  push:
+    branches: [main]
+    paths: ['core/probe-1.21.11/**', '.github/workflows/probe.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core/probe-1.21.11
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: 버전 확인 + Gradle 준비
+        run: |
+          LOADER=$(curl -fsSL https://meta.fabricmc.net/v2/versions/loader/1.21.11 | jq -r '[.[] | select(.loader.stable)][0].loader.version')
+          API=$(curl -fsSL https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml | grep -oP '(?<=<version>)[^<]*\+1\.21\.11(?=</version>)' | tail -1)
+          LOOMS=$(curl -fsSL https://maven.fabricmc.net/net/fabricmc/fabric-loom/maven-metadata.xml | grep -oP '(?<=<version>)1\.1[0-9]-SNAPSHOT(?=</version>)' | sort -V | tail -5 | tr '\n' ' ')
+          echo "loader=$LOADER api=$API looms=$LOOMS" | tee versions.txt
+          echo "GARGS=-Ploader_version=$LOADER -Pfabric_version=$API" >> $GITHUB_ENV
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.2.1
+      - name: 소스 생성
+        run: |
+          set -o pipefail
+          gradle genSources $GARGS --no-daemon --stacktrace 2>&1 | tee build.log || true
+      - name: 필요한 클래스 추출
+        if: always()
+        run: |
+          mkdir -p /tmp/ci/src
+          cp build.log versions.txt /tmp/ci/ 2>/dev/null || true
+          SRC=$(find ~/.gradle .gradle -name '*.jar' 2>/dev/null | grep -i 'minecraft' | grep -i 'sources' | head -1)
+          echo "sources jar: $SRC" | tee /tmp/ci/where.txt
+          find ~/.gradle .gradle -name '*.jar' 2>/dev/null | grep -i minecraft | head -30 >> /tmp/ci/where.txt
+          if [ -n "$SRC" ]; then
+            cd /tmp/ci/src
+            for c in client/gui/GuiGraphics client/renderer/GameRenderer client/MouseHandler client/KeyMapping \
+                     client/gui/screens/Screen client/gui/components/events/GuiEventListener client/input/MouseButtonEvent \
+                     client/input/MouseButtonInfo client/renderer/ItemInHandRenderer client/gui/screens/TitleScreen \
+                     client/OptionInstance resources/Identifier client/gui/components/Button client/gui/Font \
+                     client/gui/screens/options/OptionsScreen client/gui/screens/worldselection/SelectWorldScreen \
+                     client/gui/screens/multiplayer/JoinMultiplayerScreen client/renderer/RenderPipelines client/Minecraft \
+                     client/gui/components/AbstractWidget client/Options client/player/LocalPlayer; do
+              unzip -o -q "$SRC" "net/minecraft/$c.java" 2>/dev/null || echo "없음: $c" >> /tmp/ci/missing.txt
+            done
+          fi
+          for j in $(find ~/.gradle -name 'fabric-rendering-v1*.jar' -o -name 'fabric-key-binding-api-v1*.jar' 2>/dev/null | head -6); do
+            mkdir -p /tmp/ci/fabric && unzip -o -q "$j" '*.class' -d /tmp/ci/fabric/$(basename $j .jar) 2>/dev/null || true
+          done
+          find /tmp/ci/fabric -name '*.class' | sed 's#.*/net/#net/#' | sort > /tmp/ci/fabric-classes.txt 2>/dev/null || true
+          for cls in HudElementRegistry HudElement VanillaHudElements HudRenderCallback KeyBindingHelper; do
+            f=$(find /tmp/ci/fabric -name "$cls.class" | head -1); [ -n "$f" ] && javap -cp "$(dirname $(dirname $(dirname $(dirname $(dirname $(dirname $(dirname $f)))))))" -p "$f" >> /tmp/ci/fabric-api.txt 2>&1 || true
+            [ -n "$f" ] && javap -p "$f" >> /tmp/ci/fabric-api.txt 2>&1 || true
+          done
+          rm -rf /tmp/ci/fabric
+          cd /tmp/ci && git init -q && git checkout -q -b ci && git add -A && git -c user.name=ci -c user.email=ci@damoon commit -qm probe
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci:ci/probe-1.21.11
