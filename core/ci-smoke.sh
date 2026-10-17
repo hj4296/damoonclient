@@ -4,7 +4,7 @@
 #   LAUNCH  : 게임을 띄우는 명령 (기본: gradle runClient)
 #   LOGFILE : 게임 로그 경로 (기본: run/logs/latest.log, e2e-logfile.txt 가 있으면 그 내용)
 MODE="$1"
-export DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1
+export DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 __GLX_VENDOR_LIBRARY_NAME=mesa MESA_GL_VERSION_OVERRIDE=4.6
 
 sudo apt-get install -y -qq xdotool ffmpeg x11-xserver-utils > /dev/null
 
@@ -18,7 +18,7 @@ if [ -z "${LAUNCH:-}" ]; then
   LAUNCH="gradle runClient ${GARGS:-} --no-daemon"
 fi
 
-Xvfb :99 -screen 0 1280x720x24 &
+Xvfb :99 -screen 0 1280x720x24 +extension GLX +extension RANDR +render -noreset &
 sleep 2
 (timeout 900 bash -c "$LAUNCH" > run.log 2>&1 &)
 
