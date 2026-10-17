@@ -1,0 +1,458 @@
+Damoon Core 넣음: damoon-core-forge-1.8.9.jar
+== Damoon Client: e2e forge 1.8.9 (1.8.9, Forge) ==
+[진행] Java (jre-legacy) 1/300
+[진행] Java (jre-legacy) 30/300
+[진행] Java (jre-legacy) 60/300
+[진행] Java (jre-legacy) 90/300
+[진행] Java (jre-legacy) 120/300
+[진행] Java (jre-legacy) 150/300
+[진행] Java (jre-legacy) 180/300
+[진행] Java (jre-legacy) 210/300
+[진행] Java (jre-legacy) 240/300
+[진행] Java (jre-legacy) 270/300
+[진행] Java (jre-legacy) 300/300
+Java: /home/runner/work/damoonclient/damoonclient/e2e-home/runtime/jre-legacy/linux/bin/java
+Forge 1.8.9-11.15.1.2318-1.8.9 설치 완료
+[진행] 클라이언트 0/1
+[진행] 라이브러리 5/50
+[진행] 라이브러리 10/50
+[진행] 라이브러리 15/50
+[진행] 라이브러리 20/50
+[진행] 라이브러리 25/50
+[진행] 라이브러리 30/50
+[진행] 라이브러리 35/50
+[진행] 라이브러리 40/50
+[진행] 라이브러리 45/50
+[진행] 라이브러리 50/50
+[진행] 에셋 1/734
+[진행] 에셋 74/734
+[진행] 에셋 147/734
+[진행] 에셋 221/734
+[진행] 에셋 294/734
+[진행] 에셋 367/734
+[진행] 에셋 441/734
+[진행] 에셋 514/734
+[진행] 에셋 588/734
+[진행] 에셋 661/734
+[진행] 에셋 734/734
+LOGFILE=/home/runner/work/damoonclient/damoonclient/e2e-home/instances/e2e-forge-1.8.9/logs/latest.log
+실행: /home/runner/work/damoonclient/damoonclient/e2e-home/runtime/jre-legacy/linux/bin/java -Xms1024M -Xmx3072M -Dlog4j2.formatMsgNoLookups=true -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled -Dfml.ignoreInvalidMinecraftCertificates=true -Dfml.ignorePatchDiscrepancies=true -Dlog4j.configurationFile=/home/runner/work/damoonclient/damoonclient/e2e-home/assets/log_configs/client-1.7.xml -Djava.library.path=/home/runner/work/damoonclient/damoonclient/e2e-home/versions/1.8.9-forge1.8.9-11.15.1.2318-1.8.9/natives -cp /home/runner/work/damoonclient/damoonclient/e2e-home/libraries/net/minecraftforge/forge/1.8.9-11.15.1.2318-1.8.9/forge-1.8.9-11.15.1.2318-1.8.9.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/ow2/asm/asm-all/5.0.3/asm-all-5.0.3.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/typesafe/akka/akka-actor_2.11/2.3.3/akka-actor_2.11-2.3.3.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/typesafe/config/1.2.1/config-1.2.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/scala-actors-migration_2.11/1.1.0/scala-actors-migration_2.11-1.1.0.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/scala-compiler/2.11.1/scala-compiler-2.11.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/plugins/scala-continuations-library_2.11/1.0.2/scala-continuations-library_2.11-1.0.2.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/plugins/scala-continuations-plugin_2.11.1/1.0.2/scala-continuations-plugin_2.11.1-1.0.2.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/scala-parser-combinators_2.11/1.0.1/scala-parser-combinators_2.11-1.0.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/scala-reflect/2.11.1/scala-reflect-2.11.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/scala-swing_2.11/1.0.1/scala-swing_2.11-1.0.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/scala-lang/scala-xml_2.11/1.0.2/scala-xml_2.11-1.0.2.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/lzma/lzma/0.0.1/lzma-0.0.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/net/sf/jopt-simple/jopt-simple/4.6/jopt-simple-4.6.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/java3d/vecmath/1.5.2/vecmath-1.5.2.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/net/sf/trove4j/trove4j/3.0.3/trove4j-3.0.3.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/mojang/netty/1.8.8/netty-1.8.8.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/oshi-project/oshi-core/1.1/oshi-core-1.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/net/java/dev/jna/jna/3.4.0/jna-3.4.0.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/net/java/dev/jna/platform/3.4.0/platform-3.4.0.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/ibm/icu/icu4j-core-mojang/51.2/icu4j-core-mojang-51.2.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/paulscode/codecjorbis/20101023/codecjorbis-20101023.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/paulscode/codecwav/20101023/codecwav-20101023.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/paulscode/libraryjavasound/20101123/libraryjavasound-20101123.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/paulscode/librarylwjglopenal/20100824/librarylwjglopenal-20100824.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/paulscode/soundsystem/20120107/soundsystem-20120107.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/io/netty/netty-all/4.0.23.Final/netty-all-4.0.23.Final.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/google/guava/guava/17.0/guava-17.0.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/apache/commons/commons-lang3/3.3.2/commons-lang3-3.3.2.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/commons-io/commons-io/2.4/commons-io-2.4.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/commons-codec/commons-codec/1.9/commons-codec-1.9.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/google/code/gson/gson/2.2.4/gson-2.2.4.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/mojang/authlib/1.5.21/authlib-1.5.21.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/com/mojang/realms/1.7.59/realms-1.7.59.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/apache/commons/commons-compress/1.8.1/commons-compress-1.8.1.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/apache/httpcomponents/httpclient/4.3.3/httpclient-4.3.3.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/commons-logging/commons-logging/1.1.3/commons-logging-1.1.3.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/apache/httpcomponents/httpcore/4.3.2/httpcore-4.3.2.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/apache/logging/log4j/log4j-api/2.0-beta9/log4j-api-2.0-beta9.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/apache/logging/log4j/log4j-core/2.0-beta9/log4j-core-2.0-beta9.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/lwjgl/lwjgl/lwjgl/2.9.4-nightly-20150209/lwjgl-2.9.4-nightly-20150209.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.4-nightly-20150209/lwjgl_util-2.9.4-nightly-20150209.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/libraries/tv/twitch/twitch/6.5/twitch-6.5.jar:/home/runner/work/damoonclient/damoonclient/e2e-home/versions/1.8.9-forge1.8.9-11.15.1.2318-1.8.9/1.8.9-forge1.8.9-11.15.1.2318-1.8.9.jar net.minecraft.launchwrapper.Launch --username DamoonCI --version 1.8.9-forge1.8.9-11.15.1.2318-1.8.9 --gameDir /home/runner/work/damoonclient/damoonclient/e2e-home/instances/e2e-forge-1.8.9 --assetsDir /home/runner/work/damoonclient/damoonclient/e2e-home/assets --assetIndex 1.8 --uuid 00000000000000000000000000000000 --accessToken ******** --userProperties {} --userType msa --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232662200" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Loading tweak class name net.minecraftforge.fml.common.launcher.FMLTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232662266" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Using primary tweak class name net.minecraftforge.fml.common.launcher.FMLTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232662266" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Calling tweak class net.minecraftforge.fml.common.launcher.FMLTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232662281" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Forge Mod Loader version 11.15.1.2318 for Minecraft 1.8.9 loading]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232662281" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Java is Java HotSpot(TM) 64-Bit Server VM, version 1.8.0_202, running on Linux:amd64:6.17.0-1022-azure, installed at /home/runner/work/damoonclient/damoonclient/e2e-home/runtime/jre-legacy/linux]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232662320" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Loading tweak class name net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232662321" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Loading tweak class name net.minecraftforge.fml.common.launcher.FMLDeobfTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232662322" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Calling tweak class net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232662323" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Calling tweak class net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232662323" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232663510" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Found valid fingerprint for Minecraft Forge. Certificate fingerprint e3c3d50c7c986df74c645c0ac54639741c90a557]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232663545" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Found valid fingerprint for Minecraft. Certificate fingerprint cd99959656f753dc28d863b46769f7f8fbaefcfc]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232663546" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232663546" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Calling tweak class net.minecraftforge.fml.common.launcher.FMLDeobfTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232663853" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Loading tweak class name net.minecraftforge.fml.common.launcher.TerminalTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232663854" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Calling tweak class net.minecraftforge.fml.common.launcher.TerminalTweaker]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="LaunchWrapper" timestamp="1792232663864" level="INFO" thread="main">
+    <log4j:Message><![CDATA[Launching wrapped minecraft {net.minecraft.client.main.Main}]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.Minecraft" timestamp="1792232664376" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Setting user: DamoonCI]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.Minecraft" timestamp="1792232666295" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[LWJGL Version: 2.9.4]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232668111" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Could not load splash.properties, will create a default one]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="STDOUT" timestamp="1792232668129" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[[net.minecraftforge.fml.client.SplashProgress:start:246]: ---- Minecraft Crash Report ----
+// I let you down. Sorry :(
+
+Time: 10/17/26 10:24 AM
+Description: Loading screen debug info
+
+This is just a prompt for computer specs to be printed. THIS IS NOT A ERROR
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- System Details --
+Details:
+	Minecraft Version: 1.8.9
+	Operating System: Linux (amd64) version 6.17.0-1022-azure
+	Java Version: 1.8.0_202, Oracle Corporation
+	Java VM Version: Java HotSpot(TM) 64-Bit Server VM (mixed mode), Oracle Corporation
+	Memory: 902340168 bytes (860 MB) / 1073741824 bytes (1024 MB) up to 3221225472 bytes (3072 MB)
+	JVM Flags: 10 total; -Xms1024M -Xmx3072M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled
+	IntCache: cache: 0, tcache: 0, allocated: 0, tallocated: 0
+	FML: 
+	Loaded coremods (and transformers): 
+	GL info: ' Vendor: 'Mesa' Version: '4.6 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.4' Renderer: 'llvmpipe (LLVM 20.1.2, 256 bits)']]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232668199" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[MinecraftForge v11.15.1.2318 Initialized]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232668372" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Replaced 229 ore recipies]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232668510" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Found 0 mods from the command line. Injecting into mod discoverer]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232668511" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Searching /home/runner/work/damoonclient/damoonclient/e2e-home/instances/e2e-forge-1.8.9/mods for mods]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232669427" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Forge Mod Loader has identified 4 mods to load]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232669607" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Attempting connection with missing mods [mcp, FML, Forge, damoon] at CLIENT]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232669608" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Attempting connection with missing mods [mcp, FML, Forge, damoon] at SERVER]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.resources.SimpleReloadableResourceManager" timestamp="1792232669915" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Reloading ResourceManager: Default, FMLFileResourcePack:Forge Mod Loader, FMLFileResourcePack:Minecraft Forge, FMLFileResourcePack:Damoon Core]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232669976" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Processing ObjectHolder annotations]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232669983" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Found 384 ObjectHolder annotations]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232669986" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Identifying ItemStackHolder annotations]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232669988" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Found 0 ItemStackHolder annotations]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232670048" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Configured a dormant chunk cache size of 0]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232670057" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Applying holder lookups]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="ForgeVersionCheck" timestamp="1792232670059" level="INFO" thread="Forge Version Check">
+    <log4j:Message><![CDATA[[Forge] Starting version check at http://files.minecraftforge.net/maven/net/minecraftforge/forge/promotions_slim.json]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232670064" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Holder lookups applied]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232670064" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Injecting itemstacks]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232670064" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Itemstack injection complete]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="STDOUT" timestamp="1792232670100" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[[tv.twitch.StandardCoreAPI:<init>:16]: If on Windows, make sure to provide all of the necessary dll's as specified in the twitchsdk README. Also, make sure to set the PATH environment variable to point to the directory containing the dll's.]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.Minecraft" timestamp="1792232670101" level="ERROR" thread="Client thread">
+    <log4j:Message><![CDATA[Couldn't initialize twitch stream]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670191" level="INFO" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[Starting up SoundSystem...]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670440" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[Initializing LWJGL OpenAL]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670441" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[(The LWJGL binding of OpenAL.  For more information, see http://www.lwjgl.org)]]></log4j:Message>
+  </log4j:Event>
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+AL lib: (EE) alsa_open_playback: Could not open playback device 'default': No such file or directory
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670533" level="ERROR" thread="Thread-7">
+    <log4j:Message><![CDATA[Error in class 'LibraryLWJGLOpenAL']]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670533" level="ERROR" thread="Thread-7">
+    <log4j:Message><![CDATA[Unable to initialize OpenAL.  Probable cause: OpenAL not supported.]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670534" level="WARN" thread="Thread-7">
+    <log4j:Message><![CDATA[ERROR MESSAGE:]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670542" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[Could not locate OpenAL library.]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670542" level="WARN" thread="Thread-7">
+    <log4j:Message><![CDATA[STACK TRACE:]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670542" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[org.lwjgl.openal.AL.create(AL.java:156)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670543" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[org.lwjgl.openal.AL.create(AL.java:102)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670543" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[org.lwjgl.openal.AL.create(AL.java:206)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670543" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[paulscode.sound.libraries.LibraryLWJGLOpenAL.init(LibraryLWJGLOpenAL.java:164)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670543" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[paulscode.sound.SoundSystem.CommandNewLibrary(SoundSystem.java:1576)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670543" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[paulscode.sound.SoundSystem.CommandQueue(SoundSystem.java:2572)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670543" level="INFO" thread="Thread-7">
+    <log4j:Message><![CDATA[paulscode.sound.CommandThread.run(CommandThread.java:121)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670810" level="WARN" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[ERROR MESSAGE:]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670810" level="INFO" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[Could not locate OpenAL library.]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232670810" level="INFO" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[Starting up SoundSystem...]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232671119" level="INFO" thread="Thread-9">
+    <log4j:Message><![CDATA[Switching to No Sound]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232671119" level="INFO" thread="Thread-9">
+    <log4j:Message><![CDATA[(Silent Mode)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232671412" level="INFO" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[Sound engine started]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232671741" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Max texture size: 16384]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.renderer.texture.TextureMap" timestamp="1792232671744" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Created: 16x16 textures-atlas]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="Damoon" timestamp="1792232672615" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Damoon Core 1.0.0 로드 완료]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232672621" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Injecting itemstacks]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232672622" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Itemstack injection complete]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232672700" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Forge Mod Loader has successfully loaded 4 mods]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.resources.SimpleReloadableResourceManager" timestamp="1792232672700" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Reloading ResourceManager: Default, FMLFileResourcePack:Forge Mod Loader, FMLFileResourcePack:Minecraft Forge, FMLFileResourcePack:Damoon Core]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232672735" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[SoundSystem shutting down...]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232672935" level="WARN" thread="Client thread">
+    <log4j:Message><![CDATA[Author: Paul Lamb, www.paulscode.com]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232672936" level="INFO" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[Starting up SoundSystem...]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673137" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[Initializing LWJGL OpenAL]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673137" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[(The LWJGL binding of OpenAL.  For more information, see http://www.lwjgl.org)]]></log4j:Message>
+  </log4j:Event>
+ALSA lib confmisc.c:855:(parse_card) cannot find card '0'
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_card_inum returned error: No such file or directory
+ALSA lib confmisc.c:422:(snd_func_concat) error evaluating strings
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_concat returned error: No such file or directory
+ALSA lib confmisc.c:1342:(snd_func_refer) error evaluating name
+ALSA lib conf.c:5208:(_snd_config_evaluate) function snd_func_refer returned error: No such file or directory
+ALSA lib conf.c:5731:(snd_config_expand) Evaluate error: No such file or directory
+ALSA lib pcm.c:2721:(snd_pcm_open_noupdate) Unknown PCM default
+AL lib: (EE) alsa_open_playback: Could not open playback device 'default': No such file or directory
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673146" level="ERROR" thread="Thread-11">
+    <log4j:Message><![CDATA[Error in class 'LibraryLWJGLOpenAL']]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673146" level="ERROR" thread="Thread-11">
+    <log4j:Message><![CDATA[Unable to initialize OpenAL.  Probable cause: OpenAL not supported.]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673146" level="WARN" thread="Thread-11">
+    <log4j:Message><![CDATA[ERROR MESSAGE:]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673146" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[Could not locate OpenAL library.]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673149" level="WARN" thread="Thread-11">
+    <log4j:Message><![CDATA[STACK TRACE:]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673149" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[org.lwjgl.openal.AL.create(AL.java:156)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673149" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[org.lwjgl.openal.AL.create(AL.java:102)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673149" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[org.lwjgl.openal.AL.create(AL.java:206)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673149" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[paulscode.sound.libraries.LibraryLWJGLOpenAL.init(LibraryLWJGLOpenAL.java:164)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673149" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[paulscode.sound.SoundSystem.CommandNewLibrary(SoundSystem.java:1576)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673149" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[paulscode.sound.SoundSystem.CommandQueue(SoundSystem.java:2572)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673149" level="INFO" thread="Thread-11">
+    <log4j:Message><![CDATA[paulscode.sound.CommandThread.run(CommandThread.java:121)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673537" level="WARN" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[ERROR MESSAGE:]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673537" level="INFO" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[Could not locate OpenAL library.]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673537" level="INFO" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[Starting up SoundSystem...]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232673744" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Max texture size: 16384]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673841" level="INFO" thread="Thread-13">
+    <log4j:Message><![CDATA[Switching to No Sound]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232673841" level="INFO" thread="Thread-13">
+    <log4j:Message><![CDATA[(Silent Mode)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.audio.SoundManager" timestamp="1792232674138" level="INFO" thread="Sound Library Loader">
+    <log4j:Message><![CDATA[Sound engine started]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.client.renderer.texture.TextureMap" timestamp="1792232674177" level="INFO" thread="Client thread">
+    <log4j:Message><![CDATA[Created: 512x512 textures-atlas]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.integrated.IntegratedServer" timestamp="1792232717110" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Starting integrated minecraft server version 1.8.9]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.integrated.IntegratedServer" timestamp="1792232717110" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Generating keypair]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232717219" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Converting map!]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.world.chunk.storage.AnvilSaveConverter" timestamp="1792232717221" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Scanning folders...]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.world.chunk.storage.AnvilSaveConverter" timestamp="1792232717222" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Total conversion count is 0]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232717248" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Injecting existing block and item data into this server instance]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232717264" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Applying holder lookups]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232717265" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Holder lookups applied]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232717337" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Loading dimension 0 (새로운 세계) (net.minecraft.server.integrated.IntegratedServer@11359c85)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232717745" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Loading dimension 1 (새로운 세계) (net.minecraft.server.integrated.IntegratedServer@11359c85)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232717759" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Loading dimension -1 (새로운 세계) (net.minecraft.server.integrated.IntegratedServer@11359c85)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232717760" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Preparing start region for level 0]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232718766" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Preparing spawn area: 10%]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232719772" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Preparing spawn area: 23%]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232720779" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Preparing spawn area: 42%]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232721783" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Preparing spawn area: 64%]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232722784" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Preparing spawn area: 87%]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232727498" level="INFO" thread="Netty Local Client IO #0">
+    <log4j:Message><![CDATA[Server protocol version 2]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232727501" level="INFO" thread="Netty Server IO #1">
+    <log4j:Message><![CDATA[Client protocol version 2]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232727501" level="INFO" thread="Netty Server IO #1">
+    <log4j:Message><![CDATA[Client attempting to join with 4 mods : damoon@1.0.0,FML@8.0.99.99,Forge@11.15.1.2318,mcp@9.19]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232727510" level="INFO" thread="Netty Local Client IO #0">
+    <log4j:Message><![CDATA[[Netty Local Client IO #0] Client side modded connection established]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="FML" timestamp="1792232727517" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[[Server thread] Server side modded connection established]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.management.ServerConfigurationManager" timestamp="1792232727521" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[DamoonCI[local:E:c640a312] logged in with entity id 649 at (190.5, 64.0, 114.5)]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232727529" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[DamoonCI이(가) 게임에 참여했습니다]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.integrated.IntegratedServer" timestamp="1792232727916" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Saving and pausing game...]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232727922" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Saving chunks for level '새로운 세계'/Overworld]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232728578" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Saving chunks for level '새로운 세계'/Nether]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232728578" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Saving chunks for level '새로운 세계'/The End]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.integrated.IntegratedServer" timestamp="1792232728966" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Saving and pausing game...]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232728967" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Saving chunks for level '새로운 세계'/Overworld]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232729028" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Saving chunks for level '새로운 세계'/Nether]]></log4j:Message>
+  </log4j:Event>
+  <log4j:Event logger="net.minecraft.server.MinecraftServer" timestamp="1792232729029" level="INFO" thread="Server thread">
+    <log4j:Message><![CDATA[Saving chunks for level '새로운 세계'/The End]]></log4j:Message>
+  </log4j:Event>

@@ -1,0 +1,149 @@
+[10:24:22] [main/INFO]: Loading tweak class name net.minecraftforge.fml.common.launcher.FMLTweaker
+[10:24:22] [main/INFO]: Using primary tweak class name net.minecraftforge.fml.common.launcher.FMLTweaker
+[10:24:22] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.FMLTweaker
+[10:24:22] [main/INFO]: Forge Mod Loader version 11.15.1.2318 for Minecraft 1.8.9 loading
+[10:24:22] [main/INFO]: Java is Java HotSpot(TM) 64-Bit Server VM, version 1.8.0_202, running on Linux:amd64:6.17.0-1022-azure, installed at /home/runner/work/damoonclient/damoonclient/e2e-home/runtime/jre-legacy/linux
+[10:24:22] [main/INFO]: Loading tweak class name net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker
+[10:24:22] [main/INFO]: Loading tweak class name net.minecraftforge.fml.common.launcher.FMLDeobfTweaker
+[10:24:22] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker
+[10:24:22] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.FMLInjectionAndSortingTweaker
+[10:24:22] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[10:24:23] [main/INFO]: Found valid fingerprint for Minecraft Forge. Certificate fingerprint e3c3d50c7c986df74c645c0ac54639741c90a557
+[10:24:23] [main/INFO]: Found valid fingerprint for Minecraft. Certificate fingerprint cd99959656f753dc28d863b46769f7f8fbaefcfc
+[10:24:23] [main/INFO]: Calling tweak class net.minecraftforge.fml.relauncher.CoreModManager$FMLPluginWrapper
+[10:24:23] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.FMLDeobfTweaker
+[10:24:23] [main/INFO]: Loading tweak class name net.minecraftforge.fml.common.launcher.TerminalTweaker
+[10:24:23] [main/INFO]: Calling tweak class net.minecraftforge.fml.common.launcher.TerminalTweaker
+[10:24:23] [main/INFO]: Launching wrapped minecraft {net.minecraft.client.main.Main}
+[10:24:24] [Client thread/INFO]: Setting user: DamoonCI
+[10:24:26] [Client thread/INFO]: LWJGL Version: 2.9.4
+[10:24:28] [Client thread/INFO]: Could not load splash.properties, will create a default one
+[10:24:28] [Client thread/INFO]: [net.minecraftforge.fml.client.SplashProgress:start:246]: ---- Minecraft Crash Report ----
+// I let you down. Sorry :(
+
+Time: 10/17/26 10:24 AM
+Description: Loading screen debug info
+
+This is just a prompt for computer specs to be printed. THIS IS NOT A ERROR
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- System Details --
+Details:
+	Minecraft Version: 1.8.9
+	Operating System: Linux (amd64) version 6.17.0-1022-azure
+	Java Version: 1.8.0_202, Oracle Corporation
+	Java VM Version: Java HotSpot(TM) 64-Bit Server VM (mixed mode), Oracle Corporation
+	Memory: 902340168 bytes (860 MB) / 1073741824 bytes (1024 MB) up to 3221225472 bytes (3072 MB)
+	JVM Flags: 10 total; -Xms1024M -Xmx3072M -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M -XX:+DisableExplicitGC -XX:+ParallelRefProcEnabled
+	IntCache: cache: 0, tcache: 0, allocated: 0, tallocated: 0
+	FML: 
+	Loaded coremods (and transformers): 
+	GL info: ' Vendor: 'Mesa' Version: '4.6 (Compatibility Profile) Mesa 25.2.8-0ubuntu0.24.04.4' Renderer: 'llvmpipe (LLVM 20.1.2, 256 bits)'
+[10:24:28] [Client thread/INFO]: MinecraftForge v11.15.1.2318 Initialized
+[10:24:28] [Client thread/INFO]: Replaced 229 ore recipies
+[10:24:28] [Client thread/INFO]: Found 0 mods from the command line. Injecting into mod discoverer
+[10:24:28] [Client thread/INFO]: Searching /home/runner/work/damoonclient/damoonclient/e2e-home/instances/e2e-forge-1.8.9/mods for mods
+[10:24:29] [Client thread/INFO]: Forge Mod Loader has identified 4 mods to load
+[10:24:29] [Client thread/INFO]: Attempting connection with missing mods [mcp, FML, Forge, damoon] at CLIENT
+[10:24:29] [Client thread/INFO]: Attempting connection with missing mods [mcp, FML, Forge, damoon] at SERVER
+[10:24:29] [Client thread/INFO]: Reloading ResourceManager: Default, FMLFileResourcePack:Forge Mod Loader, FMLFileResourcePack:Minecraft Forge, FMLFileResourcePack:Damoon Core
+[10:24:29] [Client thread/INFO]: Processing ObjectHolder annotations
+[10:24:29] [Client thread/INFO]: Found 384 ObjectHolder annotations
+[10:24:29] [Client thread/INFO]: Identifying ItemStackHolder annotations
+[10:24:29] [Client thread/INFO]: Found 0 ItemStackHolder annotations
+[10:24:30] [Client thread/INFO]: Configured a dormant chunk cache size of 0
+[10:24:30] [Client thread/INFO]: Applying holder lookups
+[10:24:30] [Forge Version Check/INFO]: [Forge] Starting version check at http://files.minecraftforge.net/maven/net/minecraftforge/forge/promotions_slim.json
+[10:24:30] [Client thread/INFO]: Holder lookups applied
+[10:24:30] [Client thread/INFO]: Injecting itemstacks
+[10:24:30] [Client thread/INFO]: Itemstack injection complete
+[10:24:30] [Client thread/INFO]: [tv.twitch.StandardCoreAPI:<init>:16]: If on Windows, make sure to provide all of the necessary dll's as specified in the twitchsdk README. Also, make sure to set the PATH environment variable to point to the directory containing the dll's.
+[10:24:30] [Client thread/ERROR]: Couldn't initialize twitch stream
+[10:24:30] [Sound Library Loader/INFO]: Starting up SoundSystem...
+[10:24:30] [Thread-7/INFO]: Initializing LWJGL OpenAL
+[10:24:30] [Thread-7/INFO]: (The LWJGL binding of OpenAL.  For more information, see http://www.lwjgl.org)
+[10:24:30] [Thread-7/ERROR]: Error in class 'LibraryLWJGLOpenAL'
+[10:24:30] [Thread-7/ERROR]: Unable to initialize OpenAL.  Probable cause: OpenAL not supported.
+[10:24:30] [Thread-7/WARN]: ERROR MESSAGE:
+[10:24:30] [Thread-7/INFO]: Could not locate OpenAL library.
+[10:24:30] [Thread-7/WARN]: STACK TRACE:
+[10:24:30] [Thread-7/INFO]: org.lwjgl.openal.AL.create(AL.java:156)
+[10:24:30] [Thread-7/INFO]: org.lwjgl.openal.AL.create(AL.java:102)
+[10:24:30] [Thread-7/INFO]: org.lwjgl.openal.AL.create(AL.java:206)
+[10:24:30] [Thread-7/INFO]: paulscode.sound.libraries.LibraryLWJGLOpenAL.init(LibraryLWJGLOpenAL.java:164)
+[10:24:30] [Thread-7/INFO]: paulscode.sound.SoundSystem.CommandNewLibrary(SoundSystem.java:1576)
+[10:24:30] [Thread-7/INFO]: paulscode.sound.SoundSystem.CommandQueue(SoundSystem.java:2572)
+[10:24:30] [Thread-7/INFO]: paulscode.sound.CommandThread.run(CommandThread.java:121)
+[10:24:30] [Sound Library Loader/WARN]: ERROR MESSAGE:
+[10:24:30] [Sound Library Loader/INFO]: Could not locate OpenAL library.
+[10:24:30] [Sound Library Loader/INFO]: Starting up SoundSystem...
+[10:24:31] [Thread-9/INFO]: Switching to No Sound
+[10:24:31] [Thread-9/INFO]: (Silent Mode)
+[10:24:31] [Sound Library Loader/INFO]: Sound engine started
+[10:24:31] [Client thread/INFO]: Max texture size: 16384
+[10:24:31] [Client thread/INFO]: Created: 16x16 textures-atlas
+[10:24:32] [Client thread/INFO]: Damoon Core 1.0.0 로드 완료
+[10:24:32] [Client thread/INFO]: Injecting itemstacks
+[10:24:32] [Client thread/INFO]: Itemstack injection complete
+[10:24:32] [Client thread/INFO]: Forge Mod Loader has successfully loaded 4 mods
+[10:24:32] [Client thread/INFO]: Reloading ResourceManager: Default, FMLFileResourcePack:Forge Mod Loader, FMLFileResourcePack:Minecraft Forge, FMLFileResourcePack:Damoon Core
+[10:24:32] [Client thread/INFO]: SoundSystem shutting down...
+[10:24:32] [Client thread/WARN]: Author: Paul Lamb, www.paulscode.com
+[10:24:32] [Sound Library Loader/INFO]: Starting up SoundSystem...
+[10:24:33] [Thread-11/INFO]: Initializing LWJGL OpenAL
+[10:24:33] [Thread-11/INFO]: (The LWJGL binding of OpenAL.  For more information, see http://www.lwjgl.org)
+[10:24:33] [Thread-11/ERROR]: Error in class 'LibraryLWJGLOpenAL'
+[10:24:33] [Thread-11/ERROR]: Unable to initialize OpenAL.  Probable cause: OpenAL not supported.
+[10:24:33] [Thread-11/WARN]: ERROR MESSAGE:
+[10:24:33] [Thread-11/INFO]: Could not locate OpenAL library.
+[10:24:33] [Thread-11/WARN]: STACK TRACE:
+[10:24:33] [Thread-11/INFO]: org.lwjgl.openal.AL.create(AL.java:156)
+[10:24:33] [Thread-11/INFO]: org.lwjgl.openal.AL.create(AL.java:102)
+[10:24:33] [Thread-11/INFO]: org.lwjgl.openal.AL.create(AL.java:206)
+[10:24:33] [Thread-11/INFO]: paulscode.sound.libraries.LibraryLWJGLOpenAL.init(LibraryLWJGLOpenAL.java:164)
+[10:24:33] [Thread-11/INFO]: paulscode.sound.SoundSystem.CommandNewLibrary(SoundSystem.java:1576)
+[10:24:33] [Thread-11/INFO]: paulscode.sound.SoundSystem.CommandQueue(SoundSystem.java:2572)
+[10:24:33] [Thread-11/INFO]: paulscode.sound.CommandThread.run(CommandThread.java:121)
+[10:24:33] [Sound Library Loader/WARN]: ERROR MESSAGE:
+[10:24:33] [Sound Library Loader/INFO]: Could not locate OpenAL library.
+[10:24:33] [Sound Library Loader/INFO]: Starting up SoundSystem...
+[10:24:33] [Client thread/INFO]: Max texture size: 16384
+[10:24:33] [Thread-13/INFO]: Switching to No Sound
+[10:24:33] [Thread-13/INFO]: (Silent Mode)
+[10:24:34] [Sound Library Loader/INFO]: Sound engine started
+[10:24:34] [Client thread/INFO]: Created: 512x512 textures-atlas
+[10:25:17] [Server thread/INFO]: Starting integrated minecraft server version 1.8.9
+[10:25:17] [Server thread/INFO]: Generating keypair
+[10:25:17] [Server thread/INFO]: Converting map!
+[10:25:17] [Server thread/INFO]: Scanning folders...
+[10:25:17] [Server thread/INFO]: Total conversion count is 0
+[10:25:17] [Server thread/INFO]: Injecting existing block and item data into this server instance
+[10:25:17] [Server thread/INFO]: Applying holder lookups
+[10:25:17] [Server thread/INFO]: Holder lookups applied
+[10:25:17] [Server thread/INFO]: Loading dimension 0 (새로운 세계) (net.minecraft.server.integrated.IntegratedServer@11359c85)
+[10:25:17] [Server thread/INFO]: Loading dimension 1 (새로운 세계) (net.minecraft.server.integrated.IntegratedServer@11359c85)
+[10:25:17] [Server thread/INFO]: Loading dimension -1 (새로운 세계) (net.minecraft.server.integrated.IntegratedServer@11359c85)
+[10:25:17] [Server thread/INFO]: Preparing start region for level 0
+[10:25:18] [Server thread/INFO]: Preparing spawn area: 10%
+[10:25:19] [Server thread/INFO]: Preparing spawn area: 23%
+[10:25:20] [Server thread/INFO]: Preparing spawn area: 42%
+[10:25:21] [Server thread/INFO]: Preparing spawn area: 64%
+[10:25:22] [Server thread/INFO]: Preparing spawn area: 87%
+[10:25:27] [Netty Local Client IO #0/INFO]: Server protocol version 2
+[10:25:27] [Netty Server IO #1/INFO]: Client protocol version 2
+[10:25:27] [Netty Server IO #1/INFO]: Client attempting to join with 4 mods : damoon@1.0.0,FML@8.0.99.99,Forge@11.15.1.2318,mcp@9.19
+[10:25:27] [Netty Local Client IO #0/INFO]: [Netty Local Client IO #0] Client side modded connection established
+[10:25:27] [Server thread/INFO]: [Server thread] Server side modded connection established
+[10:25:27] [Server thread/INFO]: DamoonCI[local:E:c640a312] logged in with entity id 649 at (190.5, 64.0, 114.5)
+[10:25:27] [Server thread/INFO]: DamoonCI이(가) 게임에 참여했습니다
+[10:25:27] [Server thread/INFO]: Saving and pausing game...
+[10:25:27] [Server thread/INFO]: Saving chunks for level '새로운 세계'/Overworld
+[10:25:28] [Server thread/INFO]: Saving chunks for level '새로운 세계'/Nether
+[10:25:28] [Server thread/INFO]: Saving chunks for level '새로운 세계'/The End
+[10:25:28] [Server thread/INFO]: Saving and pausing game...
+[10:25:28] [Server thread/INFO]: Saving chunks for level '새로운 세계'/Overworld
+[10:25:29] [Server thread/INFO]: Saving chunks for level '새로운 세계'/Nether
+[10:25:29] [Server thread/INFO]: Saving chunks for level '새로운 세계'/The End
