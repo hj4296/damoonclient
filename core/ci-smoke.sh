@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 가상 화면(Xvfb)에서 개발용 클라이언트를 실행하고 Damoon 기능을 차례로 눌러 보며 스크린샷을 찍습니다.
 # 사용법: ci-smoke.sh fabric|forge   (각 모드 폴더 안에서 실행)
-set -u
+# (변수 미설정에도 계속 진행)
 MODE="$1"
 export DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1
 
@@ -28,7 +28,7 @@ wait_for() { # 패턴, 최대 초
   done
   return 1
 }
-geom() { eval "$(xdotool search --name 'Minecraft' 2>/dev/null | head -1 | xargs -r xdotool getwindowgeometry --shell)"; WS=$((WIDTH / 2)); HS=$((HEIGHT / 2)); }
+geom() { X=0; Y=0; WIDTH=854; HEIGHT=480; eval "$(xdotool search --name 'Minecraft' 2>/dev/null | head -1 | xargs -r xdotool getwindowgeometry --shell)"; WS=$((WIDTH / 2)); HS=$((HEIGHT / 2)); }
 click() { geom; xdotool mousemove $((X + $1 * 2)) $((Y + $2 * 2)) click 1; }   # GUI 배율 2 기준 좌표
 shot() { ffmpeg -loglevel error -y -f x11grab -video_size 1280x720 -i :99 -frames:v 1 "$1.png"; echo "shot $1"; }
 

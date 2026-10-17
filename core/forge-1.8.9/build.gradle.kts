@@ -45,3 +45,8 @@ tasks.processResources {
 }
 
 base.archivesName.set("damoon-core-forge-1.8.9")
+
+// 개발 실행(runClient)도 Java 8로 (1.8.9는 Java 8 전용)
+tasks.withType(JavaExec::class) {
+    javaLauncher.set(javaToolchains.launcherFor(java.toolchain))
+}
