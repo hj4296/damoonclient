@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "damoon",
+  "version": "${version}",
+  "name": "Damoon Core",
+  "description": "Damoon Client 내장 기능: 메인 메뉴, HUD, 줌, 풀브라이트, 토글 스프린트",
+  "authors": ["Damoon"],
+  "license": "MIT",
+  "icon": "assets/damoon/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["net.damoon.core.DamoonCore"]
+  },
+  "mixins": ["damoon.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "fabric-api": "*",
+    "minecraft": "1.21.1",
+    "java": ">=21"
+  }
+}
