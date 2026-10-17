@@ -34,8 +34,8 @@ public final class Config {
             {"zoom", "줌 (C키)", "true"},
             {"fullbright", "풀브라이트", "false"},
             {"togglesprint", "항상 달리기", "false"},
-            {"oldblock", "1.7 칼 막기 (블록히트)", "true"},
-            {"oldswing", "1.7 휘두르기 (쿨다운 모션 없음)", "true"},
+            {"oldblock", "1.7 칼 막기", "true"},
+            {"oldswing", "1.7 휘두르기", "true"},
             {"custommenu", "Damoon 메인 메뉴", "true"},
     };
 
