@@ -82,8 +82,9 @@ if [ "$MODE" != plain ]; then
     xdotool mousemove_relative --sync 0 200 2>/dev/null || true
     shot 7-sword
     xdotool mousedown 3; sleep 2; shot 8-sword-block
-    xdotool click 1; sleep 0.15; shot 9-blockhit
-    sleep 1; xdotool mouseup 3; sleep 1
+    (ffmpeg -loglevel error -y -f x11grab -framerate 8 -video_size 1280x720 -i :99 -t 1.5 9-blockhit-%02d.png &)
+    sleep 0.2; xdotool click 1; sleep 2
+    xdotool mouseup 3; sleep 1
     xdotool click 1; sleep 0.15; shot 10-swing-no-dip
   fi
 fi
