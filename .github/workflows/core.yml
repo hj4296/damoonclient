@@ -93,10 +93,6 @@ jobs:
           set -o pipefail
           gradle build --no-daemon --stacktrace 2>&1 | tee build.log
 
-      - name: 가상 화면에서 게임 실행 + 스크린샷
-        if: success()
-        run: bash ../ci-smoke.sh forge
-
       - name: 결과 올리기 (ci/forge-1.8.9 브랜치)
         if: always()
         run: |
@@ -123,3 +119,55 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist-core/*.jar
+
+  # 실제 사용자처럼: Damoon 런처 코드로 버전·로더를 설치하고 빌드된 Damoon Core를 넣어 실행
+  e2e:
+    needs: [fabric-1_21_1, forge-1_8_9]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: forge-1.8.9
+            loader: forge
+            mc: '1.8.9'
+            mode: forge
+            jar: dist-core/damoon-core-forge-1.8.9.jar
+          - name: fabric-1.21.1
+            loader: fabric
+            mc: '1.21.1'
+            mode: fabric
+            jar: dist-core/damoon-core-fabric-1.21.1.jar
+          - name: fabric-26.3
+            loader: fabric
+            mc: '26.3'
+            mode: plain
+            jar: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --omit=dev --no-audit --no-fund
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: damoon-core-*
+          path: dist-core
+          merge-multiple: true
+      - name: 런처 코드로 설치·실행 + 스크린샷
+        env:
+          LAUNCH: node test/e2e-launch.js ${{ matrix.loader }} ${{ matrix.mc }} ${{ matrix.jar }}
+        run: bash core/ci-smoke.sh ${{ matrix.mode }}
+      - name: 결과 올리기 (ci/e2e-${{ matrix.name }})
+        if: always()
+        run: |
+          mkdir -p /tmp/ci
+          cp run.log game.log /tmp/ci/ 2>/dev/null || true
+          cp *.png /tmp/ci/ 2>/dev/null || true
+          cp -r crash-reports /tmp/ci/ 2>/dev/null || true
+          cd /tmp/ci
+          git init -q && git checkout -q -b ci
+          git add -A && git -c user.name=ci -c user.email=ci@damoon commit -qm "run ${{ github.run_id }}" --allow-empty
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci:ci/e2e-${{ matrix.name }}
