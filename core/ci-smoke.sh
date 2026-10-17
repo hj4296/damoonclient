@@ -6,7 +6,7 @@
 MODE="$1"
 export DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1
 
-sudo apt-get install -y -qq xdotool ffmpeg > /dev/null
+sudo apt-get install -y -qq xdotool ffmpeg x11-xserver-utils > /dev/null
 
 if [ -z "${LAUNCH:-}" ]; then
   mkdir -p run
