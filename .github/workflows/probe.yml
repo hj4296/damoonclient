@@ -38,7 +38,7 @@ jobs:
         run: |
           mkdir -p /tmp/ci/src
           cp build.log versions.txt /tmp/ci/ 2>/dev/null || true
-          SRC=$(find ~/.gradle .gradle -name '*.jar' 2>/dev/null | grep -i 'minecraft' | grep -i 'sources' | head -1)
+          SRC=$(realpath $(find ~/.gradle .gradle -name '*.jar' 2>/dev/null | grep -i 'minecraft' | grep -i 'sources' | head -1))
           echo "sources jar: $SRC" | tee /tmp/ci/where.txt
           find ~/.gradle .gradle -name '*.jar' 2>/dev/null | grep -i minecraft | head -30 >> /tmp/ci/where.txt
           if [ -n "$SRC" ]; then
@@ -49,8 +49,15 @@ jobs:
                      client/OptionInstance resources/Identifier client/gui/components/Button client/gui/Font \
                      client/gui/screens/options/OptionsScreen client/gui/screens/worldselection/SelectWorldScreen \
                      client/gui/screens/multiplayer/JoinMultiplayerScreen client/renderer/RenderPipelines client/Minecraft \
-                     client/gui/components/AbstractWidget client/Options client/player/LocalPlayer; do
+                     client/gui/components/AbstractWidget client/Options client/player/LocalPlayer \
+                     client/model/HumanoidModel client/renderer/entity/player/AvatarRenderer client/renderer/entity/player/PlayerRenderer \
+                     client/renderer/entity/state/AvatarRenderState client/renderer/entity/state/HumanoidRenderState client/renderer/entity/HumanoidMobRenderer \
+                     client/renderer/entity/ArmedEntityRenderState client/renderer/entity/state/ArmedEntityRenderState client/renderer/item/ItemModelResolver \
+                     client/gui/components/Tooltip world/entity/EquipmentSlot; do
               unzip -o -q "$SRC" "net/minecraft/$c.java" 2>/dev/null || echo "없음: $c" >> /tmp/ci/missing.txt
+            done
+            unzip -l "$SRC" | awk '{print $4}' | grep -E 'client/(input|renderer/entity/(player|state))/' > /tmp/ci/listing.txt || true
+            for _ in 1; do :
             done
           fi
           for j in $(find ~/.gradle -name 'fabric-rendering-v1*.jar' -o -name 'fabric-key-binding-api-v1*.jar' 2>/dev/null | head -6); do

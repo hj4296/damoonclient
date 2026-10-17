@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     tags: ['v*']
-    paths-ignore: ['**.md']
+    paths-ignore: ['**.md', 'core/probe-1.21.11/**', '.github/workflows/probe.yml']
   workflow_dispatch:
 
 permissions:
