@@ -120,9 +120,60 @@ jobs:
         with:
           files: dist-core/*.jar
 
+  fabric-1_21_11:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core/fabric-1.21.11
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 9.2.1
+
+      - name: 최신 Fabric 버전 확인
+        run: |
+          LOADER=$(curl -fsSL https://meta.fabricmc.net/v2/versions/loader/1.21.11 | jq -r '[.[] | select(.loader.stable)][0].loader.version')
+          API=$(curl -fsSL https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml | grep -oP '(?<=<version>)[^<]*\+1\.21\.11(?=</version>)' | tail -1)
+          echo "loader=$LOADER api=$API"
+          echo "GARGS=-Ploader_version=$LOADER -Pfabric_version=$API" >> $GITHUB_ENV
+
+      - name: 빌드
+        run: |
+          set -o pipefail
+          gradle build $GARGS --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: 결과 올리기 (ci/fabric-1.21.11 브랜치)
+        if: always()
+        run: |
+          mkdir -p /tmp/ci
+          cp build.log /tmp/ci/ 2>/dev/null || true
+          cp build/libs/*.jar /tmp/ci/ 2>/dev/null || true
+          cd /tmp/ci
+          git init -q && git checkout -q -b ci
+          git add -A && git -c user.name=ci -c user.email=ci@damoon commit -qm "run ${{ github.run_id }}" --allow-empty
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci:ci/fabric-1.21.11
+
+      - name: 배포용 jar 준비
+        run: |
+          mkdir -p ../../dist-core
+          cp $(ls build/libs/*.jar | grep -v -- '-sources' | head -1) ../../dist-core/damoon-core-fabric-1.21.11.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: damoon-core-fabric-1.21.11
+          path: dist-core/*.jar
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-core/*.jar
+
   # 실제 사용자처럼: Damoon 런처 코드로 버전·로더를 설치하고 빌드된 Damoon Core를 넣어 실행
   e2e:
-    needs: [fabric-1_21_1, forge-1_8_9]
+    needs: [fabric-1_21_1, fabric-1_21_11, forge-1_8_9]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     strategy:
@@ -139,11 +190,11 @@ jobs:
             mc: '1.21.1'
             mode: fabric
             jar: dist-core/damoon-core-fabric-1.21.1.jar
-          - name: fabric-26.3
+          - name: fabric-1.21.11
             loader: fabric
-            mc: '26.3'
-            mode: plain
-            jar: ''
+            mc: '1.21.11'
+            mode: fabric17
+            jar: dist-core/damoon-core-fabric-1.21.11.jar
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -47,13 +47,18 @@ shot 1-title
 
 if [ "$MODE" != plain ]; then
   # 1) Damoon 설정 버튼
-  if [ "$MODE" = fabric ]; then click $((WS / 2)) $((HS / 2 + 62)); else click $((WS / 2 - 51)) $((HS / 2 + 62)); fi
+  if [ "$MODE" = forge ]; then click $((WS / 2 - 51)) $((HS / 2 + 62)); else click $((WS / 2)) $((HS / 2 + 62)); fi
   sleep 3; shot 2-damoon-menu
   xdotool key Escape; sleep 2
 
   # 2) 싱글플레이 → 새 월드 만들기
   click $((WS / 2)) $((HS / 2 + 14)); sleep 5; shot 3-singleplayer
-  if [ "$MODE" = fabric ]; then
+  if [ "$MODE" = fabric17 ]; then
+    # 게임 모드: 서바이벌 → 하드코어 → 크리에이티브 (명령어 허용)
+    click $((WS / 2)) $((HS / 2 - 34)); sleep 1; click $((WS / 2)) $((HS / 2 - 34)); sleep 1
+    shot 3a-creative
+    click $((WS / 2 - 79)) $((HS - 17))
+  elif [ "$MODE" = fabric ]; then
     click $((WS / 2 - 79)) $((HS - 17))
   else
     click $((WS / 2 + 79)) $((HS - 42)); sleep 3
@@ -70,6 +75,17 @@ if [ "$MODE" != plain ]; then
 
   # 4) 줌 (C 누르고 있기)
   xdotool keydown c; sleep 3; shot 6-zoom; xdotool keyup c; sleep 1
+
+  # 5) 1.7 애니메이션: 칼 받기 → 우클릭 유지(막기) → 막은 채로 좌클릭(블록히트)
+  if [ "$MODE" = fabric17 ]; then
+    xdotool key t; sleep 2; xdotool type --delay 40 "/give @s diamond_sword"; sleep 1; xdotool key Return; sleep 3
+    xdotool mousemove_relative --sync 0 200 2>/dev/null || true
+    shot 7-sword
+    xdotool mousedown 3; sleep 2; shot 8-sword-block
+    xdotool click 1; sleep 0.15; shot 9-blockhit
+    sleep 1; xdotool mouseup 3; sleep 1
+    xdotool click 1; sleep 0.15; shot 10-swing-no-dip
+  fi
 fi
 
 cp "$(logfile)" game.log 2>/dev/null || true

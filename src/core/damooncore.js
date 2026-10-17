@@ -12,6 +12,7 @@ const RELEASE_BASE = process.env.DAMOON_CORE_URL || 'https://github.com/hj4296/d
 const SUPPORTED = {
   'forge@1.8.9': 'damoon-core-forge-1.8.9.jar',
   'fabric@1.21.1': 'damoon-core-fabric-1.21.1.jar',
+  'fabric@1.21.11': 'damoon-core-fabric-1.21.11.jar',
 };
 
 function coreFile(loader, mc) { return SUPPORTED[`${loader}@${mc}`] || null; }

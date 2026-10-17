@@ -162,6 +162,7 @@ t('최적화 프리셋', () => {
   const core = require('../src/core/damooncore');
   assert.strictEqual(core.coreFile('forge', '1.8.9'), 'damoon-core-forge-1.8.9.jar');
   assert.strictEqual(core.coreFile('fabric', '1.21.1'), 'damoon-core-fabric-1.21.1.jar');
+  assert.strictEqual(core.coreFile('fabric', '1.21.11'), 'damoon-core-fabric-1.21.11.jar');
   assert.strictEqual(core.coreFile('fabric', '1.8.9'), null);
   assert.deepStrictEqual(presetFor('vanilla'), []);
 });
