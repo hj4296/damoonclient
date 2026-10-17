@@ -78,16 +78,30 @@ function setPlayButton(s) {
   btn.classList.toggle('stop', s === 'running');
   btn.textContent = s === 'running' ? '종료' : s === 'preparing' ? '준비 중…' : '플레이';
   $('#progress').hidden = s !== 'preparing';
+  $('#btn-official').hidden = s !== 'idle';
 }
 
 async function play(verify = false) {
   const i = cur(); if (!i) return;
   if (i.running) return guard(() => D.kill(i.id));
-  if (!state.accounts.selected) { openLogin(); return toast('먼저 Microsoft 계정으로 로그인하세요.', true); }
+  if (!state.accounts.selected) {
+    // 로그인 안 했으면 공식 런처 방식으로 안내
+    if (confirm('로그인된 계정이 없어요.\n\n공식 마인크래프트 런처로 플레이할까요?\n(로그인은 공식 런처 계정을 사용합니다)')) return playOfficial();
+    return openLogin();
+  }
   state.logs[i.id] = '';
   setPlayButton('preparing');
   await guard(() => D.play(i.id, { verify }));
 }
+async function playOfficial() {
+  const i = cur(); if (!i || i.running) return;
+  state.logs[i.id] = '';
+  setPlayButton('preparing');
+  const r = await guard(() => D.exportOfficial(i.id));
+  if (r) { $('#official-name').textContent = r.profileName; $('#dlg-official').showModal(); }
+}
+$('#btn-official').onclick = playOfficial;
+$('#official-close').onclick = () => $('#dlg-official').close();
 $('#btn-play').onclick = () => play(false);
 $('#btn-verify').onclick = () => play(true);
 

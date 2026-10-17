@@ -1,7 +1,7 @@
 {
   "name": "damoon-client",
   "productName": "Damoon Client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Damoon Client - 1.8.9 ~ 26.3 지원 마인크래프트 런처 (모드로더 · 모드 · 최적화)",
   "main": "main.js",
   "author": "Damoon",

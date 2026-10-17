@@ -53,6 +53,7 @@
           <div class="play-wrap">
             <div class="progress" id="progress" hidden><div class="bar" id="bar"></div><span id="progress-text"></span></div>
             <button class="play" id="btn-play">플레이</button>
+            <button class="link-btn" id="btn-official" title="로그인은 공식 마인크래프트 런처가 처리합니다">공식 런처로 플레이 →</button>
           </div>
         </header>
         <nav class="tabs" id="tabs">
@@ -136,6 +137,7 @@
       <h2>Microsoft 로그인</h2>
       <div id="login-body"><p>코드를 받는 중…</p></div>
       <div class="accounts" id="acc-list"></div>
+      <p class="hint">Client ID가 없나요? 로그인 없이 <b>공식 런처로 플레이</b>를 쓰면 공식 마인크래프트 런처의 계정으로 실행됩니다.</p>
       <div class="row gap end"><button id="login-close">닫기</button></div>
     </div>
   </dialog>
@@ -151,6 +153,20 @@
       <p class="hint" id="set-root"></p>
       <div class="row gap end"><button value="cancel">취소</button><button id="set-save" class="primary" value="ok">저장</button></div>
     </form>
+  </dialog>
+
+  <!-- 공식 런처 안내 -->
+  <dialog id="dlg-official">
+    <div class="dlg">
+      <h2>공식 런처에 추가했어요 🎉</h2>
+      <ol class="steps">
+        <li>공식 <b>Minecraft Launcher</b>를 엽니다 (열려 있었다면 껐다가 다시 여세요)</li>
+        <li><b>Minecraft: Java Edition</b> → 왼쪽 아래 <b>설치 버전</b>(Installations) 선택</li>
+        <li>목록에서 <b id="official-name"></b> 옆 <b>플레이</b></li>
+      </ol>
+      <p class="hint">모드·최적화·설정은 Damoon에서 관리하고, 로그인은 공식 런처 계정을 씁니다. 모드를 바꾼 뒤에는 그냥 다시 플레이하면 됩니다.</p>
+      <div class="row gap end"><button id="official-close" class="primary">확인</button></div>
+    </div>
   </dialog>
 
   <div class="toast" id="toast" hidden></div>

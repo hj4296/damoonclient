@@ -7,6 +7,7 @@ const versions = require('./src/core/versions');
 const instances = require('./src/core/instances');
 const mods = require('./src/core/mods');
 const auth = require('./src/core/auth');
+const official = require('./src/core/official');
 const { recommendedMemory } = require('./src/core/optimize');
 const os = require('os');
 
@@ -131,6 +132,22 @@ handle('game:play', async (id, opts = {}) => {
   }
 });
 handle('game:kill', (id) => { const c = running.get(id); if (c) c.kill(); });
+
+// 로그인 없이: 공식 Minecraft Launcher에 프로필로 추가
+handle('game:exportOfficial', async (id) => {
+  if (running.has(id)) throw new Error('준비 중이거나 실행 중입니다.');
+  running.set(id, null);
+  send('game:state', { id, state: 'preparing' });
+  try {
+    return await official.exportToOfficial(id, {
+      onProgress: p => send('progress', { id, ...p }),
+      onLog: text => send('log', { id, text }),
+    });
+  } finally {
+    running.delete(id);
+    send('game:state', { id, state: 'stopped' });
+  }
+});
 
 app.whenReady().then(() => {
   const custom = readSettings().dataDir;

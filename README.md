@@ -65,7 +65,12 @@ npm start          # 개발 모드 실행
 npm test           # 단위 테스트 (오프라인)
 ```
 
-## Microsoft 로그인 설정 (필수, 1회)
+## 로그인 없이 플레이 (공식 런처 사용)
+
+**공식 런처로 플레이** 버튼을 누르면 Damoon이 버전·모드로더·모드·최적화를 준비한 뒤 공식 Minecraft Launcher에 `Damoon · 인스턴스이름` 프로필을 추가합니다.
+공식 런처 → Minecraft: Java Edition → 설치 버전에서 그 프로필로 플레이하면 됩니다. 로그인은 공식 런처 계정을 쓰므로 아래 Client ID 설정이 필요 없습니다.
+
+## Microsoft 로그인 설정 (Damoon에서 직접 실행할 때만)
 
 마인크래프트 계정 인증은 Microsoft에 등록된 앱 ID가 있어야 합니다.
 

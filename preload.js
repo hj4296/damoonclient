@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('damoon', {
   settings: { get: () => call('settings:get'), set: (p) => call('settings:set', p) },
   play: (id, opts) => call('game:play', id, opts),
   kill: (id) => call('game:kill', id),
+  exportOfficial: (id) => call('game:exportOfficial', id),
   open: (url) => call('shell:open', url),
   on,
 });

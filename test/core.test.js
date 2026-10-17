@@ -182,5 +182,39 @@ t('인스턴스 생성/수정 + 모드 켜기/끄기', () => {
   assert.strictEqual(instances.list().length, 2);
 });
 
-fs.rmSync(process.env.DAMOON_HOME, { recursive: true, force: true });
-console.log(`\n${n}개 테스트 통과`);
+
+// 공식 런처 내보내기 (네트워크 없이: 미리 받아둔 것처럼 파일을 준비)
+(async () => {
+  const official = require('../src/core/official');
+  const off = path.join(process.env.DAMOON_HOME, 'official-mc');
+  process.env.DAMOON_OFFICIAL_DIR = off;
+  fs.mkdirSync(P.cache, { recursive: true });
+  fs.writeFileSync(path.join(P.cache, 'version_manifest_v2.json'), JSON.stringify({ versions: [{ id: '26.3', type: 'release', releaseTime: '2026-09-15T00:00:00Z' }] }));
+  for (const v of [{ ...v263 }, { ...fabric263 }]) {
+    fs.mkdirSync(P.versionDir(v.id), { recursive: true });
+    fs.writeFileSync(P.versionJson(v.id), JSON.stringify(v));
+  }
+  const lib = (rel) => { const f = path.join(P.libraries, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, 'jar'); };
+  for (const l of [...v263.libraries, ...fabric263.libraries]) lib(l.downloads?.artifact?.path || mavenPath(l.name));
+  const inst = instances.create({ name: 'Official Test', mc: '26.3', loader: 'fabric' });
+  instances.save({ ...instances.get(inst.id), versionId: fabric263.id, optimizedOnce: true });
+  fs.mkdirSync(off, { recursive: true });
+  fs.writeFileSync(path.join(off, 'launcher_profiles.json'), JSON.stringify({ profiles: { keep: { name: '기존 프로필' } }, settings: { x: 1 }, version: 3 }));
+
+  const r = await official.exportToOfficial(inst.id);
+  const prof = JSON.parse(fs.readFileSync(path.join(off, 'launcher_profiles.json'), 'utf8'));
+  const mine = prof.profiles['damoon-official-test'];
+  assert.strictEqual(r.profileName, 'Damoon · Official Test');
+  assert.ok(prof.profiles.keep && prof.settings.x === 1, '기존 프로필/설정 보존');
+  assert.strictEqual(mine.lastVersionId, fabric263.id);
+  assert.strictEqual(mine.gameDir, P.instanceDir(inst.id));
+  assert.ok(mine.javaArgs.includes('-Xmx') && mine.icon.startsWith('data:image/png'));
+  assert.ok(fs.existsSync(path.join(off, 'versions', fabric263.id, fabric263.id + '.json')), '로더 JSON 복사');
+  assert.ok(!fs.existsSync(path.join(off, 'versions', '26.3')), '바닐라는 공식 런처가 직접 받음');
+  assert.ok(fs.existsSync(path.join(off, 'libraries', mavenPath('net.fabricmc:fabric-loader:0.19.3'))), '라이브러리 복사');
+  assert.ok(fs.existsSync(path.join(off, 'launcher_profiles.json.damoon-backup')), '백업 생성');
+  n++; console.log('✓ 공식 런처로 내보내기');
+
+  fs.rmSync(process.env.DAMOON_HOME, { recursive: true, force: true });
+  console.log(`\n${n}개 테스트 통과`);
+})().catch(e => { console.error(e); process.exit(1); });

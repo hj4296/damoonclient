@@ -92,28 +92,7 @@ async function ensureLoader(inst, java, onProgress, onLog) {
 
 // 설치 → 최적화 → 실행
 async function play(id, account, { onProgress = () => {}, onLog = () => {}, onExit = () => {}, verify = false } = {}) {
-  let inst = get(id);
-  const gameDir = P.instanceDir(id);
-
-  onLog(`== Damoon Client: ${inst.name} (${inst.mc}, ${LOADER_NAMES[inst.loader]}) ==\n`);
-  const vanilla = await versions.resolveVersion(inst.mc);
-  const java = await ensureJava(vanilla, onProgress, { override: inst.javaPath });
-  onLog(`Java: ${java}\n`);
-
-  // Forge 계열 프로세서는 바닐라 jar가 먼저 필요
-  if (vanilla.downloads?.client) await download(vanilla.downloads.client.url, P.versionJar(inst.mc), { sha1: vanilla.downloads.client.sha1 });
-  inst = await ensureLoader(inst, java, onProgress, onLog);
-
-  // 최초 1회 최적화 모드팩 설치
-  if (inst.optimize && !inst.optimizedOnce && inst.loader !== 'vanilla') {
-    onLog('최적화 모드 설치 중...\n');
-    try {
-      const done = await mods.installOptimizationPack({ gameDir, mc: inst.mc, loader: inst.loader, onLog: s => onLog(s + '\n') });
-      onLog(`최적화 모드 ${done.length}개 설치\n`);
-    } catch (e) { onLog(`최적화 모드 설치 일부 실패: ${e.message}\n`); }
-    inst = save({ ...inst, optimizedOnce: true });
-  }
-
+  const { inst, gameDir, java } = await prepare(id, { onProgress, onLog });
   const version = await versions.resolveVersion(inst.versionId);
   const installed = await installVersion(version, gameDir, onProgress, { verify });
   const args = buildArgs({
@@ -131,4 +110,35 @@ async function play(id, account, { onProgress = () => {}, onLog = () => {}, onEx
   return child;
 }
 
-module.exports = { LOADERS, LOADER_NAMES, list, get, create, update, remove, availableLoaders, play, ensureLoader };
+// 자바 + 로더 + 최적화 모드까지 준비 (직접 실행 / 공식 런처 내보내기 공용)
+async function prepare(id, { onProgress = () => {}, onLog = () => {}, needJava = true } = {}) {
+  let inst = get(id);
+  const gameDir = P.instanceDir(id);
+
+  onLog(`== Damoon Client: ${inst.name} (${inst.mc}, ${LOADER_NAMES[inst.loader]}) ==\n`);
+  const vanilla = await versions.resolveVersion(inst.mc);
+  // 공식 런처로 내보낼 때는 Forge/NeoForge 설치(프로세서 실행)에만 자바가 필요
+  const loaderNeedsJava = ['forge', 'neoforge'].includes(inst.loader) && !(inst.versionId && fs.existsSync(P.versionJson(inst.versionId)));
+  let java = null;
+  if (needJava || loaderNeedsJava) {
+    java = await ensureJava(vanilla, onProgress, { override: inst.javaPath });
+    onLog(`Java: ${java}\n`);
+  }
+
+  // Forge 계열 프로세서는 바닐라 jar가 먼저 필요
+  if (vanilla.downloads?.client) await download(vanilla.downloads.client.url, P.versionJar(inst.mc), { sha1: vanilla.downloads.client.sha1 });
+  inst = await ensureLoader(inst, java, onProgress, onLog);
+
+  // 최초 1회 최적화 모드팩 설치
+  if (inst.optimize && !inst.optimizedOnce && inst.loader !== 'vanilla') {
+    onLog('최적화 모드 설치 중...\n');
+    try {
+      const done = await mods.installOptimizationPack({ gameDir, mc: inst.mc, loader: inst.loader, onLog: s => onLog(s + '\n') });
+      onLog(`최적화 모드 ${done.length}개 설치\n`);
+    } catch (e) { onLog(`최적화 모드 설치 일부 실패: ${e.message}\n`); }
+    inst = save({ ...inst, optimizedOnce: true });
+  }
+  return { inst, gameDir, java };
+}
+
+module.exports = { LOADERS, LOADER_NAMES, list, get, create, update, remove, save, availableLoaders, play, prepare, ensureLoader };

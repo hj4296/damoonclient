@@ -88,6 +88,9 @@ input:focus, select:focus { border-color: var(--moon-2); }
 }
 .play:hover { background: #ffd67a; }
 .play.stop { background: var(--panel-2); color: var(--bad); box-shadow: none; border: 1px solid #5a2a2a; }
+.link-btn { background: none; border: none; padding: 2px 4px; color: var(--moon); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.link-btn:hover { background: none; color: #ffd67a; }
+.steps { margin: 0; padding-left: 20px; line-height: 1.9; }
 .progress { width: 260px; height: 22px; background: var(--panel); border-radius: 6px; position: relative; overflow: hidden; border: 1px solid var(--line); }
 .progress .bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--moon-2), var(--moon)); transition: width .2s; }
 .progress span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: var(--text); text-shadow: 0 1px 2px #000; }
