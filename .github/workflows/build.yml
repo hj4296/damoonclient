@@ -46,4 +46,6 @@ jobs:
       - if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          name: Damoon Client ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
           files: ${{ matrix.files }}
