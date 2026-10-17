@@ -42,30 +42,7 @@ jobs:
 
       - name: 가상 화면에서 게임 실행 + 스크린샷
         if: success()
-        run: |
-          sudo apt-get install -y -qq xdotool ffmpeg > /dev/null
-          mkdir -p run
-          printf 'onboardAccessibility:false\nlang:ko_kr\nskipMultiplayerWarning:true\njoinedFirstServer:true\n' > run/options.txt
-          Xvfb :99 -screen 0 1280x720x24 &
-          export DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1
-          sleep 2
-          (timeout 420 gradle runClient $GARGS --no-daemon > run.log 2>&1 &)
-          for i in $(seq 1 80); do
-            sleep 5
-            if grep -q "Sound engine started\|Created: .*minecraft:textures/atlas/gui" run/logs/latest.log 2>/dev/null; then break; fi
-            if grep -q "BUILD FAILED\|Exception in thread \"Render thread\"\|Crash report saved" run.log run/logs/latest.log 2>/dev/null; then break; fi
-          done
-          sleep 25
-          ffmpeg -loglevel error -f x11grab -video_size 1280x720 -i :99 -frames:v 1 shot1-title.png || true
-          # "Damoon 설정" 버튼 클릭 (창 854x480, GUI 배율 2 기준)
-          xdotool mousemove 426 364 click 1 || true
-          sleep 4
-          ffmpeg -loglevel error -f x11grab -video_size 1280x720 -i :99 -frames:v 1 shot2-menu.png || true
-          xdotool key Escape || true
-          sleep 2
-          pkill -f 'net.fabricmc.devlaunchinjector\|KnotClient' || true
-          sleep 3
-          cp -r run/crash-reports . 2>/dev/null || true
+        run: bash ../ci-smoke.sh fabric
 
       - name: 결과 올리기 (ci/fabric-1.21.1 브랜치)
         if: always()
@@ -88,6 +65,59 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: damoon-core-fabric-1.21.1
+          path: dist-core/*.jar
+      - if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-core/*.jar
+
+  forge-1_8_9:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core/forge-1.8.9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            8
+            17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.8
+
+      - name: 빌드
+        run: |
+          set -o pipefail
+          gradle build --no-daemon --stacktrace 2>&1 | tee build.log
+
+      - name: 가상 화면에서 게임 실행 + 스크린샷
+        if: success()
+        run: bash ../ci-smoke.sh forge
+
+      - name: 결과 올리기 (ci/forge-1.8.9 브랜치)
+        if: always()
+        run: |
+          mkdir -p /tmp/ci
+          cp build.log run.log /tmp/ci/ 2>/dev/null || true
+          cp run/logs/latest.log /tmp/ci/game.log 2>/dev/null || true
+          cp *.png /tmp/ci/ 2>/dev/null || true
+          cp -r crash-reports /tmp/ci/ 2>/dev/null || true
+          cp build/libs/*.jar /tmp/ci/ 2>/dev/null || true
+          cd /tmp/ci
+          git init -q && git checkout -q -b ci
+          git add -A && git -c user.name=ci -c user.email=ci@damoon commit -qm "run ${{ github.run_id }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci:ci/forge-1.8.9
+
+      - name: 배포용 jar 준비
+        run: |
+          mkdir -p ../../dist-core
+          cp $(ls build/libs/*.jar | grep -v -- '-sources\|-dev' | head -1) ../../dist-core/damoon-core-forge-1.8.9.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: damoon-core-forge-1.8.9
           path: dist-core/*.jar
       - if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2

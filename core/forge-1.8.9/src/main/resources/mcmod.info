@@ -1,0 +1,11 @@
+[
+  {
+    "modid": "damoon",
+    "name": "Damoon Core",
+    "description": "Damoon Client 내장 기능: 메인 메뉴, HUD, 줌, 풀브라이트, 토글 스프린트",
+    "version": "${version}",
+    "mcversion": "1.8.9",
+    "authorList": ["Damoon"],
+    "logoFile": "assets/damoon/icon.png"
+  }
+]
