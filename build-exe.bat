@@ -40,8 +40,8 @@ if errorlevel 1 (
 echo.
 echo ==============================================
 echo  완료! dist 폴더에 두 파일이 생겼습니다.
-echo   - DamoonClient-Setup-1.1.0.exe     (설치 프로그램)
-echo   - DamoonClient-Portable-1.1.0.exe  (설치 없이 바로 실행)
+echo   - DamoonClient-Setup-1.2.0.exe     (설치 프로그램)
+echo   - DamoonClient-Portable-1.2.0.exe  (설치 없이 바로 실행)
 echo ==============================================
 start "" "%~dp0dist"
 pause
