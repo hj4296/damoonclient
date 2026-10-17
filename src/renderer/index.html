@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Damoon Client</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- 사이드바: 인스턴스 목록 -->
+    <aside class="side">
+      <div class="brand">
+        <svg viewBox="0 0 32 32" class="logo" aria-hidden="true">
+          <circle cx="16" cy="16" r="13" fill="var(--moon)"/>
+          <circle cx="21" cy="12" r="11" fill="var(--side)"/>
+          <rect x="6" y="20" width="4" height="4" fill="var(--moon-2)"/>
+          <rect x="10" y="24" width="4" height="4" fill="var(--moon-2)" opacity=".6"/>
+        </svg>
+        <div>
+          <div class="brand-name">DAMOON</div>
+          <div class="brand-sub">CLIENT</div>
+        </div>
+      </div>
+      <div class="side-head">
+        <span>인스턴스</span>
+        <button class="icon-btn" id="btn-new" title="새 인스턴스">＋</button>
+      </div>
+      <ul class="inst-list" id="inst-list"></ul>
+      <div class="side-foot">
+        <button class="account" id="btn-account">
+          <img id="acc-head" alt="">
+          <div class="acc-text"><b id="acc-name">로그인</b><small id="acc-sub">Microsoft 계정</small></div>
+        </button>
+        <button class="icon-btn" id="btn-settings" title="런처 설정">⚙</button>
+      </div>
+    </aside>
+
+    <!-- 메인 -->
+    <main class="main" id="main">
+      <section class="empty" id="empty">
+        <h1>Damoon Client에 오신 것을 환영합니다</h1>
+        <p>1.8.9부터 26.3까지, 원하는 버전과 모드로더로 인스턴스를 만들어 보세요.</p>
+        <button class="primary" id="btn-new-2">새 인스턴스 만들기</button>
+      </section>
+
+      <section class="inst" id="inst" hidden>
+        <header class="hero">
+          <div>
+            <div class="badges" id="badges"></div>
+            <h1 id="inst-name"></h1>
+          </div>
+          <div class="play-wrap">
+            <div class="progress" id="progress" hidden><div class="bar" id="bar"></div><span id="progress-text"></span></div>
+            <button class="play" id="btn-play">플레이</button>
+          </div>
+        </header>
+        <nav class="tabs" id="tabs">
+          <button data-tab="mods" class="on">모드</button>
+          <button data-tab="browse">모드 찾기</button>
+          <button data-tab="config">설정</button>
+          <button data-tab="log">로그</button>
+        </nav>
+
+        <div class="tab" id="tab-mods">
+          <div class="toolbar">
+            <button id="btn-optimize" class="accent">⚡ 최적화 팩 설치</button>
+            <button id="btn-update">모두 업데이트</button>
+            <button id="btn-addfile">파일에서 추가</button>
+            <button id="btn-modfolder">폴더 열기</button>
+            <span class="grow"></span>
+            <input id="mod-filter" placeholder="설치된 모드 필터">
+          </div>
+          <div class="drop" id="drop">여기로 .jar 파일을 끌어다 놓아도 됩니다</div>
+          <ul class="mod-list" id="mod-list"></ul>
+        </div>
+
+        <div class="tab" id="tab-browse" hidden>
+          <div class="toolbar">
+            <input id="search" class="grow" placeholder="Modrinth에서 모드 검색 (예: sodium, iris, journeymap)">
+          </div>
+          <p class="hint" id="browse-hint"></p>
+          <ul class="results" id="results"></ul>
+          <button id="btn-more" class="more" hidden>더 보기</button>
+        </div>
+
+        <div class="tab" id="tab-config" hidden>
+          <form class="form" id="config-form">
+            <label>이름 <input name="name"></label>
+            <label>메모리 <span class="mem"><input type="range" name="memoryMb" min="1024" step="512"><output id="mem-out"></output></span>
+              <small id="mem-hint"></small></label>
+            <label>해상도 <span class="row"><input name="width" type="number" placeholder="기본"> × <input name="height" type="number" placeholder="기본"></span></label>
+            <label>자동 접속 서버 <input name="server" placeholder="예: mc.example.com:25565"></label>
+            <label>추가 JVM 인자 <input name="jvmArgs" placeholder="고급 사용자용"></label>
+            <label>자바 경로 <input name="javaPath" placeholder="비워두면 자동 설치된 자바 사용"></label>
+            <label class="check"><input type="checkbox" name="optimize"> 첫 실행 때 최적화 모드 자동 설치</label>
+            <div class="row gap">
+              <button type="submit" class="primary">저장</button>
+              <button type="button" id="btn-verify">파일 검증 후 실행</button>
+              <button type="button" id="btn-folder">인스턴스 폴더</button>
+              <span class="grow"></span>
+              <button type="button" id="btn-delete" class="danger">인스턴스 삭제</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="tab" id="tab-log" hidden>
+          <pre class="log" id="log"></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- 새 인스턴스 -->
+  <dialog id="dlg-new">
+    <form method="dialog" class="dlg">
+      <h2>새 인스턴스</h2>
+      <label>이름 <input id="new-name" placeholder="자동"></label>
+      <label>버전
+        <span class="row"><select id="new-version"></select>
+        <label class="check small"><input type="checkbox" id="new-snap"> 스냅샷</label></span>
+      </label>
+      <label>모드로더 <div class="chips" id="new-loaders"></div></label>
+      <label>로더 버전 <select id="new-loader-ver"></select></label>
+      <label class="check"><input type="checkbox" id="new-opt" checked> 최적화 모드 자동 설치 (Sodium, Lithium, FerriteCore 등 — 버전에 맞는 것만)</label>
+      <div class="row gap end">
+        <button value="cancel">취소</button>
+        <button id="new-create" class="primary" value="ok">만들기</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- 로그인 -->
+  <dialog id="dlg-login">
+    <div class="dlg">
+      <h2>Microsoft 로그인</h2>
+      <div id="login-body"><p>코드를 받는 중…</p></div>
+      <div class="accounts" id="acc-list"></div>
+      <div class="row gap end"><button id="login-close">닫기</button></div>
+    </div>
+  </dialog>
+
+  <!-- 런처 설정 -->
+  <dialog id="dlg-settings">
+    <form method="dialog" class="dlg">
+      <h2>런처 설정</h2>
+      <label>Microsoft Azure Client ID
+        <input id="set-client" placeholder="00000000-0000-0000-0000-000000000000">
+        <small>로그인에 필요합니다. 발급 방법은 README를 참고하세요.</small></label>
+      <label class="check"><input type="checkbox" id="set-hide"> 게임 실행 시 런처 최소화</label>
+      <p class="hint" id="set-root"></p>
+      <div class="row gap end"><button value="cancel">취소</button><button id="set-save" class="primary" value="ok">저장</button></div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

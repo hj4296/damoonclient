@@ -1,0 +1,54 @@
+{
+  "name": "damoon-client",
+  "productName": "Damoon Client",
+  "version": "1.0.0",
+  "description": "Damoon Client - 1.8.9 ~ 26.3 지원 마인크래프트 런처 (모드로더 · 모드 · 최적화)",
+  "main": "main.js",
+  "author": "Damoon",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/core.test.js",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --x64 --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.damoon.client",
+    "productName": "Damoon Client",
+    "copyright": "Copyright © 2026 Damoon",
+    "directories": { "buildResources": "build", "output": "dist" },
+    "files": ["main.js", "preload.js", "src/**/*", "package.json"],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Damoon Client",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerLanguages": ["ko_KR"],
+      "language": "1042",
+      "artifactName": "DamoonClient-Setup-${version}.${ext}"
+    },
+    "portable": { "artifactName": "DamoonClient-Portable-${version}.${ext}" },
+    "mac": { "icon": "build/icon.png", "target": "dmg", "category": "public.app-category.games" },
+    "linux": { "icon": "build/icon.png", "target": "AppImage", "category": "Game" }
+  }
+}
