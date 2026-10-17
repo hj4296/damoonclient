@@ -1,0 +1,34 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. See https://docs.gradle.org/7.6.4/userguide/gradle_daemon.html#sec:disabling_the_daemon.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+Architectury Loom: 0.10.0.5
+
+> Task :compileJava
+Note: SpongePowered MIXIN Annotation Processor Version=0.8.5
+Note: Supported obfuscation types: ObfuscationServiceFabric supports [official:intermediary,official:named,intermediary:official,intermediary:named,named:official,named:intermediary] ObfuscationServiceMCP supports [searge,notch]
+Note: /home/runner/work/damoonclient/damoonclient/core/forge-1.8.9/src/main/java/net/damoon/core/DamoonCore.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :processResources
+> Task :classes
+> Task :jar
+> Task :remapJar
+> Task :assemble
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :validateAccessWidener NO-SOURCE
+> Task :check UP-TO-DATE
+> Task :build
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1792232429913.json
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 8.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+See https://docs.gradle.org/7.6.4/userguide/command_line_interface.html#sec:command_line_warnings
+
+BUILD SUCCESSFUL in 21s
+4 actionable tasks: 4 executed
