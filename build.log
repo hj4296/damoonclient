@@ -1,0 +1,23 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.2.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :
+Fabric Loom: 1.14.10
+
+Cannot remap modifiers because it does not exists in any of the targets [] or their parents.
+Failed to find class (com/mojang/blaze3d/pipeline/RenderPipeline$Builder) to add injected interfaces from mod(s) (fabric-rendering-v1)
+Failed to find class (com/mojang/blaze3d/pipeline/RenderPipeline$Snippet) to add injected interfaces from mod(s) (fabric-rendering-v1)
+Failed to find class (net/minecraft/server/packs/resources/Resource) to add injected interfaces from mod(s) (fabric-resource-loader-v1)
+Failed to find class (com/mojang/blaze3d/pipeline/RenderPipeline) to add injected interfaces from mod(s) (fabric-rendering-v1)
+
+> Task :validateAccessWidener NO-SOURCE
+
+> Task :genSourcesWithVineflower
+Decompile cache stats: 6622 hits, 0 misses
+
+> Task :genSources
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1792231269940.json
+
+BUILD SUCCESSFUL in 21s
+1 actionable task: 1 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.2.1/userguide/configuration_cache_enabling.html

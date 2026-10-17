@@ -1,0 +1,110 @@
+Compiled from "HudElementRegistry.java"
+public interface net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry {
+  public static void addFirst(net.minecraft.class_2960, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement);
+  public static void addLast(net.minecraft.class_2960, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement);
+  public static void attachElementBefore(net.minecraft.class_2960, net.minecraft.class_2960, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement);
+  public static void attachElementAfter(net.minecraft.class_2960, net.minecraft.class_2960, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement);
+  public static void removeElement(net.minecraft.class_2960);
+  public static void replaceElement(net.minecraft.class_2960, java.util.function.Function<net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement>);
+}
+Compiled from "HudElementRegistry.java"
+public interface net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry {
+  public static void addFirst(net.minecraft.class_2960, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement);
+  public static void addLast(net.minecraft.class_2960, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement);
+  public static void attachElementBefore(net.minecraft.class_2960, net.minecraft.class_2960, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement);
+  public static void attachElementAfter(net.minecraft.class_2960, net.minecraft.class_2960, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement);
+  public static void removeElement(net.minecraft.class_2960);
+  public static void replaceElement(net.minecraft.class_2960, java.util.function.Function<net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement, net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement>);
+}
+Compiled from "HudElement.java"
+public interface net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement {
+  public abstract void render(net.minecraft.class_332, net.minecraft.class_9779);
+}
+Compiled from "HudElement.java"
+public interface net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement {
+  public abstract void render(net.minecraft.class_332, net.minecraft.class_9779);
+}
+Compiled from "VanillaHudElements.java"
+public final class net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements {
+  public static final net.minecraft.class_2960 MISC_OVERLAYS;
+  public static final net.minecraft.class_2960 CROSSHAIR;
+  public static final net.minecraft.class_2960 SPECTATOR_MENU;
+  public static final net.minecraft.class_2960 HOTBAR;
+  public static final net.minecraft.class_2960 ARMOR_BAR;
+  public static final net.minecraft.class_2960 HEALTH_BAR;
+  public static final net.minecraft.class_2960 FOOD_BAR;
+  public static final net.minecraft.class_2960 AIR_BAR;
+  public static final net.minecraft.class_2960 MOUNT_HEALTH;
+  public static final net.minecraft.class_2960 INFO_BAR;
+  public static final net.minecraft.class_2960 EXPERIENCE_LEVEL;
+  public static final net.minecraft.class_2960 HELD_ITEM_TOOLTIP;
+  public static final net.minecraft.class_2960 SPECTATOR_TOOLTIP;
+  public static final net.minecraft.class_2960 STATUS_EFFECTS;
+  public static final net.minecraft.class_2960 BOSS_BAR;
+  public static final net.minecraft.class_2960 SLEEP;
+  public static final net.minecraft.class_2960 DEMO_TIMER;
+  public static final net.minecraft.class_2960 SCOREBOARD;
+  public static final net.minecraft.class_2960 OVERLAY_MESSAGE;
+  public static final net.minecraft.class_2960 TITLE_AND_SUBTITLE;
+  public static final net.minecraft.class_2960 CHAT;
+  public static final net.minecraft.class_2960 PLAYER_LIST;
+  public static final net.minecraft.class_2960 SUBTITLES;
+  private net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements();
+  static {};
+}
+Compiled from "VanillaHudElements.java"
+public final class net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements {
+  public static final net.minecraft.class_2960 MISC_OVERLAYS;
+  public static final net.minecraft.class_2960 CROSSHAIR;
+  public static final net.minecraft.class_2960 SPECTATOR_MENU;
+  public static final net.minecraft.class_2960 HOTBAR;
+  public static final net.minecraft.class_2960 ARMOR_BAR;
+  public static final net.minecraft.class_2960 HEALTH_BAR;
+  public static final net.minecraft.class_2960 FOOD_BAR;
+  public static final net.minecraft.class_2960 AIR_BAR;
+  public static final net.minecraft.class_2960 MOUNT_HEALTH;
+  public static final net.minecraft.class_2960 INFO_BAR;
+  public static final net.minecraft.class_2960 EXPERIENCE_LEVEL;
+  public static final net.minecraft.class_2960 HELD_ITEM_TOOLTIP;
+  public static final net.minecraft.class_2960 SPECTATOR_TOOLTIP;
+  public static final net.minecraft.class_2960 STATUS_EFFECTS;
+  public static final net.minecraft.class_2960 BOSS_BAR;
+  public static final net.minecraft.class_2960 SLEEP;
+  public static final net.minecraft.class_2960 DEMO_TIMER;
+  public static final net.minecraft.class_2960 SCOREBOARD;
+  public static final net.minecraft.class_2960 OVERLAY_MESSAGE;
+  public static final net.minecraft.class_2960 TITLE_AND_SUBTITLE;
+  public static final net.minecraft.class_2960 CHAT;
+  public static final net.minecraft.class_2960 PLAYER_LIST;
+  public static final net.minecraft.class_2960 SUBTITLES;
+  private net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements();
+  static {};
+}
+Compiled from "HudRenderCallback.java"
+public interface net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback {
+  public static final net.fabricmc.fabric.api.event.Event<net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback> EVENT;
+  public abstract void onHudRender(net.minecraft.class_332, net.minecraft.class_9779);
+  private static net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback lambda$static$1(net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback[]);
+  private static void lambda$static$0(net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback[], net.minecraft.class_332, net.minecraft.class_9779);
+  static {};
+}
+Compiled from "HudRenderCallback.java"
+public interface net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback {
+  public static final net.fabricmc.fabric.api.event.Event<net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback> EVENT;
+  public abstract void onHudRender(net.minecraft.class_332, net.minecraft.class_9779);
+  private static net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback lambda$static$1(net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback[]);
+  private static void lambda$static$0(net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback[], net.minecraft.class_332, net.minecraft.class_9779);
+  static {};
+}
+Compiled from "KeyBindingHelper.java"
+public final class net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper {
+  private net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper();
+  public static net.minecraft.class_304 registerKeyBinding(net.minecraft.class_304);
+  public static net.minecraft.class_3675$class_306 getBoundKeyOf(net.minecraft.class_304);
+}
+Compiled from "KeyBindingHelper.java"
+public final class net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper {
+  private net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper();
+  public static net.minecraft.class_304 registerKeyBinding(net.minecraft.class_304);
+  public static net.minecraft.class_3675$class_306 getBoundKeyOf(net.minecraft.class_304);
+}
