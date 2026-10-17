@@ -63,7 +63,6 @@ const PRESETS = {
   ],
   forge: [
     ['embeddium', 'rubidium'], 'ferrite-core', 'modernfix', 'entityculling', 'immediatelyfast', 'dynamic-fps',
-    ['patcher'], // 1.8.9 Forge용
   ],
   'legacy-fabric': ['entityculling'],
   vanilla: [],
@@ -81,6 +80,7 @@ function writeDefaultOptions(gameDir, mcVersion) {
     'renderDistance:10',
     'entityShadows:false',
   ];
+  if (compareMc(mcVersion, '1.19') >= 0) lines.push('onboardAccessibility:false');
   if (legacy) lines.push('fboEnable:true', 'useVbo:true', 'maxFps:260');
   else lines.push('maxFps:260');
   if (compareMc(mcVersion, '1.18') >= 0) lines.push('simulationDistance:8');

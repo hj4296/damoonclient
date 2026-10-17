@@ -158,7 +158,11 @@ t('JVM 플래그: Java 21 저메모리 → G1, 고메모리 → 세대별 ZGC', 
 
 t('최적화 프리셋', () => {
   assert.ok(presetFor('fabric').includes('sodium'));
-  assert.ok(presetFor('forge').some(x => Array.isArray(x) && x.includes('patcher')));
+  assert.ok(!JSON.stringify(presetFor('forge')).includes('patcher'), 'Patcher는 Essential 메인 메뉴를 끌고 와서 제외');
+  const core = require('../src/core/damooncore');
+  assert.strictEqual(core.coreFile('forge', '1.8.9'), 'damoon-core-forge-1.8.9.jar');
+  assert.strictEqual(core.coreFile('fabric', '1.21.1'), 'damoon-core-fabric-1.21.1.jar');
+  assert.strictEqual(core.coreFile('fabric', '1.8.9'), null);
   assert.deepStrictEqual(presetFor('vanilla'), []);
 });
 

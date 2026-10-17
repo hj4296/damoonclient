@@ -95,6 +95,7 @@
             <label>추가 JVM 인자 <input name="jvmArgs" placeholder="고급 사용자용"></label>
             <label>자바 경로 <input name="javaPath" placeholder="비워두면 자동 설치된 자바 사용"></label>
             <label class="check"><input type="checkbox" name="optimize"> 첫 실행 때 최적화 모드 자동 설치</label>
+            <label class="check" id="core-row"><input type="checkbox" name="damoonCore"> ✦ Damoon Core 사용 (메인 메뉴 · HUD · 줌 · 풀브라이트 · 오른쪽 Shift 메뉴)</label>
             <div class="row gap">
               <button type="submit" class="primary">저장</button>
               <button type="button" id="btn-verify">파일 검증 후 실행</button>
@@ -121,6 +122,7 @@
         <span class="row"><select id="new-version"></select>
         <label class="check small"><input type="checkbox" id="new-snap"> 스냅샷</label></span>
       </label>
+      <p class="core-hint" id="new-core-hint"></p>
       <label>모드로더 <div class="chips" id="new-loaders"></div></label>
       <label>로더 버전 <select id="new-loader-ver"></select></label>
       <label class="check"><input type="checkbox" id="new-opt" checked> 최적화 모드 자동 설치 (Sodium, Lithium, FerriteCore 등 — 버전에 맞는 것만)</label>

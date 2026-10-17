@@ -71,7 +71,7 @@ public final class Hud {
         return info == null ? 0 : info.getResponseTime();
     }
 
-    static void text(Minecraft mc, String s, int x, int y, int color) {
+    static void drawText(Minecraft mc, String s, int x, int y, int color) {
         mc.fontRendererObj.drawStringWithShadow(s, x, y, color);
     }
 
@@ -87,7 +87,7 @@ public final class Hud {
             int w = mc.fontRendererObj.getStringWidth(t) + 10;
             Gui.drawRect(x, y, x + w, y + 16, BG);
             Gui.drawRect(x, y, x + 2, y + 16, ACCENT);
-            text(mc, t, x + 6, y + 4, WHITE);
+            drawText(mc, t, x + 6, y + 4, WHITE);
         }
     }
 
@@ -117,8 +117,8 @@ public final class Hud {
             int[] s = size(mc);
             Gui.drawRect(x, y, x + s[0], y + s[1], BG);
             Gui.drawRect(x, y, x + 2, y + s[1], ACCENT);
-            text(mc, l1(mc), x + 6, y + 4, WHITE);
-            text(mc, l2(mc), x + 6, y + 14, DIM);
+            drawText(mc, l1(mc), x + 6, y + 4, WHITE);
+            drawText(mc, l2(mc), x + 6, y + 14, DIM);
         }
     }
 
@@ -176,7 +176,7 @@ public final class Hud {
                     int left = s.getMaxDamage() - s.getItemDamage();
                     float ratio = (float) left / s.getMaxDamage();
                     int color = ratio > 0.5f ? 0xFF7CF29A : ratio > 0.2f ? 0xFFF3C969 : 0xFFFF6B6B;
-                    text(mc, String.valueOf(left), x + 22, yy + 4, color);
+                    drawText(mc, String.valueOf(left), x + 22, yy + 4, color);
                 }
             }
         }
@@ -205,8 +205,8 @@ public final class Hud {
             Gui.drawRect(x + 128, y, x + 130, y + ls.size() * 12 + 6, ACCENT);
             int yy = y + 4;
             for (String[] l : ls) {
-                text(mc, l[0], x + 4, yy, WHITE);
-                text(mc, l[1], x + 124 - mc.fontRendererObj.getStringWidth(l[1]), yy, DIM);
+                drawText(mc, l[0], x + 4, yy, WHITE);
+                drawText(mc, l[1], x + 124 - mc.fontRendererObj.getStringWidth(l[1]), yy, DIM);
                 yy += 12;
             }
         }

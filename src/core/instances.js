@@ -10,6 +10,7 @@ const { ensureJava, consoleJava } = require('./java');
 const fabric = require('./loaders/fabric');
 const forge = require('./loaders/forge');
 const mods = require('./mods');
+const damooncore = require('./damooncore');
 const { recommendedMemory, writeDefaultOptions } = require('./optimize');
 const { buildArgs, launch, redact } = require('./launch');
 
@@ -42,7 +43,7 @@ function create({ name, mc, loader = 'vanilla', loaderVersion = null, optimize =
   const inst = {
     id, name: name || `${mc} ${LOADER_NAMES[loader]}`, mc, loader, loaderVersion,
     versionId: loader === 'vanilla' ? mc : null,
-    optimize, memoryMb: recommendedMemory(mc), jvmArgs: '', javaPath: '',
+    optimize, damoonCore: true, memoryMb: recommendedMemory(mc), jvmArgs: '', javaPath: '',
     width: 0, height: 0, server: '', created: Date.now(), lastPlayed: 0,
   };
   save(inst);
@@ -138,6 +139,10 @@ async function prepare(id, { onProgress = () => {}, onLog = () => {}, needJava =
     } catch (e) { onLog(`최적화 모드 설치 일부 실패: ${e.message}\n`); }
     inst = save({ ...inst, optimizedOnce: true });
   }
+
+  // Damoon Core (게임 안 기능) — 지원 버전이면 자동 설치
+  try { await damooncore.ensure(inst, gameDir, s => onLog(s + '\n')); }
+  catch (e) { onLog(`Damoon Core 설치 실패: ${e.message}\n`); }
   return { inst, gameDir, java };
 }
 

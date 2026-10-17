@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('damoon', {
   info: () => call('app:info'),
   versions: (snap) => call('versions:list', snap),
   loaders: (mc) => call('loaders:available', mc),
+  coreSupported: () => call('core:supported'),
   instances: {
     list: () => call('instances:list'),
     create: (o) => call('instances:create', o),

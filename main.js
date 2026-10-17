@@ -54,6 +54,7 @@ const handle = (ch, fn) => ipcMain.handle(ch, async (_e, ...a) => {
 handle('app:info', () => ({ root: P.root, totalMemMb: Math.floor(os.totalmem() / 1048576), platform: process.platform, arch: process.arch }));
 handle('versions:list', (snap) => versions.listVersions({ includeSnapshots: !!snap }));
 handle('loaders:available', (mc) => instances.availableLoaders(mc));
+handle('core:supported', () => require('./src/core/damooncore').supportedList());
 
 handle('instances:list', () => instances.list().map(i => ({ ...i, running: running.has(i.id) })));
 handle('instances:create', (o) => instances.create(o));

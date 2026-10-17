@@ -158,3 +158,7 @@ dialog::backdrop { background: rgba(5, 6, 10, .7); }
 .toast.err { border-color: #5a2a2a; color: #ffb4b4; }
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-thumb { background: #262c3a; border-radius: 10px; border: 2px solid var(--bg); }
+
+.core-hint { margin: -6px 0 0; font-size: 12px; color: var(--moon); }
+.core-hint.off { color: var(--dim); }
+.badge.core { background: #3a2f14; color: var(--moon); border-color: var(--moon-2); }

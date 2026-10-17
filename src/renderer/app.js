@@ -10,7 +10,8 @@ const el = (tag, props = {}, ...kids) => {
 const LOADER_NAMES = { vanilla: '바닐라', fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge', 'legacy-fabric': 'Legacy Fabric' };
 const headUrl = (uuid) => `https://mc-heads.net/avatar/${uuid}/32`;
 
-const state = { instances: [], current: null, logs: {}, info: null, accounts: { accounts: [] }, search: { q: '', offset: 0 } };
+const state = { instances: [], current: null, logs: {}, info: null, accounts: { accounts: [] }, search: { q: '', offset: 0 }, core: [] };
+const coreFor = (mc, loader) => state.core.find(c => c.mc === mc && (!loader || c.loader === loader));
 
 function toast(msg, err = false) {
   const t = $('#toast');
@@ -49,6 +50,7 @@ function renderMain() {
   $('#inst-name').textContent = i.name;
   const b = [el('span', { className: 'badge gold', textContent: i.mc }), el('span', { className: 'badge', textContent: LOADER_NAMES[i.loader] + (i.loaderVersion && i.loader !== 'vanilla' ? ' ' + i.loaderVersion : '') })];
   if (i.optimize) b.push(el('span', { className: 'badge', textContent: '⚡ 최적화' }));
+  if (i.damoonCore !== false && coreFor(i.mc, i.loader)) b.push(el('span', { className: 'badge core', textContent: '✦ Damoon Core' }));
   $('#badges').replaceChildren(...b);
   setPlayButton(i.running ? 'running' : 'idle');
   $('#log').textContent = state.logs[i.id] || '';
@@ -201,6 +203,8 @@ function fillConfig(i) {
   f.width.value = i.width || ''; f.height.value = i.height || '';
   f.server.value = i.server || ''; f.jvmArgs.value = i.jvmArgs || ''; f.javaPath.value = i.javaPath || '';
   f.optimize.checked = !!i.optimize;
+  f.damoonCore.checked = i.damoonCore !== false;
+  $('#core-row').hidden = !coreFor(i.mc, i.loader);
   D.instances.recommendedMemory(i.mc).then(r => { $('#mem-hint').textContent = `권장: ${(r / 1024).toFixed(1)} GB (시스템 ${(state.info.totalMemMb / 1024).toFixed(0)} GB)`; });
 }
 $('#config-form').memoryMb.oninput = (e) => { $('#mem-out').textContent = (e.target.value / 1024).toFixed(1) + ' GB'; };
@@ -210,7 +214,7 @@ $('#config-form').onsubmit = (e) => guard(async () => {
   await D.instances.update(state.current, {
     name: f.name.value.trim() || cur().name, memoryMb: +f.memoryMb.value,
     width: +f.width.value || 0, height: +f.height.value || 0,
-    server: f.server.value.trim(), jvmArgs: f.jvmArgs.value.trim(), javaPath: f.javaPath.value.trim(), optimize: f.optimize.checked,
+    server: f.server.value.trim(), jvmArgs: f.jvmArgs.value.trim(), javaPath: f.javaPath.value.trim(), optimize: f.optimize.checked, damoonCore: f.damoonCore.checked,
   });
   toast('저장했습니다.'); loadInstances();
 });
@@ -239,6 +243,17 @@ async function refreshLoaders() {
   const box = $('#new-loaders');
   box.replaceChildren(el('small', { textContent: '로더 확인 중…' }));
   nw.available = await guard(() => D.loaders(mc)) || { vanilla: [{ version: mc }] };
+  // Damoon Core가 있는 버전이면 그 로더를 기본 선택
+  const core = coreFor(mc);
+  const hint = $('#new-core-hint');
+  if (core && nw.available[core.loader]?.length) {
+    nw.loader = core.loader;
+    hint.className = 'core-hint';
+    hint.textContent = `✦ ${mc} ${LOADER_NAMES[core.loader]}: Damoon 메인 메뉴 · HUD · 줌 · 풀브라이트 자동 포함`;
+  } else {
+    hint.className = 'core-hint off';
+    hint.textContent = `✦ Damoon Core(게임 안 기능)는 ${state.core.map(c => `${c.mc} ${LOADER_NAMES[c.loader]}`).join(', ')}에서 지원됩니다`;
+  }
   const order = ['vanilla', 'fabric', 'forge', 'neoforge', 'quilt', 'legacy-fabric'];
   if (!nw.available[nw.loader]?.length) nw.loader = 'vanilla';
   box.replaceChildren(...order.filter(k => k === 'vanilla' || k !== 'legacy-fabric' || nw.available[k]?.length).map(k => {
@@ -333,6 +348,7 @@ $('#set-save').onclick = () => guard(() => D.settings.set({ msClientId: $('#set-
 /* ---------------- 시작 ---------------- */
 (async () => {
   state.info = await D.info();
+  state.core = await D.coreSupported().catch(() => []);
   state.accounts = await D.accounts.list();
   renderAccount();
   await loadInstances();
