@@ -86,7 +86,7 @@ public final class Placer {
         }
         Act.stopDig(bot);
         for (var e : l.entitiesForRendering()) {
-            if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.getItem().is(item) && ie.distanceTo(p) < 6) {
+            if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.distanceTo(p) < 6 && ie.position().distanceTo(Vec3.atCenterOf(pos)) < 2.5) {
                 bot.ctl.lookYaw(p, ie.position(), 30f);
                 bot.ctl.fwd = ie.distanceTo(p) > 0.5;
                 return false;

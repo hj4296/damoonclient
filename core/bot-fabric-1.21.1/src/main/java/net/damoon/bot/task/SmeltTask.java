@@ -103,7 +103,8 @@ public class SmeltTask extends Task {
         ItemStack in = fm.getSlot(0).getItem();
         detail = output.getDescription().getString() + " 굽는 중 (" + have + "/" + count + ")";
         if (need <= 0) {
-            if (!in.isEmpty()) Clicks.click(p, 0, 0, ClickType.QUICK_MOVE);
+            // 화로를 다시 캘 때 안의 물건이 떨어져 잃지 않게 모두 꺼냄
+            for (int sl = 0; sl <= 2; sl++) if (!fm.getSlot(sl).getItem().isEmpty()) Clicks.click(p, sl, 0, ClickType.QUICK_MOVE);
             Clicks.dropCarried(p);
             p.closeContainer();
             done = true;
@@ -113,6 +114,7 @@ public class SmeltTask extends Task {
             int src = Clicks.findInvSlot(p, input);
             if (src < 0) {
                 if (fm.isLit()) return S.RUNNING;
+                for (int sl = 0; sl <= 2; sl++) if (!fm.getSlot(sl).getItem().isEmpty()) Clicks.click(p, sl, 0, ClickType.QUICK_MOVE);
                 p.closeContainer();
                 done = true;
                 return S.RUNNING;
