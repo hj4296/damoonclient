@@ -35,6 +35,8 @@ public class NetherTask extends Task {
     private CraftTask boatCraft;
     private boolean boatTried;
     private BlockPos safeSpot;
+    private net.damoon.bot.BlazeBunker bunker;
+    private boolean bunkerFailed;
     private boolean healing;
     private int fortTicks;
     private final java.util.Set<Long> visited = new java.util.HashSet<>();
@@ -80,6 +82,22 @@ public class NetherTask extends Task {
                 // 처음 스포너를 본 자리(아직 멀리 있을 때)를 안전한 후퇴 지점으로 기억
                 safeSpot = PathExec.feet(p);
                 if (safeSpot.distSqr(spawner) < 18 * 18) safeSpot = portal;
+            }
+            // 판단: 블록이 충분하고 벙커 자리가 있으면 벙커 전술, 아니면 돌격 전술
+            if (spawner != null && bunker == null && !bunkerFailed && Inv.count(p, Inv.throwaway()) >= 14) {
+                bunker = new net.damoon.bot.BlazeBunker(spawner);
+                bot.log("판단: 벙커 전술 (블록 " + Inv.count(p, Inv.throwaway()) + "개)");
+            }
+            if (bunker != null) {
+                net.damoon.bot.BlazeBunker.R br = bunker.tick(bot, rods, RODS);
+                detail = "[벙커] " + bunker.info;
+                if (br == net.damoon.bot.BlazeBunker.R.FAILED) {
+                    bunker = null;
+                    bunkerFailed = true;
+                    bot.reflex.camp = false;
+                    bot.log("판단: 벙커 자리가 없음 → 돌격 전술 (방패 들고 칼)");
+                }
+                return S.RUNNING;
             }
             // 체력이 낮으면 후퇴해서 먹고 회복한 뒤 돌아옴
             if (healing || (spawner != null && p.getHealth() < 13)) {
@@ -158,6 +176,8 @@ public class NetherTask extends Task {
             }
             return explore(bot, "요새 찾기");
         }
+        bot.reflex.camp = false;
+        bot.reflex.forceEat = false;
         // 2) 엔더 진주
         if (pearls < PEARLS) {
             // 보트가 없으면 판자 5개로 만듦 (엔더맨을 보트에 태워 순간이동을 막는 함정)

@@ -193,6 +193,16 @@ public final class Reflex {
                 bot.ctl.sprint = r > 5 && p.getFoodData().getFoodLevel() > 6;
                 if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
             }
+            // 칼 쿨다운을 기다리는 동안엔 방패를 들어 막음 (밀려나서 떨어지지 않게)
+            float charge = p.getAttackStrengthScale(0.5f);
+            boolean shield = p.getOffhandItem().is(Items.SHIELD) && !ranged(threat) && r < 4.0;
+            if (shield && charge < 0.9f) {
+                bot.ctl.use = true;
+                bot.ctl.fwd = false;
+                doing = "방패로 막으며 " + threat.getName().getString() + "와 싸우는 중";
+                return true;
+            }
+            if (p.isUsingItem() && p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; return true; }
             if (r <= 3.0 && bot.ctl.aimed(p, 25)) Act.attack(bot, threat, 0.92f);
             doing = "싸우는 중: " + threat.getName().getString();
             return true;
