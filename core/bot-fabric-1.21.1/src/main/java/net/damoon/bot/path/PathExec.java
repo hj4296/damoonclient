@@ -155,9 +155,9 @@ public final class PathExec {
                 if (!at(f, from)) { walkTo(bot, from, false); c.sneak = true; return R.RUNNING; }
                 if (!c.aimed(p, 12)) { c.sneak = true; return R.RUNNING; }
                 double along = (p.getX() - (from.x + 0.5)) * dir.getStepX() + (p.getZ() - (from.z + 0.5)) * dir.getStepZ();
-                if (along < 0.1) { c.back = true; break; }                 // 가장자리까지 뒷걸음
-                c.sneak = true;                                              // 가장자리: 웅크림
-                if (along < 0.3) c.back = true;
+                // 새 블록 뒤쪽에선 일어서서 빠르게 뒷걸음, 가장자리 가까이(중앙 -0.15칸부터)는 웅크려 미끄러지듯
+                c.back = along < 0.3;
+                c.sneak = along > -0.15 || !p.onGround();
                 BlockPos against = new BlockPos(from.x, from.y - 1, from.z);
                 if (!Act.place(bot, against, dir)) { why = "다리 놓을 블록 없음"; return R.FAILED; }
             }

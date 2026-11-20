@@ -183,8 +183,16 @@ public final class PathFinder {
         return c;
     }
 
+    /** 이 경로에서 앞서 놓기로 한 블록인지 (공중에 다리를 계속 이어 놓기 위해) */
+    private static boolean placedBy(Node n, int x, int y, int z) {
+        long k = BlockPos.asLong(x, y, z);
+        for (Node p = n; p != null; p = p.parent) if (p.place == k) return true;
+        return false;
+    }
+
     private void expand(Node n) {
         int x = n.x, y = n.y, z = n.z;
+        boolean standing = floor(x, y - 1, z) || placedBy(n, x, y - 1, z);
         boolean onWater = BlockUtil.isWater(st(x, y - 1, z)) || BlockUtil.isWater(st(x, y, z));
         boolean canPlace = placeBlocks > 0 && placesUsed(n) < placeBlocks;
 
@@ -210,10 +218,10 @@ public final class PathFinder {
                         }
                         if (!passable(nx, fy, nz)) break;
                     }
-                    if (canPlace && !onWater && floor(x, y - 1, z)) {
+                    if (canPlace && !onWater && standing) {
                         add(n, nx, y, nz, WALK * 2 + PLACE + (landed ? 4 : 0), Move.BRIDGE, NONE, BlockPos.asLong(nx, y - 1, nz));
                     }
-                } else if (canPlace && !onWater && c1 == 0 && c2 == 0 && floor(x, y - 1, z) && BlockUtil.isWater(st(nx, y - 1, nz))) {
+                } else if (canPlace && !onWater && c1 == 0 && c2 == 0 && standing && BlockUtil.isWater(st(nx, y - 1, nz))) {
                     add(n, nx, y, nz, WALK * 2 + PLACE, Move.BRIDGE, NONE, BlockPos.asLong(nx, y - 1, nz));
                 }
             }
@@ -236,7 +244,7 @@ public final class PathFinder {
             }
         }
         // 기둥 쌓기 (점프하며 발밑에 블록)
-        if (canPlace && floor(x, y - 1, z) && !onWater) {
+        if (canPlace && standing && !onWater) {
             double a = clear(x, y + 2, z);
             if (a < BlockUtil.INF) {
                 add(n, x, y + 1, z, JUMP + PLACE + 8 + a, Move.PILLAR, a > 0 ? new long[]{BlockPos.asLong(x, y + 2, z)} : NONE, BlockPos.asLong(x, y, z));
