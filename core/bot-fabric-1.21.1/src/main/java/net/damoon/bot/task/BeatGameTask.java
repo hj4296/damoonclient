@@ -341,7 +341,7 @@ public class BeatGameTask extends Task {
         if (loot != null) return loot;
 
         // 네더에서는 블레이즈 막대만 (진주는 오버월드에서 혼자 있는 엔더맨을 잡아 구함)
-        boolean afterNether = NetherTask.rods(p) >= NetherTask.RODS;
+        boolean afterNether = NetherTask.rods(p) >= NetherTask.RODS || Inv.count(p, Items.ENDER_EYE) >= 10;
         if (!afterNether) {
             // ---- 6. 다이아몬드 ----
             if (tier < 4) {
@@ -434,7 +434,9 @@ public class BeatGameTask extends Task {
         }
 
         // ---- 9. 엔더 진주: 오버월드의 혼자 있는 엔더맨 (밤·동굴) ----
-        if (NetherTask.pearls(p) < NetherTask.PEARLS) {
+        // 요새 찾기를 시작했으면 (눈을 던져서 줄어도) 진주 사냥으로 돌아가지 않음 — 눈이 6개 아래로 떨어질 때만
+        if (stronghold != null && Inv.count(p, Items.ENDER_EYE) < 6 && Inv.count(p, Items.ENDER_PEARL) == 0) stronghold = null;
+        if (NetherTask.pearls(p) < NetherTask.PEARLS && stronghold == null) {
             stage = "9. 엔더 진주 (" + NetherTask.pearls(p) + "/" + NetherTask.PEARLS + ")";
             if (!net.damoon.bot.EnderTrap.hasBoat(p) && net.damoon.bot.EnderTrap.boatFor(p) != null && !cool(bot, "boat")) {
                 Item boat = net.damoon.bot.EnderTrap.boatFor(p);

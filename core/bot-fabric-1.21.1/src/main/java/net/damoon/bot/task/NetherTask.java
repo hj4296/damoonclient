@@ -23,7 +23,7 @@ import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
  * 네더: 요새를 찾아 블레이즈 막대를 모으고, 엔더맨을 잡아 엔더 진주를 모은 뒤 들어온 포털로 돌아감.
  */
 public class NetherTask extends Task {
-    public static final int RODS = 7, PEARLS = 13;
+    public static final int RODS = 7, PEARLS = 12;
     private BlockPos portal;
     private Hunter blazes, endermen;
     private Miner rack;
@@ -52,7 +52,8 @@ public class NetherTask extends Task {
     @Override public String detail() { return detail; }
 
     public static int rods(LocalPlayer p) {
-        return Inv.count(p, Items.BLAZE_ROD) + (Inv.count(p, Items.BLAZE_POWDER) + Inv.count(p, Items.ENDER_EYE)) / 2;
+        // 막대 1개 = 가루 2개, 엔더의 눈 1개에 가루 1개 (올림)
+        return Inv.count(p, Items.BLAZE_ROD) + (Inv.count(p, Items.BLAZE_POWDER) + Inv.count(p, Items.ENDER_EYE) + 1) / 2;
     }
 
     public static int pearls(LocalPlayer p) {

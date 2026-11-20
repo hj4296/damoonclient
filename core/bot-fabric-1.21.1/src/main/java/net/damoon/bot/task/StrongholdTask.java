@@ -127,7 +127,9 @@ public class StrongholdTask extends Task {
         if (throwTicks < 30) return S.RUNNING;
         // 눈이 떨어졌으면 주우러
         for (Entity e : l.entitiesForRendering()) {
-            if (e instanceof ItemEntity ie && ie.getItem().is(Items.ENDER_EYE) && ie.distanceTo(p) < 20) {
+            // 깊은 물속(위로 2칸 넘게 물)에 떨어진 눈은 포기 (익사 위험)
+            if (e instanceof ItemEntity ie && ie.getItem().is(Items.ENDER_EYE) && ie.distanceTo(p) < 20
+                    && !l.getFluidState(ie.blockPosition().above(2)).is(net.minecraft.tags.FluidTags.WATER)) {
                 detail = "엔더의 눈 줍는 중";
                 Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0));
                 if (r == Nav.R.RUNNING) return S.RUNNING;
