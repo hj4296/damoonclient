@@ -30,6 +30,9 @@ public final class EnderTrap {
     private final java.util.Map<Integer, Integer> pickTime = new java.util.HashMap<>();
     private int targetTicks;
     public String info = "";
+    /** 쳐다보기 방식: 엔더맨 한 마리의 눈을 쳐다봐 화나게 해서 불러온 뒤 방패 반격으로 잡음 (보트 없이) */
+    public boolean stare;
+    private int stareTicks;
 
     public static Item boatFor(LocalPlayer p) {
         Item[][] m = {{Items.OAK_PLANKS, Items.OAK_BOAT}, {Items.SPRUCE_PLANKS, Items.SPRUCE_BOAT}, {Items.BIRCH_PLANKS, Items.BIRCH_BOAT},
@@ -71,7 +74,7 @@ public final class EnderTrap {
                     // 혼자 있는 엔더맨만 (여러 마리를 한꺼번에 화나게 하지 않게)
                     boolean alone = true;
                     for (Entity o : l.entitiesForRendering())
-                        if (o != em && o instanceof EnderMan && o.distanceTo(em) < 14) { alone = false; break; }
+                        if (o != em && o instanceof EnderMan && o.distanceTo(em) < (stare ? 5 : 14)) { alone = false; break; }
                     if (!alone && !em.isCreepy()) continue;
                     if (d < 48 && d < bd) { bd = d; t = em; }
                 }
@@ -106,6 +109,26 @@ public final class EnderTrap {
             info = "화난 엔더맨과 싸우는 중 (" + Melee.fight(bot, em, true) + ")";
             return R.RUNNING;
         }
+        if (stare || (!hasBoat(p) && boat == null)) {
+            // 쳐다보기: 보이는 거리까지 다가간 뒤 눈을 쳐다봄 → 화나서 순간이동해 오면 반사 행동(방패 반격)이 싸움
+            boolean los = p.hasLineOfSight(em);
+            if (d > 20 || !los) {
+                info = "엔더맨 쪽으로 가는 중";
+                // 안 보이면 바로 옆까지 (화나지 않은 엔더맨은 공격하지 않음)
+                Nav.R r = bot.nav.go(new Goal.Near(em.blockPosition(), los ? 12 : 2.5));
+                if (r == Nav.R.ARRIVED && !los) { ignore.add(em.getId()); targetId = -1; bot.nav.stop(); }
+                if (r == Nav.R.FAILED) { bot.nav.stop(); ignore.add(em.getId()); targetId = -1; }
+                return R.RUNNING;
+            }
+            bot.nav.stop();
+            Inv.selectWeapon(p);
+            bot.ctl.lookAt(p, em.getEyePosition());
+            bot.ctl.allowEnderGaze = true;
+            info = "엔더맨 눈을 쳐다봐서 부르는 중";
+            if (++stareTicks > 20 * 12) { stareTicks = 0; ignore.add(em.getId()); targetId = -1; }
+            return R.RUNNING;
+        }
+        stareTicks = 0;
         // 화나게 하지 않도록 눈이 아니라 다리를 봄
         Vec3 legs = em.position().add(0, 0.4, 0);
         if (!hasBoat(p) && boat == null) {

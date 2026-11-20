@@ -17,6 +17,8 @@ public final class Melee {
 
     private static int strafeTick;
     private static boolean counter;
+    private static final java.util.Map<Integer, Integer> lastDist = new java.util.HashMap<>();
+    private static final java.util.Map<Integer, Double> bestDist = new java.util.HashMap<>();
     private static final java.util.Map<Integer, Integer> engaged = new java.util.HashMap<>();
 
     /** 이 상대와 붙어 있은 틱 수 (마지막 공격 이후) */
@@ -81,8 +83,19 @@ public final class Melee {
             bot.ctl.use = true;
             if (Math.max(Math.abs(hx), Math.abs(hz)) < arm + 0.1 && Reflex.safeBehind(p)) bot.ctl.back = true;
             else if (r > 3.2 && approach) {
-                bot.ctl.fwd = true;
-                if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+                Integer last = lastDist.get(t.getId());
+                // 앞이 낭떠러지라 못 걷거나 오래 안 가까워지면 길찾기로 돌아서 감
+                if (!Bot.safeAhead(p) || (last != null && bot.ticks - last > 60)) {
+                    bot.nav.go(new net.damoon.bot.path.Goal.Near(t.blockPosition(), 2.0));
+                    bot.ctl.use = true;
+                } else {
+                    bot.ctl.fwd = true;
+                    if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+                }
+                double dnow = t.distanceTo(p);
+                Double best = bestDist.get(t.getId());
+                if (best == null || dnow < best - 0.5) { bestDist.put(t.getId(), dnow); lastDist.put(t.getId(), bot.ticks); }
+                return "방패 들고 다가가는 중";
             }
             return "방패로 막으며 틈 보는 중";
         }

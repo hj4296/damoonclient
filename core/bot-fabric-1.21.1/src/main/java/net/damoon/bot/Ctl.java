@@ -16,11 +16,14 @@ public final class Ctl {
     private boolean look;
     private float tYaw, tPitch;
     public float speed = 35f;
+    /** 이번 틱엔 엔더맨 눈을 일부러 쳐다봄 (엔더맨 굴에서 부를 때) */
+    public boolean allowEnderGaze;
 
     public void reset() {
         fwd = back = left = right = jump = sneak = sprint = use = false;
         look = false;
         speed = 35f;
+        allowEnderGaze = false;
     }
 
     public void look(float yaw, float pitch) {
@@ -80,7 +83,7 @@ public final class Ctl {
             p.setXRot(Mth.clamp(p.getXRot() + ease(dp), -90f, 90f));
             p.setYHeadRot(p.getYRot());
         }
-        if (p != null) avoidEndermanGaze(p);
+        if (p != null && !allowEnderGaze) avoidEndermanGaze(p);
         o.keyUp.setDown(fwd);
         o.keyDown.setDown(back);
         o.keyLeft.setDown(left);

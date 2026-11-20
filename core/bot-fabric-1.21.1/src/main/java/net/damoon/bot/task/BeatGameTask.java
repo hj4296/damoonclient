@@ -183,7 +183,9 @@ public class BeatGameTask extends Task {
         int cobble = Inv.count(p, s -> s.is(Items.COBBLESTONE) || s.is(Items.COBBLED_DEEPSLATE) || s.is(Items.BLACKSTONE));
 
         // ---- 밤: 침대가 있으면 자서 밤을 건너뜀 ----
-        if ((BedTask.night(l) && BedTask.hasBed(p) && !cool(bot, "bed")) || sub instanceof BedTask) {
+        // 진주를 모을 때(막대는 다 모았고 진주가 모자람)는 밤에 자지 않음 — 엔더맨은 밤에 나옴
+        boolean pearlTime = NetherTask.rods(p) >= NetherTask.RODS && NetherTask.pearls(p) < NetherTask.PEARLS;
+        if ((BedTask.night(l) && BedTask.hasBed(p) && !pearlTime && !cool(bot, "bed")) || sub instanceof BedTask) {
             stage = "밤 — 침대에서 자기";
             return run(bot, "bed", BedTask::new);
         }
@@ -437,6 +439,15 @@ public class BeatGameTask extends Task {
             if (!net.damoon.bot.EnderTrap.hasBoat(p) && net.damoon.bot.EnderTrap.boatFor(p) != null && !cool(bot, "boat")) {
                 Item boat = net.damoon.bot.EnderTrap.boatFor(p);
                 return run(bot, "boat", () -> new CraftTask(boat, 1));
+            }
+            // 밤엔 엔더맨 굴 (높이 2칸 굴 안에서 엔더맨을 불러 다리를 침) — 가장 안전
+            boolean seeEnder = false;
+            for (var e : l.entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.monster.EnderMan && e.distanceTo(p) < 48) { seeEnder = true; break; }
+            if (sub instanceof EnderHutTask || (l.dimension() == net.minecraft.world.level.Level.OVERWORLD && seeEnder
+                    && Inv.count(p, Inv.throwaway()) >= 16 && !cool(bot, "hut"))) {
+                detail = "엔더맨 굴";
+                return run(bot, "hut", () -> new EnderHutTask(NetherTask.PEARLS));
             }
             if (trap == null) trap = new net.damoon.bot.EnderTrap();
             net.damoon.bot.EnderTrap.R r = trap.tick(bot);

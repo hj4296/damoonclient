@@ -31,6 +31,8 @@ public final class Reflex {
     public boolean building;
     public final Turtle turtle = new Turtle();
     public final Tower tower = new Tower();
+    /** 엔더맨 굴 안: 엔더맨은 굴이 상대하니 반사 행동은 무시 (이 틱까지) */
+    public int ignoreEndermenUntil;
 
     /** 배고픔이 덜 찼으면 먹기 시작 (시작했으면 true) */
     public boolean startEatIfNeeded() {
@@ -364,6 +366,7 @@ public final class Reflex {
         double bd = lim;
         for (Entity e : bot.level().entitiesForRendering()) {
             if (!hostile(e) || ranged(e) || e instanceof Creeper) continue;
+            if (e instanceof EnderMan && bot.ticks < ignoreEndermenUntil) continue;
             if (e instanceof net.minecraft.world.entity.monster.Slime || e instanceof net.minecraft.world.entity.monster.Ghast) continue;
             double d = e.distanceTo(p);
             if (d >= bd || Math.abs(e.getY() - p.getY()) > 2.5 || !p.hasLineOfSight(e)) continue;
@@ -547,11 +550,13 @@ public final class Reflex {
         // 방금 나를 때린 상대에게는 종류와 상관없이 반격
         var src = p.getLastDamageSource();
         if (src != null && src.getEntity() instanceof LivingEntity atk && atk.isAlive() && atk != p
+                && !(atk instanceof EnderMan && bot.ticks < ignoreEndermenUntil)
                 && bot.level().getGameTime() - lastHurtStamp(p) < 60 && atk.distanceTo(p) < 6 && p.hasLineOfSight(atk)) {
             return atk;
         }
         for (Entity e : bot.level().entitiesForRendering()) {
             if (!hostile(e)) continue;
+            if (e instanceof EnderMan && bot.ticks < ignoreEndermenUntil) continue;
             if (bot.ticks < ignoreUntil.getOrDefault(e.getId(), 0)) continue;
             double d = e.distanceTo(p);
             // 활 쏘는 몹은 멀리서도 보이면 달려가서 벰

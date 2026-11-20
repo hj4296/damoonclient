@@ -40,6 +40,12 @@ public class NetherTask extends Task {
     private boolean bunkerFailed;
     private boolean healing;
     private int fortTicks, rackGiveUp;
+    private EnderHutTask hut;
+    private boolean pearlGiveUp;
+    private int pearlStart, hutFails, warpedTicks, warpedFails, waitEnders;
+    private BlockPos warped;
+    private boolean warpedHere;
+    private int hutRetry;
     private final java.util.Set<Long> visited = new java.util.HashSet<>();
 
     @Override public String name() { return "네더"; }
@@ -225,7 +231,67 @@ public class NetherTask extends Task {
         bot.reflex.camp = false;
         bot.reflex.building = false;
         bot.reflex.forceEat = false;
-        // 2) 엔더 진주
+        // 2) 엔더 진주: 근처에 뒤틀린 숲(엔더맨이 많고 가스트가 없음)이 있으면 거기에 엔더맨 굴을 짓고 모음
+        if (pearls < PEARLS && !pearlGiveUp) {
+            if (pearlStart == 0) pearlStart = bot.ticks;
+            if (bot.ticks - pearlStart > 20 * 60 * 15) { pearlGiveUp = true; bot.log("네더에서 진주를 충분히 못 모음 → 오버월드에서 마저"); }
+            if (hut != null) {
+                S r = hut.tick(bot);
+                detail = "[엔더맨 굴] " + hut.detail();
+                if (r == S.RUNNING) return S.RUNNING;
+                hut = null;
+                if (r == S.FAILED) hutFails++;
+                return S.RUNNING;
+            }
+            int enders = 0;
+            for (var e : l.entitiesForRendering()) if (e instanceof EnderMan && e.distanceTo(p) < 40) enders++;
+            BlockPos f0 = PathExec.feet(p);
+            boolean onWarped = l.getBlockState(f0.below()).is(Blocks.WARPED_NYLIUM);
+            // 보트가 없으면 판자로 만듦 (보트에 태운 엔더맨은 순간이동·이동을 못 함)
+            if (!net.damoon.bot.EnderTrap.hasBoat(p) && boatCraft == null && net.damoon.bot.EnderTrap.boatFor(p) != null && !boatTried) {
+                boatCraft = new CraftTask(net.damoon.bot.EnderTrap.boatFor(p), 1);
+                boatTried = true;
+            }
+            if (boatCraft != null) {
+                S r = boatCraft.tick(bot);
+                detail = "엔더맨 함정용 보트 만드는 중";
+                if (r != S.RUNNING) boatCraft = null;
+                return S.RUNNING;
+            }
+            if (false && enders >= 2 && (onWarped || warpedHere) && Inv.count(p, Inv.throwaway()) >= 12 && bot.ticks > hutRetry) {
+                // 머리 위 3x3 지붕을 얹고 그 아래에서 엔더맨을 불러 잡음 (엔더맨은 지붕 밑 옆 칸에 못 섬)
+                warpedHere = true;
+                hut = new EnderHutTask(PEARLS);
+                hutRetry = bot.ticks + 20 * 20;
+                return S.RUNNING;
+            }
+            if (enders >= 1 && (onWarped || warpedHere)) {
+                // 쳐다봐서 한 마리씩 불러 방패 반격으로 잡음
+                if (!warpedHere) bot.log("뒤틀린 숲에 엔더맨 " + enders + "마리 → 한 마리씩 쳐다봐서 불러 잡기");
+                warpedHere = true;
+                if (trap == null) trap = new net.damoon.bot.EnderTrap();
+                trap.stare = !net.damoon.bot.EnderTrap.hasBoat(p) && trapBoatLost();
+                net.damoon.bot.EnderTrap.R tr = trap.tick(bot);
+                detail = "엔더 진주 " + pearls + "/" + PEARLS + " — " + trap.info;
+                if (tr == net.damoon.bot.EnderTrap.R.RUNNING) return S.RUNNING;
+            }
+            if (warped == null || warpedTicks++ > 20 * 90) {
+                warpedTicks = 0;
+                warped = Scan.nearest(l, f0, 6, 32, 120, st -> st.is(Blocks.WARPED_NYLIUM),
+                        b -> l.getBlockState(b.above()).isAir() && l.getBlockState(b.above(2)).isAir() && b.distSqr(f0) > 9);
+                if (warped == null) { pearlGiveUp = true; bot.log("근처에 뒤틀린 숲이 없음 → 오버월드에서 진주"); return S.RUNNING; }
+                bot.log("뒤틀린 숲으로 (엔더맨 사냥) → " + warped.toShortString());
+            }
+            detail = "뒤틀린 숲으로 가는 중 (진주 " + pearls + "/" + PEARLS + ")";
+            Nav.R nr = bot.nav.go(new Goal.Near(warped.above(), 2));
+            if (nr == Nav.R.FAILED) { bot.nav.stop(); warped = null; if (++warpedFails > 4) pearlGiveUp = true; }
+            if (nr == Nav.R.ARRIVED) {
+                bot.nav.stop();
+                if (enders < 2) { detail = "뒤틀린 숲에서 엔더맨 기다리는 중"; if (++waitEnders > 20 * 60) { warped = null; waitEnders = 0; } }
+                else if (Inv.count(p, Inv.throwaway()) >= 16) hut = new EnderHutTask(PEARLS);
+            }
+            return S.RUNNING;
+        }
         if (false && pearls < PEARLS) {
             // (진주는 오버월드에서 구함) 보트가 없으면 판자 5개로 만듦 (엔더맨을 보트에 태워 순간이동을 막는 함정)
             if (!net.damoon.bot.EnderTrap.hasBoat(p) && boatCraft == null && net.damoon.bot.EnderTrap.boatFor(p) != null && !boatTried) {
@@ -250,6 +316,8 @@ public class NetherTask extends Task {
         if (nr == Nav.R.FAILED) bot.nav.stop();
         return S.RUNNING;
     }
+
+    private boolean trapBoatLost() { return true; }
 
     private static boolean isBlazeSpawner(ClientLevel l, BlockPos b) {
         BlockEntity be = l.getBlockEntity(b);
