@@ -57,6 +57,13 @@ public final class Setup {
                 bot.server("give @s diamond_pickaxe", "give @s golden_helmet", "give @s flint_and_steel", "give @s obsidian 10", "give @s bow", "give @s arrow 64", "give @s milk_bucket", "give @s shield");
                 bot.log("시험용: 포털 직전 상태로 지급");
             }
+            case "s85" -> {
+                // 시험용: 블레이즈 막대는 모았고 엔더 진주가 없는 상태 (오버월드 엔더맨 사냥부터)
+                run(bot, "s6");
+                bot.server("give @s diamond_pickaxe", "give @s blaze_rod 7", "give @s bow", "give @s arrow 32", "give @s shield",
+                        "give @s golden_helmet", "give @s milk_bucket");
+                bot.log("시험용: 진주 사냥 직전 상태로 지급");
+            }
             case "s9" -> {
                 // 시험용: 네더를 마친 상태 (요새 찾기부터)
                 run(bot, "s6");
