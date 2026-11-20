@@ -117,6 +117,8 @@ public final class Placer {
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
         var st = l.getBlockState(pos);
+        // 덩굴이 있으면 블록을 못 놓으니 먼저 끊음 (바로 부서짐)
+        if (BlockUtil.vine(st)) { Act.dig(bot, pos); return 0; }
         if (!st.canBeReplaced()) return 1;
         if (new AABB(pos).intersects(p.getBoundingBox())) return -1;
         if (!Inv.select(p, item)) return -1;

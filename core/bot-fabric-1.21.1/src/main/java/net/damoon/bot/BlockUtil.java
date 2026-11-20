@@ -47,6 +47,13 @@ public final class BlockUtil {
                 || b instanceof CampfireBlock || b == Blocks.POINTED_DRIPSTONE;
     }
 
+    public static boolean vine(BlockState s) {
+        if (s == null) return false;
+        Block b = s.getBlock();
+        return b == Blocks.WEEPING_VINES || b == Blocks.WEEPING_VINES_PLANT || b == Blocks.TWISTING_VINES || b == Blocks.TWISTING_VINES_PLANT
+                || b == Blocks.CAVE_VINES || b == Blocks.CAVE_VINES_PLANT || b == Blocks.VINE;
+    }
+
     public static boolean isPortal(BlockState s) {
         if (s == null) return false;
         Block b = s.getBlock();
@@ -58,6 +65,8 @@ public final class BlockUtil {
         if (s == null) return false;
         if (s.isAir()) return true;
         if (hurts(s) || isPortal(s)) return false;
+        // 덩굴(늘어진·뒤틀린·동굴·일반)은 통과는 되지만 그 칸에 블록을 놓을 수 없고 매달리게 됨 → 부수고 지나감
+        if (vine(s)) return false;
         if (!s.getFluidState().isEmpty()) return isWater(s) && s.getCollisionShape(l, new BlockPos(x, y, z)).isEmpty();
         return s.getCollisionShape(l, new BlockPos(x, y, z)).isEmpty();
     }

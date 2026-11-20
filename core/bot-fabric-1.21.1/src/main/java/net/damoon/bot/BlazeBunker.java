@@ -28,6 +28,8 @@ public final class BlazeBunker {
     private Direction front;        // 스포너 쪽 (열린 면)
     private int phase;              // 0 자리로, 1 짓기, 2 싸우기
     private int buildTicks;
+    private boolean sally;
+    private int sallyStart, lastGain, lastRods = -1, sallyRods = -1;
     public String info = "";
 
     public BlazeBunker(BlockPos spawner) { this.spawner = spawner; }
@@ -130,6 +132,41 @@ public final class BlazeBunker {
                 }
             }
         }
+        // 오래 막대가 안 늘거나 화살이 떨어지면: 잠깐 밖으로 나가 스포너 옆에서 방패 들고 칼로 싸우고, 땅에 꽂힌 화살도 주움
+        if (rods != lastRods) { lastRods = rods; lastGain = bot.ticks; }
+        boolean noArrows = !Inv.has(p, Items.ARROW);
+        if (!sally && phase == 2 && p.getHealth() >= 16 && (bot.ticks - lastGain > 20 * 45 || (noArrows && bot.ticks - lastGain > 20 * 15))) {
+            sally = true;
+            sallyStart = bot.ticks;
+            bot.log("벙커에서 막대가 안 늘어남 → 밖으로 나가 스포너 옆에서 칼로 싸움");
+        }
+        if (sally) {
+            if (p.getHealth() < 12 || bot.ticks - sallyStart > 20 * 40 || rods != sallyRods && rods >= want) {
+                sally = false;
+                lastGain = bot.ticks;
+                phase = 1; // 나가면서 부순 벽을 다시 막음
+                buildTicks = 0;
+                bot.log("벙커로 돌아감 (체력 " + (int) p.getHealth() + ")");
+            } else {
+                if (sallyRods < 0) sallyRods = rods;
+                bot.reflex.camp = false;
+                // 땅에 꽂힌 내 화살 줍기
+                for (Entity e : l.entitiesForRendering()) {
+                    if (e instanceof net.minecraft.world.entity.projectile.AbstractArrow a && a.getOwner() == p && a.getDeltaMovement().lengthSqr() < 0.001
+                            && a.distanceTo(p) < 10 && a.pickup == net.minecraft.world.entity.projectile.AbstractArrow.Pickup.ALLOWED) {
+                        info = "땅에 꽂힌 화살 줍는 중";
+                        Nav.R r = bot.nav.go(new Goal.Near(a.blockPosition(), 0.8));
+                        if (r == Nav.R.FAILED) bot.nav.stop();
+                        return R.RUNNING;
+                    }
+                }
+                info = "스포너 옆에서 방패 들고 블레이즈와 싸우는 중 (" + rods + "/" + want + ")";
+                Nav.R r = bot.nav.go(new Goal.Near(spawner, 2.5));
+                if (r != Nav.R.RUNNING) { bot.nav.stop(); bot.ctl.lookAt(p, Vec3.atCenterOf(spawner).add(0, 1, 0)); bot.ctl.use = p.getOffhandItem().is(Items.SHIELD); }
+                return R.RUNNING;
+            }
+        }
+        sallyRods = -1;
         if (!inCell) {
             info = phase == 0 ? "벙커 자리로 이동" : "벙커로 돌아가는 중";
             bot.reflex.camp = false;

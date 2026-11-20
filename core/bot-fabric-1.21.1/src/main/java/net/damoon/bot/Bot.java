@@ -241,6 +241,26 @@ public final class Bot {
     }
 
     /** 통합 서버에서 관리자 권한으로 명령 실행 (테스트 준비용) */
+    /** 서버 명령을 실행하고 결과 메시지를 기록 (예: locate) */
+    public void serverLog(String cmd) {
+        MinecraftServer srv = mc().getSingleplayerServer();
+        if (srv == null || p() == null) return;
+        UUID id = p().getUUID();
+        srv.execute(() -> {
+            ServerPlayer sp = srv.getPlayerList().getPlayer(id);
+            if (sp == null) return;
+            net.minecraft.commands.CommandSource out = new net.minecraft.commands.CommandSource() {
+                @Override public void sendSystemMessage(net.minecraft.network.chat.Component c) { mc().execute(() -> log("결과: " + c.getString())); }
+                @Override public boolean acceptsSuccess() { return true; }
+                @Override public boolean acceptsFailure() { return true; }
+                @Override public boolean shouldInformAdmins() { return false; }
+            };
+            CommandSourceStack src = new CommandSourceStack(out, sp.position(), sp.getRotationVector(), sp.serverLevel(), 4,
+                    sp.getName().getString(), sp.getDisplayName(), srv, sp);
+            srv.getCommands().performPrefixedCommand(src, cmd);
+        });
+    }
+
     public void server(String... cmds) {
         MinecraftServer srv = mc().getSingleplayerServer();
         if (srv == null || p() == null) { log("싱글플레이 서버 없음"); return; }
@@ -309,6 +329,7 @@ public final class Bot {
             }
             case "setup" -> Setup.run(this, a.length > 1 ? a[1] : "end");
             case "cmd" -> server(line.trim().substring(4));
+            case "cmdlog" -> serverLog(line.trim().substring(7));
             case "respawn" -> { if (mc().screen instanceof DeathScreen && p() != null) { p().respawn(); mc().setScreen(null); } }
             case "gamma" -> { gamma = a.length < 2 || !a[1].equals("off"); log("감마 " + (gamma ? "켬 (1500%)" : "끔")); }
             case "probe" -> {

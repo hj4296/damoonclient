@@ -49,7 +49,7 @@ public final class Turtle {
     private int countOpen(ClientLevel l) {
         if (hole) return l.getBlockState(cell.below()).canBeReplaced() ? 1 : 0;
         int n = 0;
-        for (BlockPos w : walls()) if (l.getBlockState(w).canBeReplaced()) n++;
+        for (BlockPos w : walls()) if (l.getBlockState(w).canBeReplaced() || BlockUtil.vine(l.getBlockState(w))) n++;
         return n;
     }
 
@@ -205,7 +205,7 @@ public final class Turtle {
                 return true;
             }
             for (BlockPos w : walls()) {
-                if (!l.getBlockState(w).canBeReplaced()) continue;
+                if (!l.getBlockState(w).canBeReplaced() && !BlockUtil.vine(l.getBlockState(w))) continue;
                 int r = Placer.placeAt(bot, w, Inv.wall(p));
                 if (r == -1) continue;
                 return true;

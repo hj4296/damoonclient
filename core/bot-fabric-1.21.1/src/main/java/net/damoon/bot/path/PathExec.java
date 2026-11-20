@@ -168,7 +168,15 @@ public final class PathExec {
         if (moveTicks % 30 == 0) {
             Vec3 now = p.position();
             if (lastPos != null && now.distanceTo(lastPos) < 0.2) {
-                if (++stuckChecks >= 3) { why = "끼임"; return R.FAILED; }
+                if (++stuckChecks >= 3) {
+                    why = "끼임";
+                    StringBuilder sb = new StringBuilder("끼임 " + to + " 위치 " + String.format("%.2f %.2f %.2f", p.getX(), p.getY(), p.getZ()));
+                    for (BlockPos b : new BlockPos[]{to.pos(), to.pos().above(), to.pos().below(), from.pos(), from.pos().above(2)})
+                        sb.append(" | ").append(b.toShortString()).append('=').append(l.getBlockState(b).getBlock().builtInRegistryHolder().key().location().getPath());
+                    if (to.place != Long.MIN_VALUE) sb.append(" | 놓을곳 ").append(BlockPos.of(to.place).toShortString()).append('=').append(l.getBlockState(BlockPos.of(to.place)).getBlock().builtInRegistryHolder().key().location().getPath());
+                    bot.dbg(sb.toString());
+                    return R.FAILED;
+                }
                 c.jump = true;
             } else stuckChecks = 0;
             lastPos = now;
