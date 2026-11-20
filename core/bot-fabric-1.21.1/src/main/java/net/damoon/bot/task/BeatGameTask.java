@@ -130,6 +130,7 @@ public class BeatGameTask extends Task {
             return s == S.DONE ? S.DONE : S.RUNNING;
         }
         if (bot.ticks % 20 == 0) { Inv.equipArmor(p); Inv.equipShield(p); }
+        if (bot.ticks % 20 == 10) Inv.dropJunk(p);
         if (sub != null) { bot.trace = "sub " + subKey; return run(bot, subKey, () -> sub); }
         if (l.dimension() == Level.NETHER) {
             stage = "8. 네더";

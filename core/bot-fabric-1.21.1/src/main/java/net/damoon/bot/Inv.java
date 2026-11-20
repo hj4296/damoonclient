@@ -162,4 +162,34 @@ public final class Inv {
         Minecraft.getInstance().gameMode.handleInventoryMouseClick(p.inventoryMenu.containerId, menuSlot(i), 40, ClickType.SWAP, p);
         return true;
     }
+
+    public static final Set<Item> JUNK = Set.of(Items.GRANITE, Items.DIORITE, Items.ANDESITE, Items.TUFF, Items.CALCITE, Items.DIRT,
+            Items.WHEAT_SEEDS, Items.ROTTEN_FLESH, Items.POISONOUS_POTATO, Items.BONE, Items.MOSS_BLOCK, Items.CLAY_BALL,
+            Items.OAK_SAPLING, Items.DARK_OAK_SAPLING, Items.SPRUCE_SAPLING, Items.BIRCH_SAPLING, Items.DRIPSTONE_BLOCK, Items.POINTED_DRIPSTONE,
+            Items.SAND, Items.RED_SAND, Items.SANDSTONE, Items.AZALEA, Items.FLOWERING_AZALEA, Items.MOSS_CARPET, Items.GLOW_BERRIES,
+            Items.SMOOTH_BASALT, Items.AMETHYST_SHARD);
+
+    /** 빈 칸이 적으면 잡동사니를 버림 (블록용 조약돌은 2묶음까지만). 버렸으면 true */
+    public static boolean dropJunk(LocalPlayer p) {
+        if (p.containerMenu != p.inventoryMenu) return false;
+        Inventory inv = p.getInventory();
+        int empty = 0;
+        for (int i = 0; i < 36; i++) if (inv.items.get(i).isEmpty()) empty++;
+        if (empty >= 4) return false;
+        int keepBlocks = 128;
+        for (int i = 0; i < 36; i++) {
+            ItemStack s = inv.items.get(i);
+            if (s.isEmpty() || i == inv.selected) continue;
+            boolean junk = JUNK.contains(s.getItem());
+            if (!junk && THROWAWAY.contains(s.getItem())) {
+                if (keepBlocks > 0) { keepBlocks -= s.getCount(); continue; }
+                junk = true;
+            }
+            if (junk) {
+                Minecraft.getInstance().gameMode.handleInventoryMouseClick(p.inventoryMenu.containerId, menuSlot(i), 1, ClickType.THROW, p);
+                return true;
+            }
+        }
+        return false;
+    }
 }

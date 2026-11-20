@@ -41,6 +41,28 @@ public final class Setup {
                         "fill ~3 ~-1 ~-1 ~5 ~-1 ~1 minecraft:end_portal");
                 bot.log("엔드 전투 장비 지급 + 앞에 엔드 포털 설치");
             }
+            case "s6" -> {
+                // 시험용: 철 장비까지 끝난 상태 (다이아몬드 단계부터 시험)
+                bot.server("clear @s",
+                        "give @s iron_pickaxe", "give @s iron_sword", "give @s shield", "give @s bucket",
+                        "item replace entity @s armor.chest with iron_chestplate", "item replace entity @s armor.legs with iron_leggings",
+                        "item replace entity @s armor.feet with iron_boots", "give @s cooked_beef 24", "give @s cobblestone 64",
+                        "give @s oak_planks 32", "give @s stick 16", "give @s crafting_table", "give @s furnace", "give @s coal 16",
+                        "give @s iron_ingot 3", "give @s stone_axe", "time set day");
+                bot.log("시험용: 철 장비 상태로 지급");
+            }
+            case "s8" -> {
+                // 시험용: 네더 포털 직전 상태
+                run(bot, "s6");
+                bot.server("give @s diamond_pickaxe", "give @s golden_helmet", "give @s flint_and_steel", "give @s obsidian 10");
+                bot.log("시험용: 포털 직전 상태로 지급");
+            }
+            case "s9" -> {
+                // 시험용: 네더를 마친 상태 (요새 찾기부터)
+                run(bot, "s6");
+                bot.server("give @s diamond_pickaxe", "give @s blaze_rod 7", "give @s ender_pearl 13", "give @s bow", "give @s arrow 32");
+                bot.log("시험용: 네더를 마친 상태로 지급");
+            }
             default -> bot.log("모르는 준비: " + what);
         }
     }

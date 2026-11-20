@@ -36,6 +36,8 @@ public class ObsidianTask extends Task {
     private BlockPos lava, water;
     private int phase, wait, tries;
     private final Set<Long> badLava = new HashSet<>();
+    private final Set<Long> badWater = new HashSet<>();
+    private int waterTries;
     private String detail = "";
 
     public ObsidianTask(int want) { this.want = want; }
@@ -52,6 +54,20 @@ public class ObsidianTask extends Task {
         if (!bot.ctl.aimed(p, 1.0f)) return false;
         Minecraft.getInstance().gameMode.useItem(p, InteractionHand.MAIN_HAND);
         return true;
+    }
+
+    /** 눈에서 point까지 막는 블록이 있으면 그 블록을 캠. 캐는 중이거나 못 뚫으면 false (뚫려 있으면 true) */
+    private static int clearView(Bot bot, Vec3 point, BlockPos want, net.minecraft.world.level.ClipContext.Fluid fluid) {
+        LocalPlayer p = bot.p();
+        ClientLevel l = bot.level();
+        var hr = l.clip(new net.minecraft.world.level.ClipContext(p.getEyePosition(), point,
+                net.minecraft.world.level.ClipContext.Block.OUTLINE, fluid, p));
+        if (hr.getType() != net.minecraft.world.phys.HitResult.Type.BLOCK || hr.getBlockPos().equals(want)) { Act.stopDig(bot); return 1; }
+        BlockPos h = hr.getBlockPos();
+        BlockState hs = l.getBlockState(h);
+        if (!BlockUtil.breakable(l, h.getX(), h.getY(), h.getZ(), hs) || BlockUtil.fluidNear(l, h.getX(), h.getY(), h.getZ(), true)) return -1;
+        Act.dig(bot, h);
+        return 0;
     }
 
     private static boolean safeObsidian(ClientLevel l, BlockPos b) {
@@ -76,7 +92,9 @@ public class ObsidianTask extends Task {
                 return S.RUNNING;
             }
             bot.nav.stop();
-            if (useBucket(bot, Items.BUCKET, Vec3.atCenterOf(water).add(0, 0.3, 0))) { wait = 5; if (++tries > 30) water = null; }
+            Vec3 aimP = Vec3.atCenterOf(water).add(0, 0.3, 0);
+            if (clearView(bot, aimP, water, net.minecraft.world.level.ClipContext.Fluid.SOURCE_ONLY) == 0) return S.RUNNING;
+            if (useBucket(bot, Items.BUCKET, aimP)) { wait = 5; if (++tries > 30) water = null; }
             return S.RUNNING;
         }
 
@@ -96,7 +114,7 @@ public class ObsidianTask extends Task {
         if (!Inv.has(p, Items.WATER_BUCKET)) {
             detail = "물 뜨러 가는 중";
             BlockPos src = Scan.nearest(l, PathExec.feet(p), 3, p.getBlockY() - 24, p.getBlockY() + 40,
-                    s -> s.getFluidState().is(FluidTags.WATER) && s.getFluidState().isSource(), b -> l.getBlockState(b.above()).isAir());
+                    s -> s.getFluidState().is(FluidTags.WATER) && s.getFluidState().isSource(), b -> l.getBlockState(b.above()).isAir() && !badWater.contains(b.asLong()));
             if (src == null) return S.FAILED;
             if (Act.reach(p, new net.minecraft.world.phys.AABB(src)) > 4.0) {
                 Nav.R r = bot.nav.go(new Goal.Reach(src, 3.0));
@@ -104,7 +122,11 @@ public class ObsidianTask extends Task {
                 return S.RUNNING;
             }
             bot.nav.stop();
-            if (useBucket(bot, Items.BUCKET, Vec3.atCenterOf(src).add(0, 0.4, 0))) wait = 5;
+            Vec3 aimW = Vec3.atCenterOf(src).add(0, 0.4, 0);
+            int v = clearView(bot, aimW, src, net.minecraft.world.level.ClipContext.Fluid.SOURCE_ONLY);
+            if (v == 0) { detail = "물 앞을 막은 블록 캐는 중"; return S.RUNNING; }
+            if (v < 0) { badWater.add(src.asLong()); return S.RUNNING; }
+            if (useBucket(bot, Items.BUCKET, aimW)) { wait = 5; if (++waterTries > 12) { badWater.add(src.asLong()); waterTries = 0; } }
             return S.RUNNING;
         }
         // 용암 원천 찾기: 아래가 단단하고 위가 비어 있는 것
@@ -126,6 +148,9 @@ public class ObsidianTask extends Task {
         bot.nav.stop();
         // 용암 아래 블록의 윗면을 겨냥 → 물이 그 용암 자리에 놓이고 옆 용암 원천들이 흑요석이 됨
         Vec3 aim = Vec3.atCenterOf(lava.below()).add(0, 0.5, 0);
+        int v = clearView(bot, aim, lava.below(), net.minecraft.world.level.ClipContext.Fluid.NONE);
+        if (v == 0) { detail = "용암 앞을 막은 블록 캐는 중"; return S.RUNNING; }
+        if (v < 0) { badLava.add(lava.asLong()); lava = null; return S.RUNNING; }
         if (useBucket(bot, Items.WATER_BUCKET, aim)) {
             water = lava;
             lava = null;
