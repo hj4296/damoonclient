@@ -27,6 +27,7 @@ public final class EnderTrap {
 
     private int targetId = -1, boatId = -1, placeWait;
     private final Set<Integer> ignore = new HashSet<>();
+    private final java.util.Map<Integer, Integer> pickTime = new java.util.HashMap<>();
     private int targetTicks;
     public String info = "";
 
@@ -48,6 +49,7 @@ public final class EnderTrap {
         // 진주·보트 줍기
         for (Entity e : l.entitiesForRendering()) {
             if (e instanceof ItemEntity ie && (ie.getItem().is(Items.ENDER_PEARL) || ie.getItem().is(ItemTags.BOATS)) && ie.distanceTo(p) < 12 && !ignore.contains(ie.getId())) {
+                if (pickTime.merge(ie.getId(), 1, Integer::sum) > 20 * 8) { ignore.add(ie.getId()); continue; }
                 info = "엔더 진주 줍는 중";
                 if (ie.distanceTo(p) < 2.5) { bot.nav.stop(); bot.ctl.lookYaw(p, ie.position(), 20f); bot.ctl.fwd = true; }
                 else { Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0)); if (r == Nav.R.FAILED) { bot.nav.stop(); ignore.add(ie.getId()); } }
@@ -135,6 +137,26 @@ public final class EnderTrap {
         if (boat == null && boatId == -1) {
             for (Entity e : l.entitiesForRendering())
                 if (e instanceof Boat b && b.distanceTo(p) < 5 && b.getPassengers().isEmpty()) { boatId = b.getId(); break; }
+        }
+        // 보트가 엔더맨과 나 사이에 오도록 자리를 옮김 → 다가오던 엔더맨이 보트에 탐
+        if (boat != null && reach > 3.0 && boat.distanceTo(p) < 8) {
+            Vec3 away = new Vec3(boat.getX() - em.getX(), 0, boat.getZ() - em.getZ()).normalize();
+            Vec3 spot = boat.position().add(away.scale(1.4));
+            double sd = Math.hypot(spot.x - p.getX(), spot.z - p.getZ());
+            if (sd > 0.4) {
+                Vec3 dir = new Vec3(spot.x - p.getX(), 0, spot.z - p.getZ()).normalize();
+                // 엔더맨을 보면서 옆걸음/뒷걸음으로 자리 잡기
+                bot.ctl.lookAt(p, em.getBoundingBox().getCenter());
+                double yaw = Math.toRadians(p.getYRot());
+                double fx = -Math.sin(yaw), fz = Math.cos(yaw);
+                double fwd = dir.x * fx + dir.z * fz, side = dir.x * fz - dir.z * fx;
+                bot.ctl.fwd = fwd > 0.3;
+                bot.ctl.back = fwd < -0.3;
+                bot.ctl.left = side > 0.3;
+                bot.ctl.right = side < -0.3;
+                info = "보트를 사이에 두고 자리 잡는 중";
+                return R.RUNNING;
+            }
         }
         // 다가오길 기다림: 닿으면 벰
         Inv.selectWeapon(p);
