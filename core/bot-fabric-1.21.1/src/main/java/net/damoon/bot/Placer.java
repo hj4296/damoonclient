@@ -142,4 +142,23 @@ public final class Placer {
         if (r.consumesAction()) p.swing(InteractionHand.MAIN_HAND);
         return 0;
     }
+
+    /** 실제로 밟고 서 있는 칸 (가장자리에 걸쳐 서 있으면 발 중심 칸 아래가 빌 수 있음): 몸이 걸친 칸 중 바닥이 있는 가장 가까운 칸 */
+    public static BlockPos standCell(LocalPlayer p) {
+        ClientLevel l = (ClientLevel) p.level();
+        BlockPos f = net.damoon.bot.path.PathExec.feet(p);
+        BlockPos best = null;
+        double bd = 1e9;
+        AABB box = p.getBoundingBox();
+        for (int ox = -1; ox <= 1; ox++) for (int oz = -1; oz <= 1; oz++) {
+            BlockPos c = f.offset(ox, 0, oz);
+            if (box.maxX <= c.getX() || box.minX >= c.getX() + 1 || box.maxZ <= c.getZ() || box.minZ >= c.getZ() + 1) continue;
+            var fl = l.getBlockState(c.below());
+            if (fl.getCollisionShape(l, c.below()).isEmpty() || BlockUtil.hurts(fl)) continue;
+            if (!l.getBlockState(c).getCollisionShape(l, c).isEmpty() || !l.getBlockState(c.above()).getCollisionShape(l, c.above()).isEmpty()) continue;
+            double d = Math.pow(c.getX() + 0.5 - p.getX(), 2) + Math.pow(c.getZ() + 0.5 - p.getZ(), 2);
+            if (d < bd) { bd = d; best = c; }
+        }
+        return best != null ? best : f;
+    }
 }

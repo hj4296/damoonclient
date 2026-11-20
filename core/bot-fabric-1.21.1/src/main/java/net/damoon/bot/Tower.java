@@ -81,7 +81,7 @@ public final class Tower {
                 if (e instanceof net.minecraft.world.entity.monster.EnderMan em && em.isCreepy() && em.distanceTo(p) < 16) return false;
             if (want && !tower(p) && bot.ticks % 40 == 0) bot.dbg("기둥 조건: 블록 " + Inv.count(p, Inv.throwaway()) + " 땅 " + p.onGround());
             if (!want || !p.onGround() || p.isInWater() || p.isInLava() || Inv.count(p, Inv.throwaway()) < 4) return false;
-            BlockPos f = PathExec.feet(p);
+            BlockPos f = Placer.standCell(p);
             int h = clear(l, f.above(2)) && clear(l, f.above(3)) && clear(l, f.above(4)) ? 3
                     : (!wither && clear(l, f.above(2)) && clear(l, f.above(3))) ? 2 : 0;
             if (h == 0) return false;

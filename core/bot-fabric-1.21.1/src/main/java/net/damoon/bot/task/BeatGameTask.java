@@ -344,6 +344,9 @@ public class BeatGameTask extends Task {
                 stage = "6. 다이아몬드 곡괭이";
                 return run(bot, "dpick", () -> new CraftTask(Items.DIAMOND_PICKAXE, 1));
             }
+            // ---- 7. 활과 화살 (블레이즈를 멀리서 쏘기 위해, 못 구하면 몇 분 뒤 그냥 감) ----
+            S ba = bowAndArrows(bot, p, l, "7");
+            if (ba != null) return ba;
             // ---- 7. 네더 준비: 금 투구(피글린), 부싯돌, 흑요석, 포털 ----
             if (!Inv.has(p, Items.GOLDEN_HELMET) && !worn(p, Items.GOLDEN_HELMET) && !cool(bot, "gold")) {
                 int gold = Inv.count(p, Items.GOLD_INGOT) + Inv.count(p, Items.RAW_GOLD);
@@ -445,36 +448,8 @@ public class BeatGameTask extends Task {
                 return run(bot, "eyes", () -> new CraftTask(Items.ENDER_EYE, want));
             }
         }
-        if (!Inv.has(p, Items.BOW) && !cool(bot, "bow")) {
-            if (Inv.count(p, Items.STRING) >= 3) { stage = "9. 활 만들기"; return run(bot, "bow", () -> new CraftTask(Items.BOW, 1)); }
-            stage = "9. 활용 실 모으기 (" + Inv.count(p, Items.STRING) + "/3)";
-            BlockPos web = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 3, PathExec.feet(p).getY() - 30, PathExec.feet(p).getY() + 20, st -> st.is(Blocks.COBWEB), null);
-            if (web != null) return mine(bot, "web", st -> st.is(Blocks.COBWEB), is(Items.STRING), 3, true, 30, 20);
-            if (hunter == null || !"spider".equals(hunterKey)) { hunter = new Hunter(e -> e instanceof net.minecraft.world.entity.monster.Spider, is(Items.STRING)); hunterKey = "spider"; }
-            Hunter.R r = hunter.tick(bot);
-            detail = hunter.info;
-            if (r == Hunter.R.NONE) { fail(bot, "bow", 20 * 60 * 3); bot.log("거미가 안 보임 → 활 없이 먼저 요새로"); }
-            return S.RUNNING;
-        }
-        int arrows = Inv.count(p, Items.ARROW);
-        if (Inv.has(p, Items.BOW) && arrows < 16 && !cool(bot, "arrows")) {
-            if (Inv.count(p, Items.FLINT) > 0 && Inv.count(p, Items.FEATHER) > 0 && Inv.count(p, Items.STICK) > 0) {
-                stage = "9. 화살 만들기";
-                return run(bot, "arrow", () -> new CraftTask(Items.ARROW, arrows + 4));
-            }
-            if (Inv.count(p, Items.FEATHER) == 0) {
-                stage = "9. 화살용 깃털 (닭 사냥)";
-                if (hunter == null || !"chicken".equals(hunterKey)) { hunter = new Hunter(e -> e instanceof net.minecraft.world.entity.animal.Chicken, is(Items.FEATHER)); hunterKey = "chicken"; }
-                Hunter.R r = hunter.tick(bot);
-                detail = hunter.info;
-                if (r == Hunter.R.NONE) fail(bot, "arrows", 20 * 60 * 3);
-                return S.RUNNING;
-            }
-            stage = "9. 화살용 부싯돌 (자갈 캐기)";
-            S r = mineDeep(bot, "flint2", st -> st.is(Blocks.GRAVEL), is(Items.FLINT), Inv.count(p, Items.FLINT) + 1, PathExec.feet(p).getY());
-            if (++flintTicks > 20 * 60 * 4) { flintTicks = 0; fail(bot, "arrows", 20 * 60 * 5); }
-            return r;
-        }
+        S ba = bowAndArrows(bot, p, l, "9");
+        if (ba != null) return ba;
         // ---- 10. 요새 ----
         stage = "10. 요새 찾기 (엔더의 눈 " + eyes + "개)";
         if (stronghold == null) stronghold = new StrongholdTask();
@@ -523,6 +498,42 @@ public class BeatGameTask extends Task {
     private Hunter hunterFood;
     private final java.util.Set<Integer> lootIgnore = new java.util.HashSet<>();
     private final java.util.Map<Integer, Integer> lootTime = new java.util.HashMap<>();
+
+    /** 활과 화살 (블레이즈·엔드 수정 저격용). 없으면 null (다 했거나 못 구해서 미룸) */
+    private S bowAndArrows(Bot bot, LocalPlayer p, ClientLevel l, String no) {
+        if (!Inv.has(p, Items.BOW) && !cool(bot, "bow")) {
+            if (Inv.count(p, Items.STRING) >= 3) { stage = no + ". 활 만들기"; return run(bot, "bow", () -> new CraftTask(Items.BOW, 1)); }
+            stage = no + ". 활용 실 모으기 (" + Inv.count(p, Items.STRING) + "/3)";
+            BlockPos web = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 3, PathExec.feet(p).getY() - 30, PathExec.feet(p).getY() + 20, st -> st.is(Blocks.COBWEB), null);
+            if (web != null) return mine(bot, "web", st -> st.is(Blocks.COBWEB), is(Items.STRING), 3, true, 30, 20);
+            if (hunter == null || !"spider".equals(hunterKey)) { hunter = new Hunter(e -> e instanceof net.minecraft.world.entity.monster.Spider, is(Items.STRING)); hunterKey = "spider"; }
+            Hunter.R r = hunter.tick(bot);
+            detail = hunter.info;
+            if (r == Hunter.R.NONE) { fail(bot, "bow", 20 * 60 * 3); bot.log("거미가 안 보임 → 활 없이 먼저 요새로"); }
+            return S.RUNNING;
+        }
+        int arrows = Inv.count(p, Items.ARROW);
+        if (Inv.has(p, Items.BOW) && arrows < 16 && !cool(bot, "arrows")) {
+            if (Inv.count(p, Items.FLINT) > 0 && Inv.count(p, Items.FEATHER) > 0 && Inv.count(p, Items.STICK) > 0) {
+                stage = no + ". 화살 만들기";
+                return run(bot, "arrow", () -> new CraftTask(Items.ARROW, arrows + 4));
+            }
+            if (Inv.count(p, Items.FEATHER) == 0) {
+                stage = no + ". 화살용 깃털 (닭 사냥)";
+                if (hunter == null || !"chicken".equals(hunterKey)) { hunter = new Hunter(e -> e instanceof net.minecraft.world.entity.animal.Chicken, is(Items.FEATHER)); hunterKey = "chicken"; }
+                Hunter.R r = hunter.tick(bot);
+                detail = hunter.info;
+                if (r == Hunter.R.NONE) fail(bot, "arrows", 20 * 60 * 3);
+                return S.RUNNING;
+            }
+            stage = no + ". 화살용 부싯돌 (자갈 캐기)";
+            S r = mineDeep(bot, "flint2", st -> st.is(Blocks.GRAVEL), is(Items.FLINT), Inv.count(p, Items.FLINT) + 1, PathExec.feet(p).getY());
+            if (++flintTicks > 20 * 60 * 4) { flintTicks = 0; fail(bot, "arrows", 20 * 60 * 5); }
+            return r;
+        }
+        return null;
+    }
+
     private int goldTicks, flintTicks;
     private boolean builtPortal;
 

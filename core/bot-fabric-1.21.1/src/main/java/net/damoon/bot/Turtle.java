@@ -1,6 +1,7 @@
 package net.damoon.bot;
 
 import net.damoon.bot.path.PathExec;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
@@ -42,12 +43,26 @@ public final class Turtle {
         return !fs.getCollisionShape(l, fl).isEmpty() && !BlockUtil.isLava(fs);
     }
     /** 벽·천장을 다 막고 안에서 회복 중 */
-    public boolean sealed() { return active && phase == 1; }
+    public boolean sealed() { return active && phase == 1 && openWalls == 0; }
+    private int openWalls, fixTicks, cooldownUntil;
+
+    private int countOpen(ClientLevel l) {
+        if (hole) return l.getBlockState(cell.below()).canBeReplaced() ? 1 : 0;
+        int n = 0;
+        for (BlockPos w : walls()) if (l.getBlockState(w).canBeReplaced()) n++;
+        return n;
+    }
 
     private List<BlockPos> walls() {
         List<BlockPos> out = new ArrayList<>();
         for (int y = 0; y <= 1; y++) for (Direction h : Direction.Plane.HORIZONTAL) out.add(cell.relative(h).above(y));
-        out.add(cell.above(2));
+        // 지붕은 옆면에 붙일 곳이 있어야 놓을 수 있음 → 머리 위 옆칸에 받침 하나 (이미 막혀 있으면 그대로)
+        BlockPos roof = cell.above(2);
+        boolean support = false;
+        for (Direction h : Direction.Plane.HORIZONTAL)
+            if (!Minecraft.getInstance().level.getBlockState(roof.relative(h)).canBeReplaced()) support = true;
+        if (!support && Minecraft.getInstance().level.getBlockState(cell.above(3)).canBeReplaced()) out.add(cell.relative(Direction.NORTH).above(2));
+        out.add(roof);
         return out;
     }
 
@@ -125,8 +140,8 @@ public final class Turtle {
         // 근접 몹이 바로 붙어 있으면 (그 칸엔 벽을 못 놓고, 짓는 동안 맞음) 먼저 방패로 밀어내고 나서 지음
         boolean engaged = near != null && near.distanceTo(p) < 3.8;
         if (!active) {
-            if (!danger(bot, p) || !p.onGround()) return false;
-            BlockPos f0 = PathExec.feet(p);
+            if (bot.ticks < cooldownUntil || !danger(bot, p) || !p.onGround()) return false;
+            BlockPos f0 = Placer.standCell(p);
             // 적이 이미 붙어 있으면 벽은 못 지으니 발밑을 파고 들어감 (2칸만 내려가도 몹 팔이 안 닿음)
             boolean useHole = false; // 구멍 숨기는 몹이 같이 떨어져 들어와서 끔 (holeOk 참고)
             if (engaged && !useHole) return false;
@@ -141,9 +156,32 @@ public final class Turtle {
             bot.log("위험 (체력 " + (int) p.getHealth() + ") → " + (hole ? "적이 붙어 있어 발밑 3칸 파고 들어가 덮고 회복" : "블록으로 몸을 감싸고 회복"));
         }
         ticks++;
+        openWalls = countOpen(l);
         if (hole) return holeTick(bot, reflex, p, l);
+        // 회복 중인데 벽에 빈틈이 생겼으면 (못 놓았거나 부서짐) 다시 막음, 2초 안에 못 막으면 포기
+        if (phase == 1 && openWalls > 0) {
+            if (++fixTicks > 40) {
+                StringBuilder sb = new StringBuilder();
+                for (BlockPos w : walls()) if (l.getBlockState(w).canBeReplaced()) sb.append(w.toShortString()).append(' ');
+                bot.dbg("벽 빈틈: " + sb + " 내 위치 " + String.format("%.2f %.2f", p.getX(), p.getZ()) + " 칸 " + cell.toShortString());
+                bot.log("벽 빈틈을 못 막음 → 감싸기 포기 (10초 동안 방패로)");
+                active = false;
+                cooldownUntil = bot.ticks + 200;
+                reflex.forceEat = false;
+                return false;
+            }
+            for (BlockPos w : walls()) {
+                if (!l.getBlockState(w).canBeReplaced()) continue;
+                int r = Placer.placeAt(bot, w, Inv.wall(p));
+                if (r == -1) continue;
+                reflex.doing = "벽 빈틈 막는 중";
+                return true;
+            }
+            return false;
+        }
+        fixTicks = 0;
         if (engaged && phase == 0) { if (ticks > 20 * 30) active = false; return false; }
-        if (!PathExec.feet(p).equals(cell) && phase < 2) {
+        if (!PathExec.feet(p).equals(cell) && !Placer.standCell(p).equals(cell) && phase < 2) {
             // 밀려났으면 다시 그 자리로
             Vec3 c = Vec3.atBottomCenterOf(cell);
             bot.ctl.lookYaw(p, c, 30f);
@@ -154,7 +192,7 @@ public final class Turtle {
         if (phase == 0) {
             reflex.doing = "블록으로 몸 감싸는 중";
             double dx = cell.getX() + 0.5 - p.getX(), dz = cell.getZ() + 0.5 - p.getZ();
-            if (dx * dx + dz * dz > 0.03) {
+            if (dx * dx + dz * dz > 0.03 && ticks < 30) {
                 bot.ctl.lookYaw(p, Vec3.atBottomCenterOf(cell), 60f);
                 bot.ctl.fwd = true;
                 bot.ctl.sneak = true;

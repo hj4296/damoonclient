@@ -61,7 +61,7 @@ public final class Reflex {
         if (bot.ticks % 20 == 7 && !p.isUsingItem()) { Inv.equipArmor(p); Inv.equipShield(p); }
         // 바로 앞의 근접 몹 (위더 스켈레톤 등): 이게 있으면 먹기·우유·불 끄기·화염구 방어보다 방패 싸움이 먼저
         // 날아오는 화염구·화살: 궤적을 계산해서 나를 맞힐 것만 방패로 막음 (방패는 들고 5틱 뒤부터 막힘)
-        Entity proj = turtle.sealed() || (turtle.active()) || (tower.active() && !tower.onTop(p)) ? null : incoming(p, 15);
+        Entity proj = turtle.sealed() || (tower.active() && !tower.onTop(p)) ? null : incoming(p, 15);
         // 근접 몹이 붙어 있으면: 투사체와 근접 몹이 둘 다 방패 앞(180°)에 들어오게 가운데를 봄. 반대편이면 근접 몹 쪽 (더 아픔)
         LivingEntity melee0 = turtle.sealed() || tower.onTop(p) ? null : nearMelee(p, 4.0);
         float faceYaw = Float.NaN;
@@ -360,6 +360,8 @@ public final class Reflex {
         return false;
     }
 
+    private final java.util.Set<Integer> seenProj = new java.util.HashSet<>();
+
     /** maxT 틱 안에 내 몸에 닿을 화염구·화살 (가장 먼저 닿는 것) */
     public Entity incoming(LocalPlayer p, int maxT) {
         net.minecraft.world.phys.AABB box0 = p.getBoundingBox();
@@ -384,7 +386,12 @@ public final class Reflex {
                 // 가스트 화염구는 근처 아무 데나 맞아도 터지니 넓게
                 double grow = e instanceof net.minecraft.world.entity.projectile.LargeFireball ? 2.2 : 0.45;
                 net.minecraft.world.phys.AABB box = box0.move(pv.scale(t)).inflate(grow + t * 0.04);
-                if (box.contains(np) || box.clip(pos, np).isPresent()) { bt = t; best = e; break; }
+                if (box.contains(np) || box.clip(pos, np).isPresent()) {
+                    bt = t;
+                    best = e;
+                    if (seenProj.add(e.getId())) bot.dbg(String.format("투사체 감지 %s %.1f칸 %d틱 뒤 방패=%s", e.getType().toShortString(), e.distanceTo(p), t, p.isBlocking()));
+                    break;
+                }
                 pos = np;
                 if (fb) v = v.add(v.normalize().scale(0.1)).scale(0.95);
                 else v = v.scale(0.99).add(0, -0.05, 0);
