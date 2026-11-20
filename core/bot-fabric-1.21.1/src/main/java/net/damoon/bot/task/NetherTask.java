@@ -74,17 +74,6 @@ public class NetherTask extends Task {
         int rods = rods(p), pearls = pearls(p);
         // 네더에선 배고픔을 가득 채워 두어 체력이 계속 회복되게
         bot.reflex.forceEat = p.getHealth() < 18;
-        // 0) 엔더맨이 가까이 보이면 진주부터 (위기 탈출용으로도 씀)
-        if (pearls < PEARLS && quick == null) {
-            boolean ender = false;
-            for (var e : l.entitiesForRendering()) if (e instanceof EnderMan em && em.isAlive() && em.distanceTo(p) < 28) { ender = true; break; }
-            if (ender) {
-                if (trap == null) trap = new net.damoon.bot.EnderTrap();
-                net.damoon.bot.EnderTrap.R r = trap.tick(bot);
-                detail = "엔더 진주 " + pearls + "/" + PEARLS + " — " + trap.info;
-                if (r == net.damoon.bot.EnderTrap.R.RUNNING) return S.RUNNING;
-            }
-        }
         // 1) 블레이즈 막대
         if (rods < RODS) {
             BlockPos f = PathExec.feet(p);
@@ -221,8 +210,8 @@ public class NetherTask extends Task {
         bot.reflex.building = false;
         bot.reflex.forceEat = false;
         // 2) 엔더 진주
-        if (pearls < PEARLS) {
-            // 보트가 없으면 판자 5개로 만듦 (엔더맨을 보트에 태워 순간이동을 막는 함정)
+        if (false && pearls < PEARLS) {
+            // (진주는 오버월드에서 구함) 보트가 없으면 판자 5개로 만듦 (엔더맨을 보트에 태워 순간이동을 막는 함정)
             if (!net.damoon.bot.EnderTrap.hasBoat(p) && boatCraft == null && net.damoon.bot.EnderTrap.boatFor(p) != null && !boatTried) {
                 boatCraft = new CraftTask(net.damoon.bot.EnderTrap.boatFor(p), 1);
                 boatTried = true;

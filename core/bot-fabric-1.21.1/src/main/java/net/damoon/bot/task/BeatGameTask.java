@@ -43,6 +43,7 @@ public class BeatGameTask extends Task {
     private final EndGameTask end = new EndGameTask();
     private NetherTask nether;
     private PortalTask portalTask;
+    private net.damoon.bot.EnderTrap trap;
     private int portalFails;
     private StrongholdTask stronghold;
     private String stage = "준비";
@@ -309,7 +310,8 @@ public class BeatGameTask extends Task {
         S loot = loot(bot, p, l);
         if (loot != null) return loot;
 
-        boolean afterNether = NetherTask.rods(p) >= NetherTask.RODS && NetherTask.pearls(p) >= NetherTask.PEARLS;
+        // 네더에서는 블레이즈 막대만 (진주는 오버월드에서 혼자 있는 엔더맨을 잡아 구함)
+        boolean afterNether = NetherTask.rods(p) >= NetherTask.RODS;
         if (!afterNether) {
             // ---- 6. 다이아몬드 ----
             if (tier < 4) {
@@ -382,6 +384,22 @@ public class BeatGameTask extends Task {
             return r;
         }
 
+        // ---- 9. 엔더 진주: 오버월드의 혼자 있는 엔더맨 (밤·동굴) ----
+        if (NetherTask.pearls(p) < NetherTask.PEARLS) {
+            stage = "9. 엔더 진주 (" + NetherTask.pearls(p) + "/" + NetherTask.PEARLS + ")";
+            if (!net.damoon.bot.EnderTrap.hasBoat(p) && net.damoon.bot.EnderTrap.boatFor(p) != null && !cool(bot, "boat")) {
+                Item boat = net.damoon.bot.EnderTrap.boatFor(p);
+                return run(bot, "boat", () -> new CraftTask(boat, 1));
+            }
+            if (trap == null) trap = new net.damoon.bot.EnderTrap();
+            net.damoon.bot.EnderTrap.R r = trap.tick(bot);
+            detail = trap.info;
+            if (r == net.damoon.bot.EnderTrap.R.NONE) {
+                // 낮이면 동굴(어두운 곳)에도 엔더맨이 있음 → 탐험
+                return explore(bot, "엔더맨");
+            }
+            return S.RUNNING;
+        }
         // ---- 9. 엔드 준비: 엔더의 눈, 활과 화살 ----
         int eyes = Inv.count(p, Items.ENDER_EYE);
         if (Inv.count(p, Items.ENDER_PEARL) > 0) {
