@@ -96,7 +96,8 @@ public final class Reflex {
 
         // 가까운 적과 싸우기
         LivingEntity threat = fightEnabled ? threat(p) : null;
-        if (threat != null && ranged(threat) && p.getHealth() < 7 && threat.distanceTo(p) > 4) {
+        boolean weak = p.getHealth() < 7 || (p.isOnFire() && p.getHealth() < 10);
+        if (threat != null && ranged(threat) && weak && threat.distanceTo(p) > 3) {
             Vec3 away = p.position().subtract(threat.position()).normalize();
             bot.ctl.lookYaw(p, p.position().add(away.scale(5)), 0f);
             bot.ctl.fwd = true;

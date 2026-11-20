@@ -56,6 +56,7 @@ public final class PathExec {
 
     public R tick(Bot bot) {
         bot.trace += " exec";
+        bot.pathDriving = true;
         LocalPlayer p = bot.p();
         Level l = p.level();
         Ctl c = bot.ctl;

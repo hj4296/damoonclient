@@ -153,10 +153,40 @@ public final class Bot {
                 return;
             }
         }
+        // 길찾기가 아닌 직접 걷기(싸움·도망·줍기)일 때 앞이 낭떠러지·용암이면 멈춤
+        if (!pathDriving && (ctl.fwd || ctl.sprint) && !safeAhead(mc.player)) {
+            ctl.fwd = false;
+            ctl.sprint = false;
+        }
+        pathDriving = false;
         ctl.apply(mc.player);
         traceHist.addFirst(trace);
         while (traceHist.size() > 6) traceHist.removeLast();
         trace = "";
+    }
+
+    /** PathExec가 이번 틱에 몸을 움직였는지 (길찾기 경로는 자체적으로 안전 확인) */
+    public boolean pathDriving;
+
+    /** 바라보는 쪽으로 한 걸음 앞이 안전한지 (3칸 안에 바닥이 있고 용암·불이 아님) */
+    public static boolean safeAhead(LocalPlayer p) {
+        if (!p.onGround()) return true;
+        net.minecraft.world.level.Level l = p.level();
+        double yaw = Math.toRadians(p.getYRot());
+        double fx = p.getX() - Math.sin(yaw) * 0.9, fz = p.getZ() + Math.cos(yaw) * 0.9;
+        int y = (int) Math.floor(p.getY() + 0.05);
+        net.minecraft.core.BlockPos at = net.minecraft.core.BlockPos.containing(fx, y, fz);
+        for (int dy = 0; dy <= 1; dy++) {
+            var s = l.getBlockState(at.above(dy));
+            if (BlockUtil.hurts(s)) return false;
+        }
+        for (int k = 1; k <= 3; k++) {
+            var s = l.getBlockState(at.below(k));
+            if (BlockUtil.isLava(s) || BlockUtil.hurts(s)) return false;
+            if (BlockUtil.floor(l, at.getX(), at.getY() - k, at.getZ(), s)) return true;
+            if (!s.getCollisionShape(l, at.below(k)).isEmpty()) return true;
+        }
+        return false;
     }
 
     /** 통합 서버에서 관리자 권한으로 명령 실행 (테스트 준비용) */
