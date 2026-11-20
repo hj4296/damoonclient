@@ -44,6 +44,8 @@ public final class Bot {
     public Task root;
     public int ticks, deaths;
     public boolean victory;
+    /** 감마팩 (밝기 1500%) */
+    public boolean gamma = true;
     public long startedAt;
     public final Deque<String> events = new ArrayDeque<>();
     /** 진단용: 마지막으로 지나간 분기 */
@@ -96,6 +98,9 @@ public final class Bot {
     public void tick() {
         Minecraft mc = mc();
         Act.tick();
+        // 감마(풀브라이트): 동굴·밤에도 화면이 보이게
+        double g = gamma ? 15.0 : 1.0;
+        if (mc.options.gamma().get() != g) ((net.damoon.bot.mixin.OptionInstanceAccessor) (Object) mc.options.gamma()).damoonbot$setValue(g);
         Control.poll(this);
         if (++statusTick % 20 == 0) Control.writeStatus(this);
         if (!running || mc.player == null || mc.level == null) return;
@@ -206,6 +211,7 @@ public final class Bot {
             }
             case "setup" -> Setup.run(this, a.length > 1 ? a[1] : "end");
             case "cmd" -> server(line.trim().substring(4));
+            case "gamma" -> { gamma = a.length < 2 || !a[1].equals("off"); log("감마 " + (gamma ? "켬 (1500%)" : "끔")); }
             case "probe" -> {
                 if (p() == null) return;
                 net.minecraft.core.BlockPos f = net.damoon.bot.path.PathExec.feet(p());
