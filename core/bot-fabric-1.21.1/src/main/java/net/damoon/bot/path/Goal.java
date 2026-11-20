@@ -86,6 +86,12 @@ public interface Goal {
         }
     }
 
+    /** 이 높이 이하로 내려가기 (동굴을 따라 내려가기) */
+    record Below(int y) implements Goal {
+        public boolean isIn(int a, int b, int c) { return b <= y; }
+        public double h(int a, int b, int c) { return Math.max(0, b - y) * 3.0; }
+    }
+
     /** 이 높이 이상으로 올라가기 (땅 위로 나가기) */
     record Above(int y) implements Goal {
         public boolean isIn(int a, int b, int c) { return b >= y; }

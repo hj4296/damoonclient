@@ -96,6 +96,15 @@ public final class Reflex {
 
         // 가까운 적과 싸우기
         LivingEntity threat = fightEnabled ? threat(p) : null;
+        if (threat != null && ranged(threat) && p.getHealth() < 7 && threat.distanceTo(p) > 4) {
+            Vec3 away = p.position().subtract(threat.position()).normalize();
+            bot.ctl.lookYaw(p, p.position().add(away.scale(5)), 0f);
+            bot.ctl.fwd = true;
+            bot.ctl.sprint = p.getFoodData().getFoodLevel() > 6;
+            if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+            doing = "체력이 낮아 " + threat.getName().getString() + " 피하는 중";
+            return true;
+        }
         if (threat != null) {
             Inv.selectWeapon(p);
             Vec3 aim = threat.position().add(0, threat.getBbHeight() * 0.7, 0);
@@ -103,6 +112,7 @@ public final class Reflex {
             double r = Act.reach(p, threat.getBoundingBox());
             if (r > 2.6) {
                 bot.ctl.fwd = true;
+                bot.ctl.sprint = r > 5 && p.getFoodData().getFoodLevel() > 6;
                 if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
             }
             if (r <= 3.0 && bot.ctl.aimed(p, 25)) Act.attack(bot, threat, 0.92f);
@@ -152,16 +162,35 @@ public final class Reflex {
         return !(e instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon);
     }
 
+    private final java.util.Map<Integer, Integer> ignoreUntil = new java.util.HashMap<>();
+    private int chaseId = -1, chaseTicks;
+    private double chaseBest;
+
+    static boolean ranged(Entity e) {
+        return e instanceof net.minecraft.world.entity.monster.AbstractSkeleton || e instanceof net.minecraft.world.entity.monster.Pillager
+                || e instanceof net.minecraft.world.entity.monster.Witch || e instanceof net.minecraft.world.entity.monster.Blaze;
+    }
+
     private LivingEntity threat(LocalPlayer p) {
         LivingEntity best = null;
         double bd = 1e9;
         for (Entity e : bot.level().entitiesForRendering()) {
             if (!hostile(e)) continue;
+            if (bot.ticks < ignoreUntil.getOrDefault(e.getId(), 0)) continue;
             double d = e.distanceTo(p);
-            double lim = e instanceof EnderMan ? 8 : 4.5;
-            if (d > lim || Math.abs(e.getY() - p.getY()) > 3) continue;
+            // 활 쏘는 몹은 멀리서도 보이면 달려가서 벰
+            double lim = e instanceof EnderMan ? 8 : ranged(e) ? 14 : 4.5;
+            if (d > lim || Math.abs(e.getY() - p.getY()) > (ranged(e) ? 6 : 3)) continue;
             if (!p.hasLineOfSight(e)) continue;
-            if (d < bd) { bd = d; best = (LivingEntity) e; }
+            double score = d - (ranged(e) ? 6 : 0);
+            if (score < bd) { bd = score; best = (LivingEntity) e; }
+        }
+        // 쫓아가도 가까워지지 않으면 (절벽 위 등) 잠시 무시
+        if (best != null) {
+            double d = best.distanceTo(p);
+            if (best.getId() != chaseId) { chaseId = best.getId(); chaseTicks = 0; chaseBest = d; }
+            if (d < chaseBest - 0.5) { chaseBest = d; chaseTicks = 0; }
+            if (++chaseTicks > 100 && d > 3.5) { ignoreUntil.put(best.getId(), bot.ticks + 20 * 30); return null; }
         }
         return best;
     }

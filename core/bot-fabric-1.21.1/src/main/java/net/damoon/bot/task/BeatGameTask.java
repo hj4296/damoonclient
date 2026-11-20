@@ -148,6 +148,24 @@ public class BeatGameTask extends Task {
         Predicate<ItemStack> planks = s -> s.is(ItemTags.PLANKS);
         int cobble = Inv.count(p, s -> s.is(Items.COBBLESTONE) || s.is(Items.COBBLED_DEEPSLATE) || s.is(Items.BLACKSTONE));
 
+        // ---- 0. 급할 때: 먹을 게 떨어짐 → 땅 위로 올라가 사냥 ----
+        int foodNow = foodCount(p);
+        if (foodNow < 2 && (p.getFoodData().getFoodLevel() < 17 || p.getHealth() < 12) && tier >= 1) {
+            stage = "먹을 게 없음 → 사냥하러";
+            BlockPos fp = PathExec.feet(p);
+            int top = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, fp.getX(), fp.getZ());
+            if (fp.getY() < top - 4 && l.getBrightness(net.minecraft.world.level.LightLayer.SKY, fp) < 8) {
+                detail = "땅 위로 올라가는 중";
+                Nav.R r = bot.nav.go(new Goal.Above(top - 1));
+                if (r == Nav.R.FAILED) bot.nav.stop();
+                return S.RUNNING;
+            }
+            if (hunterFood == null) hunterFood = new Hunter(Hunter.foodAnimals(), st -> st.has(net.minecraft.core.component.DataComponents.FOOD) || st.is(Items.FEATHER));
+            Hunter.R r = hunterFood.tick(bot);
+            detail = hunterFood.info;
+            if (r == Hunter.R.NONE) return explore(bot, "동물");
+            return S.RUNNING;
+        }
         // ---- 1. 나무 ----
         int sticks = Inv.count(p, Items.STICK);
         int needSticks = Math.max(0, 8 - sticks);
@@ -407,6 +425,14 @@ public class BeatGameTask extends Task {
         }
         BlockPos f = PathExec.feet(p);
         if (digger == null) digger = new Digger(Direction.fromYRot(p.getYRot()));
+        // 계단 파기가 막혔으면 (방향을 계속 바꿈) 길찾기로 동굴을 따라 내려감
+        if (digger.recentTurns >= 4 && f.getY() > targetY) {
+            detail = "동굴을 따라 내려가는 중 (y=" + f.getY() + ")";
+            Nav.R r = bot.nav.go(new Goal.Below(Math.max(targetY, f.getY() - 12)));
+            if (r != Nav.R.RUNNING) { digger.recentTurns = 0; bot.nav.stop(); if (r == Nav.R.FAILED) digger = new Digger(Direction.fromYRot(p.getYRot() + 90)); }
+            return S.RUNNING;
+        }
+        if (bot.ticks % 400 == 0) digger.recentTurns = 0;
         bot.nav.stop();
         digger.tick(bot, f.getY() > targetY ? Digger.Mode.STAIRS : Digger.Mode.TUNNEL);
         detail = digger.info;

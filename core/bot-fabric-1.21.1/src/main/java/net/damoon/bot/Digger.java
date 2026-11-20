@@ -17,6 +17,8 @@ public final class Digger {
     public enum Mode { STAIRS, TUNNEL }
 
     private Direction dir;
+    /** 최근에 방향을 바꾼 횟수 (많으면 막힌 것) */
+    public int recentTurns;
     private int turns, stuck;
     private BlockPos lastFeet;
     public String info = "";
@@ -28,6 +30,7 @@ public final class Digger {
     private void turn(Bot bot, String why) {
         dir = dir.getClockWise();
         turns++;
+        recentTurns++;
         bot.log("방향 바꿈: " + why);
     }
 
@@ -71,6 +74,27 @@ public final class Digger {
             }
         }
         Act.stopDig(bot);
+        if (mode == Mode.STAIRS && !BlockUtil.floor(l, floor.getX(), floor.getY(), floor.getZ(), fs) && !BlockUtil.isWater(fs)) {
+            // 아래가 비었음: 3칸 안에 땅이 있으면 그냥 내려감, 깊으면 발판을 붙여 놓음
+            int drop = 0;
+            for (int k = 1; k <= 4; k++) {
+                BlockState q = l.getBlockState(floor.below(k));
+                if (BlockUtil.isLava(q)) { drop = 99; break; }
+                if (BlockUtil.floor(l, floor.getX(), floor.getY() - k, floor.getZ(), q)) { drop = k; break; }
+            }
+            if (drop > 0 && drop <= 2) {
+                Vec3 t = new Vec3(front.getX() + 0.5, p.getY(), front.getZ() + 0.5);
+                bot.ctl.lookYaw(p, t, 40f);
+                bot.ctl.fwd = true;
+                return true;
+            }
+            if (drop != 99 && Inv.count(p, Inv.throwaway()) > 0) {
+                int r = Placer.placeAt(bot, floor, Inv.throwaway());
+                if (r != -1) return true;
+            }
+            turn(bot, "아래가 깊음");
+            return true;
+        }
         if (!BlockUtil.floor(l, floor.getX(), floor.getY(), floor.getZ(), fs) || BlockUtil.isWater(fs)) {
             // 발밑이 비었으면 블록 깔기 (2칸 이상 낭떠러지면 방향 바꿈)
             BlockState below2 = l.getBlockState(floor.below());
