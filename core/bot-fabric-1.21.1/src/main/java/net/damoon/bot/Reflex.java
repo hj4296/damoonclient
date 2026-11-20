@@ -217,14 +217,20 @@ public final class Reflex {
     public static boolean hostile(Entity e) {
         if (!(e instanceof Enemy) || !(e instanceof LivingEntity le) || !le.isAlive()) return false;
         if (e instanceof EnderMan em) return em.isCreepy();
-        if (e instanceof ZombifiedPiglin) return false;
-        if (e instanceof AbstractPiglin) return false;
+        // 중립 몹은 화가 나서 공격하려 할 때만 적
+        if (e instanceof ZombifiedPiglin zp) return zp.isAggressive();
+        if (e instanceof AbstractPiglin pg) return pg.isAggressive();
         return !(e instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon);
     }
 
     private final java.util.Map<Integer, Integer> ignoreUntil = new java.util.HashMap<>();
     private int chaseId = -1, chaseTicks;
     private double chaseBest;
+
+    private static long lastHurtStamp(LocalPlayer p) {
+        // LivingEntity.lastDamageStamp 는 비공개라 hurtTime으로 근사
+        return p.hurtTime > 0 ? p.level().getGameTime() : 0;
+    }
 
     static boolean ranged(Entity e) {
         return e instanceof net.minecraft.world.entity.monster.AbstractSkeleton || e instanceof net.minecraft.world.entity.monster.Pillager
@@ -234,6 +240,12 @@ public final class Reflex {
     private LivingEntity threat(LocalPlayer p) {
         LivingEntity best = null;
         double bd = 1e9;
+        // 방금 나를 때린 상대에게는 종류와 상관없이 반격
+        var src = p.getLastDamageSource();
+        if (src != null && src.getEntity() instanceof LivingEntity atk && atk.isAlive() && atk != p
+                && bot.level().getGameTime() - lastHurtStamp(p) < 60 && atk.distanceTo(p) < 6 && p.hasLineOfSight(atk)) {
+            return atk;
+        }
         for (Entity e : bot.level().entitiesForRendering()) {
             if (!hostile(e)) continue;
             if (bot.ticks < ignoreUntil.getOrDefault(e.getId(), 0)) continue;
