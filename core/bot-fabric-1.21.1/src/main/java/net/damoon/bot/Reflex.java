@@ -205,35 +205,19 @@ public final class Reflex {
             return true;
         }
         if (threat != null) {
-            Inv.selectWeapon(p);
-            Vec3 aim = threat.position().add(0, threat.getBbHeight() * 0.7, 0);
-            bot.ctl.lookAt(p, aim);
-            double r = Act.reach(p, threat.getBoundingBox());
             // 활 쏘는 몹에게 다가갈 때는 방패를 들고 감
-            if (ranged(threat) && r > 3.0 && p.getOffhandItem().is(Items.SHIELD)) {
+            double r = Act.reach(p, threat.getBoundingBox());
+            if (ranged(threat) && r > 3.0 && shieldOn) {
+                Inv.selectWeapon(p);
+                bot.ctl.lookAt(p, threat.getBoundingBox().getCenter());
                 bot.ctl.use = true;
-                bot.ctl.fwd = true;
+                if (!camp) bot.ctl.fwd = true;
                 if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
                 doing = "방패 들고 " + threat.getName().getString() + "에게 다가가는 중";
                 return true;
             }
-            if (r > 2.6) {
-                bot.ctl.fwd = true;
-                bot.ctl.sprint = r > 5 && p.getFoodData().getFoodLevel() > 6;
-                if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
-            }
-            // 칼 쿨다운을 기다리는 동안엔 방패를 들어 막음 (밀려나서 떨어지지 않게)
-            float charge = p.getAttackStrengthScale(0.5f);
-            boolean shield = p.getOffhandItem().is(Items.SHIELD) && !ranged(threat) && r < 4.0;
-            if (shield && charge < 0.9f) {
-                bot.ctl.use = true;
-                bot.ctl.fwd = false;
-                doing = "방패로 막으며 " + threat.getName().getString() + "와 싸우는 중";
-                return true;
-            }
-            if (p.isUsingItem() && p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; return true; }
-            if (r <= 3.0 && bot.ctl.aimed(p, 25)) Act.attack(bot, threat, 0.92f);
-            doing = "싸우는 중: " + threat.getName().getString();
+            String st = Melee.fight(bot, threat, !camp);
+            doing = threat.getName().getString() + ": " + st;
             return true;
         }
 

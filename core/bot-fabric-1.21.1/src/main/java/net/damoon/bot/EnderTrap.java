@@ -98,7 +98,7 @@ public final class EnderTrap {
                 if (r == Nav.R.FAILED) bot.nav.stop();
             } else {
                 bot.nav.stop();
-                if (bot.ctl.aimed(p, 20)) Act.attack(bot, em, 0.92f);
+                Melee.fight(bot, em, false);
             }
             return R.RUNNING;
         }
@@ -158,10 +158,8 @@ public final class EnderTrap {
                 return R.RUNNING;
             }
         }
-        // 다가오길 기다림: 닿으면 벰
-        Inv.selectWeapon(p);
-        bot.ctl.lookAt(p, em.getBoundingBox().getCenter());
-        if (reach <= 3.0 && bot.ctl.aimed(p, 20)) Act.attack(bot, em, 0.92f);
+        // 다가오길 기다림: 방패로 막다가 닿으면 치명타
+        Melee.fight(bot, em, false);
         info = boat != null ? "보트 함정 앞에서 엔더맨을 기다리는 중" : "화난 엔더맨과 싸우는 중";
         return R.RUNNING;
     }

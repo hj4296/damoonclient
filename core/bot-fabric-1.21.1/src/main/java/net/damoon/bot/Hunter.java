@@ -71,10 +71,7 @@ public final class Hunter {
         info = le.getName().getString() + " 잡는 중";
         if (r <= 3.0 && p.hasLineOfSight(le)) {
             bot.nav.stop();
-            Inv.selectWeapon(p);
-            bot.ctl.lookAt(p, le.getBoundingBox().getCenter());
-            if (r > 2.2) bot.ctl.fwd = true;
-            if (bot.ctl.aimed(p, 25)) Act.attack(bot, le, 0.9f);
+            Melee.fight(bot, le, true);
             return R.RUNNING;
         }
         BlockPos at = le.blockPosition();
