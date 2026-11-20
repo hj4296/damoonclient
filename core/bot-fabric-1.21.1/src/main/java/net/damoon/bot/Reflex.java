@@ -359,8 +359,11 @@ public final class Reflex {
             if (bot.ticks < ignoreUntil.getOrDefault(e.getId(), 0)) continue;
             double d = e.distanceTo(p);
             // 활 쏘는 몹은 멀리서도 보이면 달려가서 벰
-            double lim = e instanceof EnderMan ? 8 : ranged(e) ? 14 : 4.5;
-            if (d > lim || Math.abs(e.getY() - p.getY()) > (ranged(e) ? 6 : 3)) continue;
+            boolean bowReady = Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW);
+            boolean blaze = e instanceof net.minecraft.world.entity.monster.Blaze;
+            double lim = e instanceof EnderMan ? 8 : blaze && bowReady ? 28 : ranged(e) ? 14 : 4.5;
+            double dyLim = blaze ? 14 : ranged(e) ? 6 : 3;
+            if (d > lim || Math.abs(e.getY() - p.getY()) > dyLim) continue;
             if (!p.hasLineOfSight(e)) continue;
             double score = d - (ranged(e) ? 6 : 0);
             if (score < bd) { bd = score; best = (LivingEntity) e; }
