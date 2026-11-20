@@ -72,12 +72,23 @@ public class NetherTask extends Task {
             if (blazes == null) blazes = new Hunter(e -> e instanceof Blaze, Inv.is(Items.BLAZE_ROD));
             blazes.range = 24;
             if (spawner != null) {
-                Hunter.R r = blazes.tick(bot);
-                detail = "블레이즈 막대 " + rods + "/" + RODS + " — " + blazes.info;
-                if (r == Hunter.R.NONE) {
-                    detail = "블레이즈 스포너 옆에서 기다리는 중 (" + rods + "/" + RODS + ")";
-                    Nav.R nr = bot.nav.go(new Goal.Near(spawner, 4));
+                // 블레이즈는 날아다니므로 쫓아가지 않고 스포너 근처에 서서 다가오는 블레이즈를 상대 (반사 행동이 싸움)
+                for (var e : l.entitiesForRendering()) {
+                    if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.getItem().is(Items.BLAZE_ROD) && ie.distanceTo(p) < 12) {
+                        detail = "블레이즈 막대 줍는 중 (" + rods + "/" + RODS + ")";
+                        Nav.R nr = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0));
+                        if (nr == Nav.R.ARRIVED) { bot.ctl.lookYaw(p, ie.position(), 20f); bot.ctl.fwd = true; }
+                        if (nr == Nav.R.FAILED) bot.nav.stop();
+                        return S.RUNNING;
+                    }
+                }
+                detail = "블레이즈 스포너 근처에서 기다리는 중 (" + rods + "/" + RODS + ")";
+                if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(spawner)) > 7 * 7) {
+                    Nav.R nr = bot.nav.go(new Goal.Near(spawner, 5));
                     if (nr == Nav.R.FAILED) bot.nav.stop();
+                } else {
+                    bot.nav.stop();
+                    bot.ctl.lookAt(p, net.minecraft.world.phys.Vec3.atCenterOf(spawner));
                 }
                 return S.RUNNING;
             }
