@@ -234,6 +234,16 @@ public final class Bot {
                 switch (what) {
                     case "end" -> start(EndGameTask::new);
                     case "full" -> start(net.damoon.bot.task.BeatGameTask::new);
+                    case "ender" -> start(() -> new net.damoon.bot.task.Task() {
+                        final EnderTrap trap = new EnderTrap();
+                        public String name() { return "엔더맨 사냥 (보트 함정)"; }
+                        public String detail() { return trap.info; }
+                        public S tick(Bot b) { return Inv.count(b.p(), net.minecraft.world.item.Items.ENDER_PEARL) >= 6 ? S.DONE : (trap.tick(b) == EnderTrap.R.NONE ? S.RUNNING : S.RUNNING); }
+                    });
+                    case "idle" -> start(() -> new net.damoon.bot.task.Task() {
+                        public String name() { return "대기 (반사 행동만)"; }
+                        public S tick(Bot b) { return S.RUNNING; }
+                    });
                     default -> log("모르는 작업: " + what);
                 }
             }

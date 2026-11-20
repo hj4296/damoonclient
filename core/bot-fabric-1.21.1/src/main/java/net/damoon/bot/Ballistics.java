@@ -13,9 +13,21 @@ public final class Ballistics {
     public static final double FULL = 3.0;
 
     /** 수평 거리 d에 도달했을 때 높이 (도달 못 하면 NaN). deg는 위쪽이 +. */
+    private static double gravity = 0.05;
+
+    private static double addVh, addVy;
+
+    /** 엔더 진주(중력 0.03, 속도 1.5)용. 던지는 사람의 속도(수평 진행 방향 성분, 수직)가 더해짐 */
+    public static double[] solvePearl(Vec3 from, Vec3 to, double alongVel, double upVel) {
+        gravity = 0.03;
+        addVh = alongVel;
+        addVy = upVel;
+        try { return solve(from, to, 1.5); } finally { gravity = 0.05; addVh = 0; addVy = 0; }
+    }
+
     private static double[] simulate(double deg, double d, double v) {
         double a = Math.toRadians(deg);
-        double vh = v * Math.cos(a), vy = v * Math.sin(a);
+        double vh = v * Math.cos(a) + addVh, vy = v * Math.sin(a) + addVy;
         double h = 0, y = 0;
         for (int t = 1; t < 400; t++) {
             double nh = h + vh, ny = y + vy;
@@ -26,7 +38,7 @@ public final class Ballistics {
             h = nh;
             y = ny;
             vh *= 0.99;
-            vy = vy * 0.99 - 0.05;
+            vy = vy * 0.99 - gravity;
             if (vh < 1e-3) break;
         }
         return null;

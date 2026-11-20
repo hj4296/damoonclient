@@ -31,6 +31,9 @@ public class NetherTask extends Task {
     private int exploreLeg, exploreTicks;
     private String detail = "";
     private BlockPos fortWalk;
+    private net.damoon.bot.EnderTrap trap;
+    private CraftTask boatCraft;
+    private boolean boatTried;
     private BlockPos safeSpot;
     private boolean healing;
     private int fortTicks;
@@ -148,11 +151,21 @@ public class NetherTask extends Task {
         }
         // 2) 엔더 진주
         if (pearls < PEARLS) {
-            if (endermen == null) endermen = new Hunter(e -> e instanceof EnderMan, Inv.is(Items.ENDER_PEARL));
-            endermen.range = 40;
-            Hunter.R r = endermen.tick(bot);
-            detail = "엔더 진주 " + pearls + "/" + PEARLS + " — " + endermen.info;
-            if (r == Hunter.R.NONE) return explore(bot, "엔더맨 찾기");
+            // 보트가 없으면 판자 5개로 만듦 (엔더맨을 보트에 태워 순간이동을 막는 함정)
+            if (!net.damoon.bot.EnderTrap.hasBoat(p) && boatCraft == null && net.damoon.bot.EnderTrap.boatFor(p) != null && !boatTried) {
+                boatCraft = new CraftTask(net.damoon.bot.EnderTrap.boatFor(p), 1);
+                boatTried = true;
+            }
+            if (boatCraft != null) {
+                S r = boatCraft.tick(bot);
+                detail = "엔더맨 함정용 보트 만드는 중";
+                if (r != S.RUNNING) boatCraft = null;
+                return S.RUNNING;
+            }
+            if (trap == null) trap = new net.damoon.bot.EnderTrap();
+            net.damoon.bot.EnderTrap.R r = trap.tick(bot);
+            detail = "엔더 진주 " + pearls + "/" + PEARLS + " — " + trap.info;
+            if (r == net.damoon.bot.EnderTrap.R.NONE) return explore(bot, "엔더맨 찾기");
             return S.RUNNING;
         }
         // 3) 포털로 돌아가기

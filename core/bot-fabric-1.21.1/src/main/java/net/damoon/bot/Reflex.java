@@ -48,6 +48,9 @@ public final class Reflex {
             }
         }
 
+        // 엔더 진주로 위기 탈출 (공허·용암·포위)
+        if (Pearl.tick(bot)) return true;
+
         // 높은 곳에서 떨어지는 중이면 물 양동이로 착지 (MLG)
         if (!p.onGround() && !p.isInWater() && p.fallDistance > 4.5 && p.getDeltaMovement().y < -0.5
                 && bot.level().dimension() != net.minecraft.world.level.Level.NETHER && Inv.has(p, Items.WATER_BUCKET)) {
@@ -62,6 +65,7 @@ public final class Reflex {
                 if (!gs.getCollisionShape(bot.level(), g).isEmpty()) {
                     if (p.getY() - (g.getY() + 1) < 2.6 && p.getXRot() > 80) {
                         net.minecraft.client.Minecraft.getInstance().gameMode.useItem(p, net.minecraft.world.InteractionHand.MAIN_HAND);
+                        if (mlgWater == null) bot.log(String.format("물 낙법! (%.0f칸 낙하)", p.fallDistance));
                         mlgWater = g.above();
                         mlgTicks = 0;
                     }

@@ -140,23 +140,26 @@ public final class PathExec {
                 c.look(p.getYRot(), 90f);
             }
             case BRIDGE -> {
+                // 닌자 브릿지: 가는 방향 반대를 보고 아래를 내려다보며 뒷걸음질, 가장자리에서만 웅크려 블록을 깖
+                Direction dir = Direction.getNearest(to.x - from.x, 0, to.z - from.z);
+                float backYaw = dir.getOpposite().toYRot();
                 BlockPos fl = BlockPos.of(to.place);
                 BlockState fs = l.getBlockState(fl);
+                c.look(backYaw, 78f);
                 if (BlockUtil.floor(l, fl.getX(), fl.getY(), fl.getZ(), fs) && !BlockUtil.isWater(fs)) {
-                    walkTo(bot, to, false);
-                } else {
-                    c.sneak = true;
-                    if (!at(f, from) || hdist(p, from) > 0.35) {
-                        walkTo(bot, from, false);
-                        c.sneak = true;
-                        return R.RUNNING;
-                    }
-                    Direction dir = Direction.getNearest(to.x - from.x, 0, to.z - from.z);
-                    BlockPos against = new BlockPos(from.x, from.y - 1, from.z);
-                    Vec3 hit = Vec3.atCenterOf(against).add(dir.getStepX() * 0.5, 0, dir.getStepZ() * 0.5);
-                    c.lookAt(p, hit);
-                    if (c.aimed(p, 10) && !Act.place(bot, against, dir)) { why = "다리 놓을 블록 없음"; return R.FAILED; }
+                    // 블록이 깔렸으면 뒷걸음질로 그 위로
+                    if (c.aimed(p, 25)) c.back = true;
+                    if (hdist(p, to) < 0.3) c.back = false;
+                    break;
                 }
+                if (!at(f, from)) { walkTo(bot, from, false); c.sneak = true; return R.RUNNING; }
+                if (!c.aimed(p, 12)) { c.sneak = true; return R.RUNNING; }
+                double along = (p.getX() - (from.x + 0.5)) * dir.getStepX() + (p.getZ() - (from.z + 0.5)) * dir.getStepZ();
+                if (along < 0.1) { c.back = true; break; }                 // 가장자리까지 뒷걸음
+                c.sneak = true;                                              // 가장자리: 웅크림
+                if (along < 0.3) c.back = true;
+                BlockPos against = new BlockPos(from.x, from.y - 1, from.z);
+                if (!Act.place(bot, against, dir)) { why = "다리 놓을 블록 없음"; return R.FAILED; }
             }
             default -> walkTo(bot, to, true);
         }
