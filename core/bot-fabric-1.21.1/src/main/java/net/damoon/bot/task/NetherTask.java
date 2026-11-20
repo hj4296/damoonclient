@@ -83,6 +83,7 @@ public class NetherTask extends Task {
                 if (!healing) bot.log("체력 " + (int) p.getHealth() + " → 물러나서 회복");
                 healing = p.getHealth() < 19;
                 bot.reflex.forceEat = healing;
+                bot.reflex.camp = false;
                 if (healing) {
                     detail = "물러나서 회복하는 중 (체력 " + (int) p.getHealth() + ")";
                     BlockPos to = safeSpot != null ? safeSpot : portal;
@@ -104,13 +105,16 @@ public class NetherTask extends Task {
                         return S.RUNNING;
                     }
                 }
-                detail = "블레이즈 스포너 근처에서 기다리는 중 (" + rods + "/" + RODS + ")";
-                if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(spawner)) > 7 * 7) {
-                    Nav.R nr = bot.nav.go(new Goal.Near(spawner, 5));
-                    if (nr == Nav.R.FAILED) bot.nav.stop();
+                // 스포너 바로 옆에 붙어 서서 생기는 블레이즈를 바로 벰
+                detail = "블레이즈 스포너 옆에서 기다리는 중 (" + rods + "/" + RODS + ")";
+                if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(spawner)) > 2.6 * 2.6) {
+                    bot.reflex.camp = false;
+                    Nav.R nr = bot.nav.go(new Goal.Reach(spawner, 1.5));
+                    if (nr == Nav.R.FAILED) { bot.nav.stop(); bot.nav.go(new Goal.Near(spawner, 3)); }
                 } else {
+                    bot.reflex.camp = true;
                     bot.nav.stop();
-                    bot.ctl.lookAt(p, net.minecraft.world.phys.Vec3.atCenterOf(spawner));
+                    bot.ctl.lookAt(p, net.minecraft.world.phys.Vec3.atCenterOf(spawner).add(0, 1, 0));
                 }
                 return S.RUNNING;
             }

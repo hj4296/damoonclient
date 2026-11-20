@@ -24,6 +24,8 @@ public final class Reflex {
     public boolean fightEnabled = true;
     /** 회복 중: 배고픔을 가득 채워 자연 회복이 되게 */
     public boolean forceEat;
+    /** 자리 지키기 (스포너 옆): 쫓아가지 않고 다가오는 적만 벰 */
+    public boolean camp;
     private net.minecraft.core.BlockPos mlgWater;
     private int mlgTicks;
 
@@ -152,7 +154,7 @@ public final class Reflex {
                 doing = "블레이즈 공격!";
             } else {
                 bot.ctl.use = true;
-                if (!danger && r > 3.0) bot.ctl.fwd = true;
+                if (!danger && r > 3.0 && !camp) bot.ctl.fwd = true;
                 doing = danger ? "방패로 화염구 막는 중" : "방패 들고 블레이즈에게 다가가는 중";
             }
             return true;
