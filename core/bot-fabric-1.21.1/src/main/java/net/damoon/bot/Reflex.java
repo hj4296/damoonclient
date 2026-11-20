@@ -61,6 +61,15 @@ public final class Reflex {
             }
         }
 
+        // 위더·독에 걸리면 우유
+        if ((p.hasEffect(MobEffects.WITHER) || p.hasEffect(MobEffects.POISON)) && Inv.has(p, Items.MILK_BUCKET)) {
+            if (p.isUsingItem() && !p.getUseItem().is(Items.MILK_BUCKET)) { bot.ctl.use = false; return true; }
+            Inv.select(p, Inv.is(Items.MILK_BUCKET));
+            bot.ctl.use = true;
+            doing = "우유 마시는 중 (위더/독 해제)";
+            return true;
+        }
+
         // 엔더 진주로 위기 탈출 (공허·용암·포위)
         if (Pearl.tick(bot)) return true;
 
@@ -284,7 +293,8 @@ public final class Reflex {
     }
 
     static boolean ranged(Entity e) {
-        return e instanceof net.minecraft.world.entity.monster.AbstractSkeleton || e instanceof net.minecraft.world.entity.monster.Pillager
+        return (e instanceof net.minecraft.world.entity.monster.AbstractSkeleton && !(e instanceof net.minecraft.world.entity.monster.WitherSkeleton))
+                || e instanceof net.minecraft.world.entity.monster.Pillager
                 || e instanceof net.minecraft.world.entity.monster.Witch || e instanceof net.minecraft.world.entity.monster.Blaze;
     }
 

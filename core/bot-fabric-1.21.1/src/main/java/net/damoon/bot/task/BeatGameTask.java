@@ -299,10 +299,10 @@ public class BeatGameTask extends Task {
         }
         // ---- 5. 철 ----
         int ironHave = Inv.count(p, Items.IRON_INGOT) + Inv.count(p, Items.RAW_IRON) + ironInGear(p);
-        if (ironHave < 30) {
-            stage = "5. 철 캐기 (" + ironHave + "/30)";
+        if (ironHave < 33) {
+            stage = "5. 철 캐기 (" + ironHave + "/33)";
             return mineDeep(bot, "iron", st -> st.is(Blocks.IRON_ORE) || st.is(Blocks.DEEPSLATE_IRON_ORE), is(Items.RAW_IRON),
-                    Inv.count(p, Items.RAW_IRON) + (30 - ironHave), 16);
+                    Inv.count(p, Items.RAW_IRON) + (33 - ironHave), 16);
         }
         if (Inv.count(p, Items.RAW_IRON) > 0 && !cool(bot, "smeltiron")) {
             stage = "5. 철 굽기";
@@ -360,6 +360,16 @@ public class BeatGameTask extends Task {
                 }
                 stage = "7. 금 투구";
                 return run(bot, "ghelm", () -> new CraftTask(Items.GOLDEN_HELMET, 1));
+            }
+            // 우유 (위더 스켈레톤의 위더 효과를 풀기 위해) — 빈 양동이가 없으면 하나 더 만듦
+            if (!Inv.has(p, Items.MILK_BUCKET) && !cool(bot, "milk")) {
+                if (!Inv.has(p, Items.BUCKET)) {
+                    if (Inv.count(p, Items.IRON_INGOT) >= 3) { stage = "7. 우유용 양동이"; return run(bot, "bucket2", () -> new CraftTask(Items.BUCKET, 1)); }
+                } else {
+                    stage = "7. 소에게서 우유 받기";
+                    S r = milk(bot, p, l);
+                    if (r != null) return r;
+                }
             }
             if (!Inv.has(p, Items.FLINT_AND_STEEL)) {
                 if (Inv.count(p, Items.FLINT) < 1) {
@@ -477,6 +487,38 @@ public class BeatGameTask extends Task {
         return S.RUNNING;
     }
 
+    private int cowId = -1, milkTicks;
+
+    /** 빈 양동이로 소 우유 받기 (소가 안 보이면 null → 잠시 뒤 다시) */
+    private S milk(Bot bot, LocalPlayer p, ClientLevel l) {
+        net.minecraft.world.entity.Entity cow = cowId >= 0 ? l.getEntity(cowId) : null;
+        if (cow == null || !cow.isAlive()) {
+            cow = null;
+            double bd = 1e9;
+            for (var e : l.entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.animal.Cow c && !c.isBaby() && c.distanceTo(p) < 40 && c.distanceTo(p) < bd) { bd = c.distanceTo(p); cow = c; }
+            if (cow == null) { fail(bot, "milk", 20 * 60 * 2); return null; }
+            cowId = cow.getId();
+            milkTicks = 0;
+        }
+        if (++milkTicks > 20 * 40) { cowId = -1; fail(bot, "milk", 20 * 60 * 2); return null; }
+        double r = net.damoon.bot.Act.reach(p, cow.getBoundingBox());
+        detail = "소에게 다가가는 중";
+        if (r > 2.8) {
+            Nav.R nr = bot.nav.go(new Goal.Near(cow.blockPosition(), 1.5));
+            if (nr == Nav.R.FAILED) { bot.nav.stop(); cowId = -1; }
+            return S.RUNNING;
+        }
+        bot.nav.stop();
+        Inv.select(p, Inv.is(Items.BUCKET));
+        bot.ctl.lookAt(p, cow.getBoundingBox().getCenter());
+        if (bot.ctl.aimed(p, 15) && p.getMainHandItem().is(Items.BUCKET)) {
+            net.minecraft.client.Minecraft.getInstance().gameMode.interact(p, cow, net.minecraft.world.InteractionHand.MAIN_HAND);
+            detail = "우유 받는 중";
+        }
+        return S.RUNNING;
+    }
+
     private String hunterKey = "";
     private Hunter hunterFood;
     private final java.util.Set<Integer> lootIgnore = new java.util.HashSet<>();
@@ -585,7 +627,7 @@ public class BeatGameTask extends Task {
 
     private static int ironInGear(LocalPlayer p) {
         int n = 0;
-        Object[][] cost = {{Items.IRON_PICKAXE, 3}, {Items.IRON_SWORD, 2}, {Items.SHIELD, 1}, {Items.BUCKET, 3}, {Items.WATER_BUCKET, 3}, {Items.LAVA_BUCKET, 3},
+        Object[][] cost = {{Items.IRON_PICKAXE, 3}, {Items.IRON_SWORD, 2}, {Items.SHIELD, 1}, {Items.BUCKET, 3}, {Items.WATER_BUCKET, 3}, {Items.LAVA_BUCKET, 3}, {Items.MILK_BUCKET, 3},
                 {Items.IRON_CHESTPLATE, 8}, {Items.IRON_LEGGINGS, 7}, {Items.IRON_BOOTS, 4}, {Items.IRON_HELMET, 5}};
         for (Object[] c : cost) {
             Item it = (Item) c[0];
