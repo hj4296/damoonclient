@@ -30,6 +30,9 @@ public class NetherTask extends Task {
     private BlockPos exploreTo;
     private int exploreLeg, exploreTicks;
     private String detail = "";
+    private BlockPos fortWalk;
+    private int fortTicks;
+    private final java.util.Set<Long> visited = new java.util.HashSet<>();
 
     @Override public String name() { return "네더"; }
     @Override public String detail() { return detail; }
@@ -78,12 +81,30 @@ public class NetherTask extends Task {
                 }
                 return S.RUNNING;
             }
-            BlockPos fort = Scan.nearest(l, f, 6, 20, 110, s -> s.is(Blocks.NETHER_BRICKS), null);
-            if (fort != null) {
-                detail = "요새 발견! 들어가는 중";
-                Nav.R nr = bot.nav.go(new Goal.Near(fort, 3));
-                if (nr == Nav.R.FAILED) bot.nav.stop();
-                if (nr == Nav.R.ARRIVED) explore(bot, "요새 안 스포너 찾기");
+            // 요새 벽돌 위(걸을 수 있는 곳)를 따라 요새 안을 돌아다니며 스포너를 찾음
+            if (fortWalk == null || ++fortTicks > 20 * 50) {
+                fortTicks = 0;
+                java.util.List<BlockPos> bricks = Scan.find(l, f, 5, 20, 110, s -> s.is(Blocks.NETHER_BRICKS),
+                        b -> l.getBlockState(b.above()).isAir() && l.getBlockState(b.above(2)).isAir() && !visited.contains(b.asLong() >> 6), 400);
+                BlockPos pick = null;
+                double best = -1;
+                for (BlockPos b : bricks) {
+                    double d = Math.sqrt(b.distSqr(f));
+                    if (d < 12) continue;
+                    double score = Math.min(d, 60) - Math.abs(b.getY() - f.getY()) * 2 + p.getRandom().nextDouble() * 15;
+                    if (score > best) { best = score; pick = b; }
+                }
+                fortWalk = pick;
+                if (pick != null) bot.log("요새 안을 돌아다니며 스포너 찾기 → " + pick.toShortString());
+            }
+            if (fortWalk != null) {
+                detail = "요새 안에서 블레이즈 스포너 찾는 중";
+                Nav.R nr = bot.nav.go(new Goal.Near(fortWalk.above(), 2));
+                if (nr != Nav.R.RUNNING) {
+                    visited.add(fortWalk.asLong() >> 6);
+                    fortWalk = null;
+                    bot.nav.stop();
+                }
                 return S.RUNNING;
             }
             return explore(bot, "요새 찾기");
