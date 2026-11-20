@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "damoonbot",
+  "version": "${version}",
+  "name": "Damoon Bot",
+  "description": "혼자 판단해서 마인크래프트를 진행하고 엔더 드래곤을 잡는 자동 플레이 봇",
+  "authors": ["Damoon"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": { "client": ["net.damoon.bot.DamoonBot"] },
+  "mixins": ["damoonbot.mixins.json"],
+  "depends": { "fabricloader": ">=0.15.0", "fabric-api": "*", "minecraft": "1.21.1", "java": ">=21" }
+}
