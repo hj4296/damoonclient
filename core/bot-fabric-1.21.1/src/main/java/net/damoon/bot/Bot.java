@@ -50,6 +50,9 @@ public final class Bot {
     public net.minecraft.core.BlockPos deathPos;
     public net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> deathDim;
     public int deathTick;
+    /** 작업이 다시 시작돼도(죽음 등) 기억할 것: 네더를 마쳤는지, 포털 틀에 끼운 눈 */
+    public boolean pastNether;
+    public int framesWithEyes;
     public long startedAt;
     public final Deque<String> events = new ArrayDeque<>();
     /** 진단용: 마지막으로 지나간 분기 */

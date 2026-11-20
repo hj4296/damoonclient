@@ -355,6 +355,17 @@ public final class Reflex {
                 doing = threat.getName().getString() + " 활로 저격";
                 return true;
             }
+            // 약한 몹(좀벌레 등)은 칼이 준비됐을 때만 한 번 베고, 나머지 틱엔 하던 일을 계속함
+            if (threat.getMaxHealth() <= 10 && !(threat instanceof Creeper) && p.getHealth() >= 8) {
+                if (r <= 3.0 && p.getAttackStrengthScale(0.5f) >= 0.9f) {
+                    Inv.selectWeapon(p);
+                    bot.ctl.lookAt(p, threat.getBoundingBox().getCenter());
+                    if (bot.ctl.aimed(p, 30)) Act.attack(bot, threat, 0.9f);
+                    doing = threat.getName().getString() + " 베기";
+                    return true;
+                }
+                return false;
+            }
             String st = Melee.fight(bot, threat, !camp);
             doing = threat.getName().getString() + ": " + st;
             return true;

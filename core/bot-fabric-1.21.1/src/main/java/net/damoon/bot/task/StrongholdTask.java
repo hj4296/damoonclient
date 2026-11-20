@@ -41,6 +41,17 @@ public class StrongholdTask extends Task {
     private BlockPos room;
     private String detail = "";
 
+    /** 이미 포털 틀에 끼운 눈 개수 (방을 찾았을 때만) */
+    public int placedEyes(ClientLevel l) {
+        if (room == null) return 0;
+        int n = 0;
+        for (BlockPos q : BlockPos.betweenClosed(room.offset(-6, -2, -6), room.offset(6, 2, 6))) {
+            BlockState st = l.getBlockState(q);
+            if (st.is(Blocks.END_PORTAL_FRAME) && st.getValue(EndPortalFrameBlock.HAS_EYE)) n++;
+        }
+        return n;
+    }
+
     @Override public String name() { return "요새 찾기"; }
     @Override public String detail() { return detail; }
 
@@ -167,7 +178,21 @@ public class StrongholdTask extends Task {
         }
     }
 
+    private boolean spawnerGone;
+
     private S gotoRoom(Bot bot, LocalPlayer p, ClientLevel l, BlockPos f) {
+        // 포털 방의 좀벌레 스포너부터 부숨 (계속 좀벌레가 나와서 방해)
+        if (!spawnerGone) {
+            BlockPos sp = Scan.nearest(l, room, 1, room.getY() - 3, room.getY() + 6, s -> s.is(Blocks.SPAWNER), null);
+            if (sp == null || sp.distSqr(room) > 14 * 14) spawnerGone = true;
+            else {
+                detail = "좀벌레 스포너 부수는 중";
+                if (Act.reach(p, new net.minecraft.world.phys.AABB(sp)) <= 4.5) { bot.nav.stop(); Act.dig(bot, sp); }
+                else { Nav.R r = bot.nav.go(new Goal.Reach(sp, 4.0)); if (r == Nav.R.FAILED) { bot.nav.stop(); spawnerGone = true; } }
+                if (!l.getBlockState(sp).is(Blocks.SPAWNER)) { spawnerGone = true; bot.log("좀벌레 스포너를 부숨"); }
+                return S.RUNNING;
+            }
+        }
         List<BlockPos> frames = Scan.find(l, room, 1, room.getY() - 2, room.getY() + 2, s -> s.is(Blocks.END_PORTAL_FRAME), null, 16);
         BlockPos empty = null;
         double bd = 1e9;

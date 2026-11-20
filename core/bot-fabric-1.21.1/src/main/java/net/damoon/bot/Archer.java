@@ -11,6 +11,8 @@ public final class Archer {
     public int shots;
 
     public boolean ready() { return cooldown <= 0; }
+    /** 높은 포물선으로 쏨 (가만히 있는 표적만) */
+    public boolean high;
 
     private boolean snapped;
 
@@ -52,7 +54,7 @@ public final class Archer {
         if (!p.isUsingItem() && !Inv.select(p, Inv.is(Items.BOW))) return false;
         Vec3 from = p.getEyePosition().subtract(0, 0.1, 0);
         Vec3 aim = target;
-        double[] s = Ballistics.solve(from, aim, Ballistics.FULL);
+        double[] s = high && vel == null ? Ballistics.solveHigh(from, aim, Ballistics.FULL) : Ballistics.solve(from, aim, Ballistics.FULL);
         if (vel != null) {
             for (int k = 0; k < 4 && s != null; k++) {
                 aim = target.add(vel.scale(s[1]));

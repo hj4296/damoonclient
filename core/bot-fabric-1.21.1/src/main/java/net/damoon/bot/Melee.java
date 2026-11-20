@@ -38,7 +38,7 @@ public final class Melee {
     /** 다른 근접 몹이 곧 나를 칠 수 있는 자리에 있는지 (그러면 방패를 내리면 안 됨) */
     private static boolean othersThreat(Bot bot, LocalPlayer p, LivingEntity t) {
         for (Entity e : bot.level().entitiesForRendering()) {
-            if (e == t || !Tower.groundMelee(e)) continue;
+            if (e == t || !Tower.groundMelee(e) || ((LivingEntity) e).getMaxHealth() <= 10) continue;
             double ox = e.getX() - p.getX(), oz = e.getZ() - p.getZ();
             double arm = e.getBbWidth() / 2 + 0.83 + p.getBbWidth() / 2;
             if (Math.max(Math.abs(ox), Math.abs(oz)) > arm + 1.2 || Math.abs(e.getY() - p.getY()) > 2.5) continue;
@@ -62,6 +62,16 @@ public final class Melee {
         // 방패 근접전: 상대 팔이 안 닿는 거리(약 2칸)이거나 방금 휘둘러 막은 직후에만 방패를 내리고 벰.
         // 그 밖엔 방패를 상대 쪽으로 들고 있음 (정면 공격은 모두 막고, 막으면 상대가 밀려남)
         trackSwing(bot, t);
+        // 약한 몹(좀벌레·엔더마이트 등 체력 10 이하)은 방패로 기다리지 않고 바로 벰 (칼 휩쓸기로 여러 마리)
+        boolean weakMob = t.getMaxHealth() <= 10 || t instanceof net.minecraft.world.entity.monster.Silverfish
+                || t instanceof net.minecraft.world.entity.monster.Endermite;
+        if (weakMob) {
+            bot.ctl.use = false;
+            if (p.isUsingItem()) return "방패 내림";
+            if (r > 2.8 && approach) { bot.ctl.fwd = true; if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true; }
+            if (r <= 3.0 && bot.ctl.aimed(p, 30) && Act.attack(bot, t, 0.85f)) return "약한 몹 베기";
+            return "약한 몹 상대";
+        }
         boolean meleeMob = !(t instanceof net.minecraft.world.entity.monster.Creeper) && !Reflex.ranged(t)
                 && !(t instanceof net.minecraft.world.entity.monster.Blaze) && Reflex.hostile(t);
         if (shield && meleeMob) {

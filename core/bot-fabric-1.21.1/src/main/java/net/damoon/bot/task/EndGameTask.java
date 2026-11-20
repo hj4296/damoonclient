@@ -18,6 +18,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.entity.AreaEffectCloud;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.boss.enderdragon.EndCrystal;
 import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.entity.boss.enderdragon.phases.DragonPhaseInstance;
@@ -78,6 +79,21 @@ public class EndGameTask extends Task {
         ClientLevel l = bot.level();
         bot.reflex.holdEating = false;
 
+        // 따라오는 작은 몹(좀벌레 등)은 먼저 다 잡음 — 포털 들어가기 전, 그리고 엔드 시작 발판 위에서 (밀려 떨어지지 않게)
+        Entity pest = null;
+        for (Entity e : l.entitiesForRendering())
+            if (e instanceof net.minecraft.world.entity.monster.Silverfish || e instanceof net.minecraft.world.entity.monster.Endermite)
+                if (((LivingEntity) e).isAlive() && e.distanceTo(p) < 7 && Math.abs(e.getY() - p.getY()) < 3) { pest = e; break; }
+        if (pest != null) {
+            bot.nav.stop();
+            bot.ctl.sneak = true;
+            Inv.selectWeapon(p);
+            bot.ctl.lookAt(p, pest.getBoundingBox().getCenter());
+            if (Act.reach(p, pest.getBoundingBox()) <= 3.0 && bot.ctl.aimed(p, 30)) Act.attack(bot, pest, 0.85f);
+            detail = "따라온 " + pest.getName().getString() + " 먼저 잡는 중 (웅크린 채)";
+            if (l.dimension() == Level.END && !wasInEnd) { wasInEnd = true; bot.log("엔드 도착!"); }
+            return S.RUNNING;
+        }
         if (l.dimension() != Level.END) {
             if (wasInEnd) return S.DONE;
             return enterPortal(bot, p, l);
@@ -93,7 +109,8 @@ public class EndGameTask extends Task {
         List<EndCrystal> crystals = new ArrayList<>();
         for (Entity e : l.entitiesForRendering()) {
             if (e instanceof EnderDragon d && d.isAlive()) dragon = d;
-            if (e instanceof EndCrystal c && c.isAlive() && c.getY() > 60 && Math.hypot(c.getX(), c.getZ()) > 20) crystals.add(c);
+            // 철창 안 크리스탈 2개는 그냥 둠: 옆에서 부수면 폭발에 죽고, 드래곤이 가운데 앉아 있을 땐 멀어서 회복도 못 함
+            if (e instanceof EndCrystal c && c.isAlive() && c.getY() > 60 && Math.hypot(c.getX(), c.getZ()) > 20 && !caged(l, c)) crystals.add(c);
         }
 
         // 브레스 피하기
@@ -109,12 +126,24 @@ public class EndGameTask extends Task {
             if (away.lengthSqr() < 0.01) away = new Vec3(-p.getX(), 0, -p.getZ());
             // 섬 밖으로 나가지 않게 가운데 쪽으로 살짝 꺾음
             Vec3 toCenter = new Vec3(-p.getX(), 0, -p.getZ()).normalize().scale(0.4);
-            Vec3 dir = away.normalize().add(toCenter);
-            bot.ctl.lookYaw(p, p.position().add(dir.scale(5)), 5f);
-            bot.ctl.fwd = true;
-            bot.ctl.sprint = true;
-            if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+            Vec3 dir = away.normalize().add(toCenter).normalize();
+            // 발밑이 있는 방향으로만 (다리 위·섬 가장자리에서 공허로 달려가지 않게): 원래 방향에서 가까운 안전한 방향을 고름
+            Vec3 pick = null;
+            double bestDot = -2;
+            for (int k = 0; k < 16; k++) {
+                double a = k * Math.PI / 8;
+                Vec3 d = new Vec3(Math.cos(a), 0, Math.sin(a));
+                boolean ok = true;
+                for (double t = 1.0; t <= 3.0 && ok; t += 1.0)
+                    if (!Bot.safeAheadToward(p, p.getX() + d.x * t, p.getZ() + d.z * t)) ok = false;
+                if (ok && d.dot(dir) > bestDot) { bestDot = d.dot(dir); pick = d; }
+            }
             bot.reflex.holdEating = true; // 구름 안에서 멈춰서 먹지 않기
+            if (pick == null) { detail = "브레스 — 피할 땅이 없어 웅크리고 버팀"; bot.ctl.sneak = true; return S.RUNNING; }
+            bot.ctl.lookYaw(p, p.position().add(pick.scale(5)), 5f);
+            bot.ctl.fwd = true;
+            bot.ctl.sprint = bestDot > 0;
+            if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
             return S.RUNNING;
         }
 
@@ -238,15 +267,18 @@ public class EndGameTask extends Task {
             return S.RUNNING;
         }
         Vec3 from = p.getEyePosition().subtract(0, 0.1, 0);
-        boolean here = p.onGround() && from.distanceTo(ctr) < 48 && Ballistics.clearShot(l, p, from, ctr, Ballistics.FULL);
+        boolean lowOk = p.onGround() && from.distanceTo(ctr) < 48 && Ballistics.clearShot(l, p, from, ctr, Ballistics.FULL);
+        boolean highOk = !lowOk && p.onGround() && from.distanceTo(ctr) < 60 && Ballistics.clearShot(l, p, from, ctr, Ballistics.FULL, true);
+        boolean here = lowOk || highOk;
         if (here) {
+            archer.high = highOk;
             bot.nav.stop();
             detail = "크리스탈 조준 (남은 " + left + ", " + (crystalShots + 1) + "번째 화살)";
             if (archer.tick(bot, ctr, null)) {
                 spotShots++;
                 crystalShots++;
                 shotsAt.put(crystalId, crystalShots);
-                double[] s = Ballistics.solve(from, ctr, Ballistics.FULL);
+                double[] s = highOk ? Ballistics.solveHigh(from, ctr, Ballistics.FULL) : Ballistics.solve(from, ctr, Ballistics.FULL);
                 waitShot = (int) (s == null ? 30 : s[1]) + 12;
                 bot.log("크리스탈에 화살 발사 (" + crystalShots + ")");
                 if (spotShots >= 3) {
@@ -286,7 +318,8 @@ public class EndGameTask extends Task {
             bot.nav.stop();
         } else if (r == Nav.R.ARRIVED) {
             // 도착했는데 못 쏘면 다른 자리
-            if (!Ballistics.clearShot(l, p, p.getEyePosition().subtract(0, 0.1, 0), ctr, Ballistics.FULL)) {
+            Vec3 e2 = p.getEyePosition().subtract(0, 0.1, 0);
+            if (!Ballistics.clearShot(l, p, e2, ctr, Ballistics.FULL) && !Ballistics.clearShot(l, p, e2, ctr, Ballistics.FULL, true)) {
                 badSpots.add(spot.asLong());
                 spot = null;
             }
@@ -297,19 +330,19 @@ public class EndGameTask extends Task {
     private BlockPos findSpot(ClientLevel l, LocalPlayer p, Vec3 ctr) {
         BlockPos best = null;
         double bs = 1e9;
-        for (int r : new int[]{12, 16, 20, 24, 28, 9}) {
+        for (int r : new int[]{12, 16, 20, 24, 28, 9, 34, 40}) {
             for (int a = 0; a < 32; a++) {
                 double ang = a * Math.PI * 2 / 32;
                 int x = (int) Math.floor(ctr.x + Math.cos(ang) * r), z = (int) Math.floor(ctr.z + Math.sin(ang) * r);
                 if (!l.hasChunk(x >> 4, z >> 4)) continue;
                 int y = groundY(l, x, z);
-                if (y < 20 || Math.abs(y - p.getY()) > 7) continue;
+                if (y < 20 || Math.abs(y - p.getY()) > 14) continue;
                 if (!l.getBlockState(new BlockPos(x, y - 1, z)).is(Blocks.END_STONE)) continue;
                 if (badSpots.contains(BlockPos.asLong(x, y, z))) continue;
                 if (!BlockUtil.floor(l, x, y - 1, z, l.getBlockState(new BlockPos(x, y - 1, z)))) continue;
                 if (BlockUtil.isWater(l.getBlockState(new BlockPos(x, y - 1, z)))) continue;
                 Vec3 eye = new Vec3(x + 0.5, y + 1.62 - 0.1, z + 0.5);
-                if (!Ballistics.clearShot(l, p, eye, ctr, Ballistics.FULL)) continue;
+                if (!Ballistics.clearShot(l, p, eye, ctr, Ballistics.FULL) && !Ballistics.clearShot(l, p, eye, ctr, Ballistics.FULL, true)) continue;
                 double score = Math.sqrt(p.distanceToSqr(x + 0.5, y, z + 0.5)) + Math.abs(r - 16) * 0.7;
                 if (score < bs) { bs = score; best = new BlockPos(x, y, z); }
             }
@@ -339,7 +372,8 @@ public class EndGameTask extends Task {
         LocalPlayer p = bot.p();
         BlockPos best = null;
         double bd = 1e9;
-        for (int dist : new int[]{6, 5}) {
+        // 크리스탈 폭발(9칸 안은 철 갑옷으로도 위험)을 피해 10칸쯤 떨어진 곳에 기둥
+        for (int dist : new int[]{10, 9, 11, 8}) {
             for (int[] d : dirs) {
                 int x = cx + d[0] * dist, z = cz + d[1] * dist;
                 int y = groundY(l, x, z);
@@ -422,6 +456,7 @@ public class EndGameTask extends Task {
                 detail = "철창 안 크리스탈 쏘는 중";
                 Vec3 ctr = c.position().add(0, 1.0, 0);
                 if (towerWait > 0) { towerWait--; bot.ctl.lookAt(p, ctr); return S.RUNNING; }
+                archer.high = false;
                 if (archer.tick(bot, ctr, null)) {
                     towerShots++;
                     towerWait = 25;
@@ -508,6 +543,7 @@ public class EndGameTask extends Task {
         double dist = p.getEyePosition().distanceTo(headC);
         if (dist < 60 && dist > 6 && p.hasLineOfSight(d)) {
             detail = hp + " — 날아다니는 드래곤 저격";
+            archer.high = false;
             if (archer.tick(bot, headC, vel)) bot.log("드래곤에 화살 발사");
         } else {
             detail = hp + " — 내려앉기를 기다림";

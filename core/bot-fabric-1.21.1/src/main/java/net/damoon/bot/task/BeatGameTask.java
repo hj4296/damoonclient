@@ -341,7 +341,19 @@ public class BeatGameTask extends Task {
         if (loot != null) return loot;
 
         // 네더에서는 블레이즈 막대만 (진주는 오버월드에서 혼자 있는 엔더맨을 잡아 구함)
-        boolean afterNether = NetherTask.rods(p) >= NetherTask.RODS || Inv.count(p, Items.ENDER_EYE) >= 10;
+        // 포털 틀에 이미 끼운 눈 (작업이 다시 시작돼도 알 수 있게 주변을 봄, 5초마다)
+        if (bot.ticks - frameScanTick > 100 && l.dimension() == net.minecraft.world.level.Level.OVERWORLD) {
+            frameScanTick = bot.ticks;
+            int fwe = net.damoon.bot.Scan.find(l, PathExec.feet(p), 4, l.getMinBuildHeight(), 70,
+                    st -> st.is(Blocks.END_PORTAL_FRAME) && st.getValue(net.minecraft.world.level.block.EndPortalFrameBlock.HAS_EYE), null, 12).size();
+            if (fwe > 0 || bot.framesWithEyes == 0) bot.framesWithEyes = Math.max(bot.framesWithEyes, fwe);
+        }
+        int placedEyes = bot.framesWithEyes;
+        int eyesAll = Inv.count(p, Items.ENDER_EYE) + placedEyes;
+        if (NetherTask.rods(p) >= NetherTask.RODS || eyesAll >= 10) bot.pastNether = true;
+        // 네더 뒤에 죽어서 막대·눈을 다 잃었으면 네더부터 다시
+        if (bot.pastNether && NetherTask.rods(p) == 0 && Inv.count(p, Items.BLAZE_POWDER) == 0 && eyesAll + Inv.count(p, Items.ENDER_PEARL) < 12) bot.pastNether = false;
+        boolean afterNether = bot.pastNether;
         if (!afterNether) {
             // ---- 6. 다이아몬드 ----
             if (tier < 4) {
@@ -435,8 +447,8 @@ public class BeatGameTask extends Task {
 
         // ---- 9. 엔더 진주: 오버월드의 혼자 있는 엔더맨 (밤·동굴) ----
         // 요새 찾기를 시작했으면 (눈을 던져서 줄어도) 진주 사냥으로 돌아가지 않음 — 눈이 6개 아래로 떨어질 때만
-        if (stronghold != null && Inv.count(p, Items.ENDER_EYE) < 6 && Inv.count(p, Items.ENDER_PEARL) == 0) stronghold = null;
-        if (NetherTask.pearls(p) < NetherTask.PEARLS && stronghold == null) {
+        if (stronghold != null && eyesAll < 6 && Inv.count(p, Items.ENDER_PEARL) == 0) stronghold = null;
+        if (NetherTask.pearls(p) + placedEyes < NetherTask.PEARLS && stronghold == null) {
             stage = "9. 엔더 진주 (" + NetherTask.pearls(p) + "/" + NetherTask.PEARLS + ")";
             if (!net.damoon.bot.EnderTrap.hasBoat(p) && net.damoon.bot.EnderTrap.boatFor(p) != null && !cool(bot, "boat")) {
                 Item boat = net.damoon.bot.EnderTrap.boatFor(p);
@@ -462,7 +474,8 @@ public class BeatGameTask extends Task {
         }
         // ---- 9. 엔드 준비: 엔더의 눈, 활과 화살 ----
         int eyes = Inv.count(p, Items.ENDER_EYE);
-        if (Inv.count(p, Items.ENDER_PEARL) > 0) {
+        // 눈은 (틀에 끼운 것 포함) 12개까지만 만들고 나머지 진주는 공허·낙하 탈출용으로 남김
+        if (Inv.count(p, Items.ENDER_PEARL) > 0 && eyes + placedEyes < 12) {
             if (Inv.count(p, Items.BLAZE_POWDER) < 1 && Inv.has(p, Items.BLAZE_ROD)) {
                 stage = "9. 블레이즈 가루";
                 int want = Inv.count(p, Items.BLAZE_POWDER) + Inv.count(p, Items.BLAZE_ROD) * 2;
@@ -470,12 +483,17 @@ public class BeatGameTask extends Task {
             }
             if (Inv.count(p, Items.BLAZE_POWDER) > 0) {
                 stage = "9. 엔더의 눈";
-                int want = eyes + Math.min(Inv.count(p, Items.ENDER_PEARL), Inv.count(p, Items.BLAZE_POWDER));
+                int want = eyes + Math.min(12 - eyes - placedEyes, Math.min(Inv.count(p, Items.ENDER_PEARL), Inv.count(p, Items.BLAZE_POWDER)));
                 return run(bot, "eyes", () -> new CraftTask(Items.ENDER_EYE, want));
             }
         }
         S ba = bowAndArrows(bot, p, l, "9");
         if (ba != null) return ba;
+        // ---- 10. 엔드 준비: 물 양동이 (높은 곳에서 떨어지면 물 낙법) ----
+        if (Inv.has(p, Items.BUCKET) && !Inv.has(p, Items.WATER_BUCKET) && l.dimension() == net.minecraft.world.level.Level.OVERWORLD && !cool(bot, "water")) {
+            stage = "10. 엔드 준비: 물 양동이";
+            return run(bot, "water", WaterTask::new);
+        }
         // ---- 10. 요새 ----
         stage = "10. 요새 찾기 (엔더의 눈 " + eyes + "개)";
         if (stronghold == null) stronghold = new StrongholdTask();
@@ -560,7 +578,7 @@ public class BeatGameTask extends Task {
         return null;
     }
 
-    private int goldTicks, flintTicks;
+    private int goldTicks, flintTicks, frameScanTick = -1000;
     private boolean builtPortal;
 
     /** 근처에 떨어진 쓸 만한 아이템 줍기 */

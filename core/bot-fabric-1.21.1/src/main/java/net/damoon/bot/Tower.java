@@ -59,7 +59,7 @@ public final class Tower {
         LivingEntity closest = null;
         double cd = 1e9;
         for (Entity e : l.entitiesForRendering()) {
-            if (!groundMelee(e) || e instanceof net.minecraft.world.entity.monster.EnderMan) continue;
+            if (!groundMelee(e) || e instanceof net.minecraft.world.entity.monster.EnderMan || ((LivingEntity) e).getMaxHealth() <= 10) continue;
             double d = e.distanceTo(p);
             if (d > 10 || Math.abs(e.getY() - p.getY()) > 4) continue;
             if (d > 5 && !p.hasLineOfSight(e)) continue;

@@ -90,9 +90,40 @@ public final class Ballistics {
         return null;
     }
 
-    /** 이 지점에서 쏘면 화살이 블록에 안 막히고 target 근처까지 가는지 */
+    /** 높게 쏘아 올려 위에서 떨어지는 탄도 (기둥 위 크리스탈처럼 아래에서 낮게 쏘면 가장자리에 막힐 때) */
+    public static double[] solveHigh(Vec3 from, Vec3 to, double v) {
+        double dx = to.x - from.x, dz = to.z - from.z;
+        double d = Math.sqrt(dx * dx + dz * dz);
+        double dy = to.y - from.y;
+        if (d < 0.5) return null;
+        double prevDeg = Double.NaN, prevErr = Double.NaN;
+        for (double deg = 85; deg >= -10; deg -= 0.5) {
+            double[] r = simulate(deg, d, v);
+            double err = r == null ? -1e9 : r[0] - dy;
+            if (!Double.isNaN(prevErr) && prevErr < 0 && err >= 0) {
+                double lo = prevDeg, hi = deg; // lo: 못 미침(높은 각), hi: 넘음
+                double[] best = r;
+                for (int i = 0; i < 30; i++) {
+                    double mid = (lo + hi) / 2;
+                    double[] m = simulate(mid, d, v);
+                    double e = m == null ? -1e9 : m[0] - dy;
+                    if (e < 0) lo = mid; else { hi = mid; best = m; }
+                }
+                return new double[]{-hi, best == null ? d / v : best[1]};
+            }
+            prevDeg = deg;
+            prevErr = err;
+        }
+        return null;
+    }
+
     public static boolean clearShot(Level l, Player p, Vec3 from, Vec3 target, double v) {
-        double[] s = solve(from, target, v);
+        return clearShot(l, p, from, target, v, false);
+    }
+
+    /** 이 지점에서 쏘면 화살이 블록에 안 막히고 target 근처까지 가는지 */
+    public static boolean clearShot(Level l, Player p, Vec3 from, Vec3 target, double v, boolean high) {
+        double[] s = high ? solveHigh(from, target, v) : solve(from, target, v);
         if (s == null) return false;
         float[] ang = Ctl.angles(from, target);
         double yaw = Math.toRadians(ang[0]);
