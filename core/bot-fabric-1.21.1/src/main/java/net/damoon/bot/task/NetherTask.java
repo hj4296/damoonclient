@@ -92,7 +92,7 @@ public class NetherTask extends Task {
                 double sd = 1e9;
                 for (var e : l.entitiesForRendering())
                     if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && b.distanceTo(p) < 20 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
-                if (shooter != null && (shooter.isOnFire() || p.getHealth() < 16)) {
+                if (shooter != null && false) { // 피난처 대신 위급할 땐 터틀링, 평소엔 이동하며 활로 저격
                     var here = net.damoon.bot.BlazeBunker.here(l, p, shooter.blockPosition());
                     if (here != null && (bunker == null || !here.cell().equals(bunker.cell()))) {
                         quick = here;

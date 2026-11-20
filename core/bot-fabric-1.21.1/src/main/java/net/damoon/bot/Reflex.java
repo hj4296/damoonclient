@@ -250,6 +250,13 @@ public final class Reflex {
                 doing = "방패 들고 " + threat.getName().getString() + "에게 다가가는 중";
                 return true;
             }
+            // 활이 있으면 멀리 있는 근접 몹(위더 스켈레톤 등)은 먼저 활로 쏨
+            if (r > 5.0 && Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW) && p.hasLineOfSight(threat) && !(p.isUsingItem() && p.getUseItem().is(Items.SHIELD))) {
+                Vec3 vel = threat.position().subtract(threat.xo, threat.yo, threat.zo);
+                if (archer.tick(bot, threat.getBoundingBox().getCenter(), vel)) bot.log(threat.getName().getString() + "에게 화살 발사");
+                doing = threat.getName().getString() + " 활로 저격";
+                return true;
+            }
             String st = Melee.fight(bot, threat, !camp);
             doing = threat.getName().getString() + ": " + st;
             return true;
@@ -361,7 +368,8 @@ public final class Reflex {
             // 활 쏘는 몹은 멀리서도 보이면 달려가서 벰
             boolean bowReady = Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW);
             boolean blaze = e instanceof net.minecraft.world.entity.monster.Blaze;
-            double lim = e instanceof EnderMan ? 8 : blaze && bowReady ? 28 : ranged(e) ? 14 : 4.5;
+            double lim = e instanceof EnderMan ? 8 : blaze && bowReady ? 28 : ranged(e) ? 14
+                    : (bowReady && e instanceof net.minecraft.world.entity.monster.WitherSkeleton) ? 14 : 4.5;
             double dyLim = blaze ? 14 : ranged(e) ? 6 : 3;
             if (d > lim || Math.abs(e.getY() - p.getY()) > dyLim) continue;
             if (!p.hasLineOfSight(e)) continue;

@@ -12,6 +12,15 @@ public final class Archer {
 
     public boolean ready() { return cooldown <= 0; }
 
+    private boolean snapped;
+
+    private void release(Bot bot) {
+        bot.ctl.use = false;
+        cooldown = 5;
+        aimedTicks = 0;
+        shots++;
+    }
+
     public void reset() {
         cooldown = 0;
         aimedTicks = 0;
@@ -34,18 +43,24 @@ public final class Archer {
         }
         if (s == null) return false;
         float yaw = Ctl.angles(from, aim)[0];
-        bot.ctl.look(yaw, (float) s[0]);
+        float pitch = (float) s[0];
+        bot.ctl.look(yaw, pitch);
         bot.ctl.speed = 20f;
         bot.ctl.use = true;
-        boolean drawn = p.isUsingItem() && p.getTicksUsingItem() >= 21;
-        float tol = vel == null ? 0.4f : 1.2f;
-        aimedTicks = bot.ctl.aimed(p, tol) ? aimedTicks + 1 : 0;
-        if (drawn && aimedTicks >= 2) {
-            bot.ctl.use = false;
-            cooldown = 5;
-            aimedTicks = 0;
-            shots++;
-            return true;
+        boolean drawn = p.isUsingItem() && p.getUseItem().is(Items.BOW) && p.getTicksUsingItem() >= 21;
+        if (vel == null) {
+            // 가만히 있는 표적: 부드럽게 맞춰서 쏨
+            aimedTicks = bot.ctl.aimed(p, 0.4f) ? aimedTicks + 1 : 0;
+            if (drawn && aimedTicks >= 2) { release(bot); return true; }
+            return false;
+        }
+        // 움직이는 표적: 다 당기면 시점을 한 번에 맞추고 (서버가 먼저 받도록) 다음 틱에 놓음
+        if (drawn && snapped) { snapped = false; release(bot); return true; }
+        if (drawn) {
+            p.setYRot(yaw);
+            p.setXRot(pitch);
+            p.setYHeadRot(yaw);
+            snapped = true;
         }
         return false;
     }
