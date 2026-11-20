@@ -42,7 +42,12 @@ public final class Reflex {
             for (Entity e : bot.level().entitiesForRendering())
                 if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isOnFire() && b.distanceTo(p) < 24 && p.hasLineOfSight(b)) { eating = false; break; }
         }
-        // 먹는 중이면 계속
+        // 먹는 중이면 계속 (단, 방패 등 다른 걸 쓰고 있으면 먼저 손을 떼야 먹기 시작됨)
+        if (eating && p.isUsingItem() && !p.getUseItem().has(net.minecraft.core.component.DataComponents.FOOD)) {
+            bot.ctl.use = false;
+            doing = "먹으려고 방패 내리는 중";
+            return true;
+        }
         if (eating) {
             eatTicks++;
             if ((!p.isUsingItem() && eatTicks > 6) || eatTicks > 70) {
@@ -240,7 +245,8 @@ public final class Reflex {
                 if (ok) {
                     eating = true;
                     eatTicks = 0;
-                    bot.ctl.use = true;
+                    // 방패를 들고 있었으면 이번 틱엔 떼기만 함
+                    bot.ctl.use = !(p.isUsingItem() && !p.getUseItem().has(net.minecraft.core.component.DataComponents.FOOD));
                     bot.ctl.look(p.getYRot(), -30f);
                     doing = gap ? "황금사과 먹는 중" : "먹는 중";
                     return true;
