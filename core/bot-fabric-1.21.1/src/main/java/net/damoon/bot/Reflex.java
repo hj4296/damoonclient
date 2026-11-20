@@ -62,6 +62,14 @@ public final class Reflex {
         // 바로 앞의 근접 몹 (위더 스켈레톤 등): 이게 있으면 먹기·우유·불 끄기·화염구 방어보다 방패 싸움이 먼저
         // 날아오는 화염구·화살: 궤적을 계산해서 나를 맞힐 것만 방패로 막음 (방패는 들고 5틱 뒤부터 막힘)
         Entity proj = turtle.sealed() || (tower.active() && !tower.onTop(p)) ? null : incoming(p, 15);
+        // 한 번 막기 시작한 투사체는 지나갈 때까지 계속 막음 (예측이 틱마다 흔들려도)
+        if (proj == null && lastProj >= 0 && !turtle.sealed()) {
+            Entity lp = bot.level().getEntity(lastProj);
+            if (lp != null && lp.isAlive() && lp.distanceTo(p) < 20
+                    && lp.getDeltaMovement().dot(p.getBoundingBox().getCenter().subtract(lp.position())) > 0) proj = lp;
+            else lastProj = -1;
+        }
+        if (proj != null) lastProj = proj.getId();
         // 근접 몹이 붙어 있으면: 투사체와 근접 몹이 둘 다 방패 앞(180°)에 들어오게 가운데를 봄. 반대편이면 근접 몹 쪽 (더 아픔)
         LivingEntity melee0 = turtle.sealed() || tower.onTop(p) ? null : nearMelee(p, 4.0);
         float faceYaw = Float.NaN;
@@ -76,7 +84,9 @@ public final class Reflex {
             if (eating) eating = false;
             Inv.selectWeapon(p);
             if (p.isUsingItem() && !p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; doing = "투사체! 손에 든 것 내림"; return true; }
+            float multi = bestShieldYaw(p, proj);
             if (!Float.isNaN(faceYaw)) bot.ctl.look(faceYaw, 10f);
+            else if (!Float.isNaN(multi)) bot.ctl.look(multi, 0f);
             else bot.ctl.lookAt(p, proj.position());
             bot.ctl.speed = 45f;
             bot.ctl.use = true;
@@ -361,9 +371,36 @@ public final class Reflex {
     }
 
     private final java.util.Set<Integer> seenProj = new java.util.HashSet<>();
+    private int lastProj = -1;
+
+    /** 지금 날아오는 투사체들 (incoming이 채움): 방패 방향을 고를 때 씀 */
+    private final java.util.List<Entity> incomingAll = new java.util.ArrayList<>();
+
+    /** 날아오는 투사체를 가장 많이(아픈 것 우선) 막을 수 있는 방향 (방패는 앞쪽 ±90°를 막음) */
+    private float bestShieldYaw(LocalPlayer p, Entity first) {
+        if (incomingAll.size() <= 1) return Float.NaN;
+        java.util.List<float[]> dirs = new java.util.ArrayList<>();
+        for (Entity e : incomingAll) {
+            float w = e instanceof net.minecraft.world.entity.projectile.LargeFireball ? 4
+                    : e instanceof net.minecraft.world.entity.projectile.AbstractHurtingProjectile ? 3 : 1;
+            dirs.add(new float[]{Ctl.angles(p.getEyePosition(), e.position())[0], w});
+        }
+        java.util.List<Float> cand = new java.util.ArrayList<>();
+        for (float[] a : dirs) cand.add(a[0]);
+        for (int i = 0; i < dirs.size(); i++) for (int j = i + 1; j < dirs.size(); j++)
+            cand.add(dirs.get(i)[0] + net.minecraft.util.Mth.wrapDegrees(dirs.get(j)[0] - dirs.get(i)[0]) / 2);
+        float best = Float.NaN, bw = -1;
+        for (float c : cand) {
+            float w = 0;
+            for (float[] a : dirs) if (Math.abs(net.minecraft.util.Mth.wrapDegrees(a[0] - c)) < 78) w += a[1];
+            if (w > bw) { bw = w; best = c; }
+        }
+        return best;
+    }
 
     /** maxT 틱 안에 내 몸에 닿을 화염구·화살 (가장 먼저 닿는 것) */
     public Entity incoming(LocalPlayer p, int maxT) {
+        incomingAll.clear();
         net.minecraft.world.phys.AABB box0 = p.getBoundingBox();
         Vec3 pv = p.getDeltaMovement().multiply(1, 0, 1);
         Entity best = null;
@@ -380,15 +417,15 @@ public final class Reflex {
             if (v.lengthSqr() < 1e-6) continue;
             // 나에게서 멀어지는 것(내가 쏜 화살 등)은 무시
             if (v.dot(p.getBoundingBox().getCenter().subtract(pos)) <= 0) continue;
-            for (int t = 1; t <= Math.min(maxT, bt - 1); t++) {
+            for (int t = 1; t <= maxT; t++) {
                 Vec3 np = pos.add(v);
                 // 내가 움직이는 것도 예측, 멀리 볼수록 여유를 크게
                 // 가스트 화염구는 근처 아무 데나 맞아도 터지니 넓게
                 double grow = e instanceof net.minecraft.world.entity.projectile.LargeFireball ? 2.2 : 0.45;
                 net.minecraft.world.phys.AABB box = box0.move(pv.scale(t)).inflate(grow + t * 0.04);
                 if (box.contains(np) || box.clip(pos, np).isPresent()) {
-                    bt = t;
-                    best = e;
+                    incomingAll.add(e);
+                    if (t < bt) { bt = t; best = e; }
                     if (seenProj.add(e.getId())) bot.dbg(String.format("투사체 감지 %s %.1f칸 %d틱 뒤 방패=%s", e.getType().toShortString(), e.distanceTo(p), t, p.isBlocking()));
                     break;
                 }

@@ -26,7 +26,7 @@ public final class Turtle {
     private boolean hole;
 
     /** 발밑 3칸을 파도 안전한지: 캘 수 있고, 사방이 막혀 있고, 그 아래가 단단하고, 용암·물이 없음 */
-    static boolean holeOk(ClientLevel l, LocalPlayer p, BlockPos f) {
+    public static boolean holeOk(ClientLevel l, LocalPlayer p, BlockPos f) {
         for (int d = 1; d <= 3; d++) {
             BlockPos b = f.below(d);
             var s = l.getBlockState(b);
@@ -55,6 +55,12 @@ public final class Turtle {
 
     private List<BlockPos> walls() {
         List<BlockPos> out = new ArrayList<>();
+        // 벽 칸 아래가 비어 있으면(낭떠러지 옆) 받침부터 — 내 발밑 블록 옆면에 붙음
+        for (Direction h : Direction.Plane.HORIZONTAL) {
+            BlockPos under = cell.relative(h).below();
+            var us = Minecraft.getInstance().level.getBlockState(under);
+            if (us.canBeReplaced() && us.getFluidState().isEmpty()) out.add(under);
+        }
         for (int y = 0; y <= 1; y++) for (Direction h : Direction.Plane.HORIZONTAL) out.add(cell.relative(h).above(y));
         // 지붕은 옆면에 붙일 곳이 있어야 놓을 수 있음 → 머리 위 옆칸에 받침 하나 (이미 막혀 있으면 그대로)
         BlockPos roof = cell.above(2);
@@ -192,7 +198,7 @@ public final class Turtle {
         if (phase == 0) {
             reflex.doing = "블록으로 몸 감싸는 중";
             double dx = cell.getX() + 0.5 - p.getX(), dz = cell.getZ() + 0.5 - p.getZ();
-            if (dx * dx + dz * dz > 0.03 && ticks < 30) {
+            if (dx * dx + dz * dz > 0.03 && ticks < 60) {
                 bot.ctl.lookYaw(p, Vec3.atBottomCenterOf(cell), 60f);
                 bot.ctl.fwd = true;
                 bot.ctl.sneak = true;

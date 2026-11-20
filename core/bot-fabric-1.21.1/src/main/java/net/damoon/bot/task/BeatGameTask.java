@@ -187,6 +187,13 @@ public class BeatGameTask extends Task {
             stage = "밤 — 침대에서 자기";
             return run(bot, "bed", BedTask::new);
         }
+        // 밤인데 침대가 없고 장비가 약하면 (방패나 갑옷 없음) 땅 속에 숨어서 아침까지 (오버월드 땅 위에서만)
+        boolean weak = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
+        if (sub instanceof HideTask || (BedTask.night(l) && !BedTask.hasBed(p) && weak && l.dimension() == net.minecraft.world.level.Level.OVERWORLD
+                && l.canSeeSky(PathExec.feet(p)) && !cool(bot, "hide") && HideTask.canHide(bot))) {
+            stage = "밤 — 땅 속에 숨기";
+            return run(bot, "hide", HideTask::new);
+        }
         // ---- 0. 급할 때: 먹을 게 떨어짐 → 땅 위로 올라가 사냥 ----
         int foodNow = foodCount(p);
         if (foodNow < 2 && (p.getFoodData().getFoodLevel() < 17 || p.getHealth() < 12) && tier >= 1) {
@@ -373,6 +380,12 @@ public class BeatGameTask extends Task {
                     S r = milk(bot, p, l);
                     if (r != null) return r;
                 }
+            }
+            // 예비 방패 (화염구를 막다 보면 방패가 닳아 부서짐)
+            int shields = Inv.count(p, Items.SHIELD) + (p.getOffhandItem().is(Items.SHIELD) ? 1 : 0);
+            if (shields < 2 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
+                if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "7. 예비 방패"; return run(bot, "shield2", () -> new CraftTask(Items.SHIELD, Inv.count(p, Items.SHIELD) + 1)); }
+                if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "7. 예비 방패용 판자"; return run(bot, "shield2planks", () -> new CraftTask(pl, want)); }
             }
             if (!Inv.has(p, Items.FLINT_AND_STEEL)) {
                 if (Inv.count(p, Items.FLINT) < 1) {

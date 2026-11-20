@@ -21,6 +21,24 @@ public final class Archer {
         shots++;
     }
 
+    private static boolean pathHitsNeutral(Bot bot, Vec3 from, float yaw, float pitch, Vec3 target) {
+        double yr = Math.toRadians(yaw), pr = Math.toRadians(pitch);
+        double v = 3.0;
+        double vx = -Math.sin(yr) * Math.cos(pr) * v, vy = -Math.sin(pr) * v, vz = Math.cos(yr) * Math.cos(pr) * v;
+        Vec3 pos = from;
+        double dist = from.distanceTo(target);
+        for (int t = 0; t < 60 && pos.distanceTo(from) < dist + 1; t++) {
+            Vec3 next = pos.add(vx, vy, vz);
+            net.minecraft.world.phys.AABB seg = new net.minecraft.world.phys.AABB(pos, next).inflate(0.6);
+            for (var e : bot.level().getEntities(bot.p(), seg, Act::neutral)) {
+                if (e.getBoundingBox().inflate(0.4).clip(pos, next).isPresent()) return true;
+            }
+            pos = next;
+            vx *= 0.99; vy = vy * 0.99 - 0.05; vz *= 0.99;
+        }
+        return false;
+    }
+
     public void reset() {
         cooldown = 0;
         aimedTicks = 0;
@@ -44,6 +62,12 @@ public final class Archer {
         if (s == null) return false;
         float yaw = Ctl.angles(from, aim)[0];
         float pitch = (float) s[0];
+        // 화살 길에 중립 몹(좀비화 피글린 등)이 있으면 쏘지 않음 (무리 전체가 화냄)
+        if (pathHitsNeutral(bot, from, yaw, pitch, aim)) {
+            if (p.isUsingItem() && p.getTicksUsingItem() >= 21) bot.ctl.use = true; // 당긴 채 기다림
+            bot.ctl.look(yaw, pitch);
+            return false;
+        }
         bot.ctl.look(yaw, pitch);
         bot.ctl.speed = 20f;
         bot.ctl.use = true;

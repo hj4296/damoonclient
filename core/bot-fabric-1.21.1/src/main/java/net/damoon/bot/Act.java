@@ -79,10 +79,26 @@ public final class Act {
         return true;
     }
 
+    /** 화나지 않은 중립 몹 (좀비화 피글린·피글린·엔더맨) — 맞으면 무리 전체가 덤빔 */
+    public static boolean neutral(Entity o) {
+        if (o instanceof net.minecraft.world.entity.monster.ZombifiedPiglin zp) return !zp.isAggressive();
+        if (o instanceof net.minecraft.world.entity.monster.piglin.AbstractPiglin pg) return !pg.isAggressive();
+        if (o instanceof net.minecraft.world.entity.monster.EnderMan em) return !em.isCreepy();
+        return false;
+    }
+
     /** 공격 쿨다운이 찼으면 때림 */
     public static boolean attack(Bot bot, Entity e, float minCharge) {
         LocalPlayer p = bot.p();
         if (p.getAttackStrengthScale(0.5f) < minCharge) return false;
+        // 칼 휩쓸기(땅에서 그냥 벨 때)가 옆의 중립 몹을 맞히지 않게: 그럴 땐 점프해서 떨어질 때(치명타, 휩쓸기 없음) 벰
+        if (p.onGround() && !p.isSprinting() && p.getMainHandItem().is(net.minecraft.tags.ItemTags.SWORDS)) {
+            for (Entity o : bot.level().entitiesForRendering())
+                if (o != e && neutral(o) && o.distanceToSqr(e) < 3.0 * 3.0) {
+                    bot.ctl.jump = true;
+                    return false;
+                }
+        }
         Minecraft.getInstance().gameMode.attack(p, e);
         p.swing(InteractionHand.MAIN_HAND);
         return true;
