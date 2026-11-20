@@ -30,6 +30,11 @@ public final class Pearl {
             minR = 2;
             maxR = 40;
             if (l.dimension() == net.minecraft.world.level.Level.END) prefer = new Vec3(-p.getX(), 0, -p.getZ());
+        } else if (!p.onGround() && !p.isInWater() && p.getDeltaMovement().y < -0.6 && fallDamage(l, p) >= p.getHealth() - 2
+                && !(Inv.has(p, Items.WATER_BUCKET) && l.dimension() != net.minecraft.world.level.Level.NETHER)) {
+            why = "죽을 높이에서 떨어지는 중";
+            minR = 2;
+            maxR = 24;
         } else if (p.isInLava()) {
             why = "용암에 빠짐";
             minR = 3;
@@ -73,6 +78,17 @@ public final class Pearl {
             aimTicks = 0;
         }
         return true;
+    }
+
+    /** 지금 떨어지면 받을 낙하 피해 (대략) */
+    private static float fallDamage(ClientLevel l, LocalPlayer p) {
+        BlockPos b = p.blockPosition();
+        for (int dy = 1; dy <= 64; dy++) {
+            var s = l.getBlockState(b.below(dy));
+            if (!s.getFluidState().isEmpty() && !BlockUtil.isLava(s)) return 0;
+            if (!s.getCollisionShape(l, b.below(dy)).isEmpty()) return Math.max(0, p.fallDistance + dy - 1 - 3);
+        }
+        return 99;
     }
 
     private static boolean noGroundBelow(ClientLevel l, LocalPlayer p) {

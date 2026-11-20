@@ -152,6 +152,11 @@ public final class PathFinder {
         }
         BlockState below = st(x, y - 1, z);
         if (BlockUtil.isWater(below) || BlockUtil.isWater(st(x, y, z))) d += 6;
+        // 낭떠러지 가장자리는 피함 (맞고 밀려 떨어지지 않게 다리 가운데로)
+        for (int[] o : side) {
+            int nx = x + o[0], nz = z + o[1];
+            if (!floor(nx, y - 1, nz) && passable(nx, y - 1, nz) && passable(nx, y - 2, nz) && passable(nx, y - 3, nz) && !floor(nx, y - 4, nz)) d += 5;
+        }
         return d;
     }
 

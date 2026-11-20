@@ -35,7 +35,7 @@ public class NetherTask extends Task {
     private CraftTask boatCraft;
     private boolean boatTried;
     private BlockPos safeSpot;
-    private net.damoon.bot.BlazeBunker bunker;
+    private net.damoon.bot.BlazeBunker bunker, quick;
     private boolean bunkerFailed;
     private boolean healing;
     private int fortTicks;
@@ -74,6 +74,17 @@ public class NetherTask extends Task {
         int rods = rods(p), pearls = pearls(p);
         // 네더에선 배고픔을 가득 채워 두어 체력이 계속 회복되게
         bot.reflex.forceEat = p.getHealth() < 18;
+        // 0) 엔더맨이 가까이 보이면 진주부터 (위기 탈출용으로도 씀)
+        if (pearls < PEARLS && quick == null) {
+            boolean ender = false;
+            for (var e : l.entitiesForRendering()) if (e instanceof EnderMan em && em.isAlive() && em.distanceTo(p) < 28) { ender = true; break; }
+            if (ender) {
+                if (trap == null) trap = new net.damoon.bot.EnderTrap();
+                net.damoon.bot.EnderTrap.R r = trap.tick(bot);
+                detail = "엔더 진주 " + pearls + "/" + PEARLS + " — " + trap.info;
+                if (r == net.damoon.bot.EnderTrap.R.RUNNING) return S.RUNNING;
+            }
+        }
         // 1) 블레이즈 막대
         if (rods < RODS) {
             BlockPos f = PathExec.feet(p);
@@ -86,24 +97,31 @@ public class NetherTask extends Task {
                 if (safeSpot.distSqr(spawner) < 18 * 18) safeSpot = portal;
             }
             // 이동 중에 블레이즈가 쏘아 대면 그 자리에 바로 피난처를 지음 (블레이즈 쪽만 열어 둠)
-            if (bunker == null && Inv.count(p, Inv.throwaway()) >= 12) {
+            if (quick == null && Inv.count(p, Inv.throwaway()) >= 12) {
                 net.minecraft.world.entity.monster.Blaze shooter = null;
                 double sd = 1e9;
                 for (var e : l.entitiesForRendering())
                     if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && b.distanceTo(p) < 20 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
                 if (shooter != null && (shooter.isOnFire() || p.getHealth() < 16)) {
                     var here = net.damoon.bot.BlazeBunker.here(l, p, shooter.blockPosition());
-                    if (here != null) {
-                        bunker = here;
+                    if (here != null && (bunker == null || !here.cell().equals(bunker.cell()))) {
+                        quick = here;
                         bot.log("블레이즈 공격 → 이 자리에 피난처를 지음");
                     }
                 }
             }
-            if (bunker != null && bunker.quick && bunker.calmFor(bot, 20 * 10) && p.getHealth() >= 18) {
-                bot.log("블레이즈가 없음 → 피난처에서 나와 전진");
-                bunker = null;
-                bot.reflex.camp = false;
-                bot.reflex.building = false;
+            if (quick != null) {
+                if (quick.calmFor(bot, 20 * 10) && p.getHealth() >= 18) {
+                    bot.log("블레이즈가 없음 → 피난처에서 나와 전진");
+                    quick = null;
+                    bot.reflex.camp = false;
+                    bot.reflex.building = false;
+                } else {
+                    net.damoon.bot.BlazeBunker.R qr = quick.tick(bot, rods, RODS);
+                    detail = "[피난처] " + quick.info;
+                    if (qr == net.damoon.bot.BlazeBunker.R.FAILED) quick = null;
+                    return S.RUNNING;
+                }
             }
             // 판단: 블록이 충분하고 벙커 자리가 있으면 벙커 전술, 아니면 돌격 전술
             if (spawner != null && bunker == null && !bunkerFailed && Inv.count(p, Inv.throwaway()) >= 14) {
