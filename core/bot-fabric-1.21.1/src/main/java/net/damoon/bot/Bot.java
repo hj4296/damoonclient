@@ -74,6 +74,38 @@ public final class Bot {
         } catch (IOException ignored) {}
     }
 
+    /** 화면엔 안 띄우는 디버그 기록 (bot/debug.log) */
+    public void dbg(String s) {
+        try {
+            String t = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+            Files.writeString(dir().resolve("debug.log"), t + " [" + ticks + "] " + s + "\n", StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
+        } catch (IOException ignored) {}
+    }
+
+    private float lastHp = -1;
+
+    /** 맞을 때마다 원인·방향·방패 상태를 기록 (전투 디버깅용) */
+    private void trackDamage() {
+        var p = mc().player;
+        float hp = p.getHealth();
+        if (lastHp >= 0 && hp < lastHp - 0.01f) {
+            var src = p.getLastDamageSource();
+            String who = "-", ang = "-";
+            if (src != null && src.getEntity() != null) {
+                var e = src.getEntity();
+                who = e.getName().getString() + String.format("@%.1f", e.distanceTo(p));
+                double a = Math.toDegrees(Math.atan2(e.getZ() - p.getZ(), e.getX() - p.getX())) - 90 - p.getYRot();
+                a = ((a % 360) + 540) % 360 - 180;
+                ang = String.format("%.0f", a);
+            }
+            dbg(String.format("피해 %.1f hp=%.1f 원인=%s 상대=%s 각도=%s 방패=%s 사용중=%s 손=%s 행동=%s", lastHp - hp, hp,
+                    src == null ? "-" : src.getMsgId(), who, ang, p.isBlocking(), p.isUsingItem(),
+                    p.getUseItem().getItem().toString(), reflex.doing));
+        }
+        lastHp = hp;
+    }
+
     public static Path dir() {
         Path d = Minecraft.getInstance().gameDirectory.toPath().resolve("bot");
         try { Files.createDirectories(d); } catch (IOException ignored) {}
@@ -112,6 +144,11 @@ public final class Bot {
         ticks++;
 
         if (mc.screen instanceof PauseScreen) mc.setScreen(null);
+        if (mc.screen instanceof DeathScreen && ticks - deathTick < 60 && deaths > 0) {
+            mc.player.respawn();
+            mc.setScreen(null);
+            return;
+        }
         if (mc.screen instanceof DeathScreen) {
             deathPos = mc.player.blockPosition();
             deathDim = mc.level.dimension();
@@ -124,6 +161,7 @@ public final class Bot {
             if (restart != null) root = restart.get();
             return;
         }
+        if (mc.player != null && mc.level != null) trackDamage();
         if (mc.screen instanceof WinScreen) {
             if (!victory) {
                 victory = true;

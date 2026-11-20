@@ -30,6 +30,7 @@ public final class Reflex {
     /** 벙커 짓는 중: 체력이 넉넉하면 방패보다 짓기를 먼저 */
     public boolean building;
     public final Turtle turtle = new Turtle();
+    public final Tower tower = new Tower();
 
     /** 배고픔이 덜 찼으면 먹기 시작 (시작했으면 true) */
     public boolean startEatIfNeeded() {
@@ -56,6 +57,19 @@ public final class Reflex {
         if (p.containerMenu != p.inventoryMenu) return false;
 
         trackBlazes(p);
+        // 갑옷·방패는 생기면 바로 착용 (어떤 작업 중이든)
+        if (bot.ticks % 20 == 7 && !p.isUsingItem()) { Inv.equipArmor(p); Inv.equipShield(p); }
+        // 바로 앞의 근접 몹 (위더 스켈레톤 등): 이게 있으면 먹기·우유·불 끄기·화염구 방어보다 방패 싸움이 먼저
+        boolean safe = turtle.sealed() || tower.active();
+        LivingEntity near = safe ? null : nearMelee(p, 4.5);
+        if (eating && !safe) {
+            LivingEntity n6 = nearMelee(p, 6.0);
+            if (n6 != null) {
+                eating = false;
+                if (p.isUsingItem()) bot.ctl.use = false;
+                bot.log("먹다가 " + n6.getName().getString() + "이(가) 다가와서 멈춤");
+            }
+        }
         // 먹는 중이라도 곧 화염구가 날아오면 멈추고 방패부터
         if (eating) {
             for (Entity e : bot.level().entitiesForRendering())
@@ -79,7 +93,8 @@ public final class Reflex {
         }
 
         // 위더·독에 걸리면 우유
-        if ((p.hasEffect(MobEffects.WITHER) || p.hasEffect(MobEffects.POISON)) && Inv.has(p, Items.MILK_BUCKET)) {
+        if ((p.hasEffect(MobEffects.WITHER) || p.hasEffect(MobEffects.POISON)) && Inv.has(p, Items.MILK_BUCKET)
+                && near == null && !blazeSoon(p, 40) && (turtle.sealed() || !hostileNear(p, 8))) {
             if (p.isUsingItem() && !p.getUseItem().is(Items.MILK_BUCKET)) { bot.ctl.use = false; return true; }
             Inv.select(p, Inv.is(Items.MILK_BUCKET));
             bot.ctl.use = true;
@@ -88,7 +103,9 @@ public final class Reflex {
         }
 
         // 위험하면 블록으로 몸을 감싸고 회복 (터틀링)
-        if (turtle.tick(bot, this)) return true;
+        // 근접 몹이 여럿이면 기둥을 쌓고 올라가 위에서 싸움
+        if (tower.tick(bot, this)) return true;
+        if (!tower.active() && turtle.tick(bot, this, near)) return true;
 
         // 엔더 진주로 위기 탈출 (공허·용암·포위)
         if (Pearl.tick(bot)) return true;
@@ -143,7 +160,7 @@ public final class Reflex {
                     if (d < fd) { fd = d; fire = q.immutable(); }
                 }
             }
-            if (fire != null && Act.reach(p, new net.minecraft.world.phys.AABB(fire)) < 4.0) {
+            if (fire != null && near == null && Act.reach(p, new net.minecraft.world.phys.AABB(fire)) < 4.0) {
                 Act.dig(bot, fire);
                 doing = "불 끄는 중";
                 return true;
@@ -164,7 +181,7 @@ public final class Reflex {
         }
 
         // 가까운 적과 싸우기
-        LivingEntity threat = fightEnabled ? threat(p) : null;
+        LivingEntity threat = fightEnabled ? (near != null ? near : threat(p)) : null;
         if (building && p.getHealth() > 9 && threat != null && Act.reach(p, threat.getBoundingBox()) > 3.0) threat = null;
         boolean shieldOn = p.getOffhandItem().is(Items.SHIELD);
 
@@ -175,7 +192,7 @@ public final class Reflex {
         for (Entity e : bot.level().entitiesForRendering())
             if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && inShotWindow(b, 0) && b.distanceTo(p) < 24 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
         boolean meleeTarget = threat instanceof net.minecraft.world.entity.monster.Blaze bt && Act.reach(p, bt.getBoundingBox()) <= 3.0 && bt.getHealth() <= 7;
-        if (shooter != null && shieldOn && !meleeTarget && !(building && p.getHealth() > 9)) {
+        if (shooter != null && shieldOn && !meleeTarget && near == null && !(building && p.getHealth() > 9)) {
             Inv.selectWeapon(p);
             bot.ctl.lookAt(p, shooter.getBoundingBox().getCenter());
             bot.ctl.use = true;
@@ -268,7 +285,9 @@ public final class Reflex {
             float hp = p.getHealth();
             boolean gap = hp <= 10 && Inv.has(p, Items.GOLDEN_APPLE) && !p.hasEffect(MobEffects.REGENERATION);
             boolean need = food <= 14 || (hp < 14 && food < 20) || (forceEat && food < 20);
-            if (gap || need) {
+            // 적이 가까이 있거나 곧 화염구가 오면 먹지 않음 (먹는 1.6초 동안 방패를 못 듦)
+            boolean unsafe = !turtle.sealed() && (hostileNear(p, 7) || blazeSoon(p, 35));
+            if ((gap || need) && (!unsafe || (hp <= 5 && !hostileNear(p, 4)))) {
                 boolean ok = gap ? Inv.select(p, Inv.is(Items.GOLDEN_APPLE)) : selectBestFood(p);
                 if (ok) {
                     eating = true;
@@ -281,6 +300,38 @@ public final class Reflex {
                 }
             }
         }
+        return false;
+    }
+
+    /** 가까이 있고 보이는 근접 몹 (활·화염구 쏘는 몹·크리퍼 제외) */
+    private LivingEntity nearMelee(LocalPlayer p, double lim) {
+        LivingEntity best = null;
+        double bd = lim;
+        for (Entity e : bot.level().entitiesForRendering()) {
+            if (!hostile(e) || ranged(e) || e instanceof Creeper) continue;
+            if (e instanceof net.minecraft.world.entity.monster.Slime || e instanceof net.minecraft.world.entity.monster.Ghast) continue;
+            double d = e.distanceTo(p);
+            if (d >= bd || Math.abs(e.getY() - p.getY()) > 2.5 || !p.hasLineOfSight(e)) continue;
+            bd = d;
+            best = (LivingEntity) e;
+        }
+        return best;
+    }
+
+    private boolean hostileNear(LocalPlayer p, double lim) {
+        for (Entity e : bot.level().entitiesForRendering())
+            if (hostile(e) && !(e instanceof EnderMan) && e.distanceTo(p) < lim && p.hasLineOfSight(e)) return true;
+        return false;
+    }
+
+    public boolean blazeSoon(LocalPlayer p, net.minecraft.world.entity.monster.Blaze b, int ahead) {
+        return b.isAlive() && b.distanceTo(p) < 24 && inShotWindow(b, ahead);
+    }
+
+    /** ahead 틱 안에 화염구를 쏠 블레이즈가 보이는지 */
+    private boolean blazeSoon(LocalPlayer p, int ahead) {
+        for (Entity e : bot.level().entitiesForRendering())
+            if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && b.distanceTo(p) < 24 && inShotWindow(b, ahead) && p.hasLineOfSight(b)) return true;
         return false;
     }
 

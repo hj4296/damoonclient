@@ -21,6 +21,8 @@ public final class Turtle {
     private int phase, ticks;
 
     public boolean active() { return active; }
+    /** 벽·천장을 다 막고 안에서 회복 중 */
+    public boolean sealed() { return active && phase == 1; }
 
     private List<BlockPos> walls() {
         List<BlockPos> out = new ArrayList<>();
@@ -33,17 +35,24 @@ public final class Turtle {
         float hp = p.getHealth();
         if (hp >= 14) return false;
         if (p.isOnFire()) return true;
-        if (hp >= 12) return false;
+        if (hp >= 12) {
+            // 위더 스켈레톤이 근처면 더 일찍
+            for (Entity e : bot.level().entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.monster.WitherSkeleton && e.distanceTo(p) < 6) return true;
+            return false;
+        }
         for (Entity e : bot.level().entitiesForRendering()) if (Reflex.hostile(e) && e.distanceTo(p) < 14) return true;
         return false;
     }
 
     /** 이번 틱을 썼으면 true. heal 단계에서는 먹기를 위해 Reflex가 이어서 처리 */
-    public boolean tick(Bot bot, Reflex reflex) {
+    public boolean tick(Bot bot, Reflex reflex, Entity near) {
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
+        // 근접 몹이 바로 붙어 있으면 (그 칸엔 벽을 못 놓고, 짓는 동안 맞음) 먼저 방패로 밀어내고 나서 지음
+        boolean engaged = near != null && near.distanceTo(p) < 3.2;
         if (!active) {
-            if (!danger(bot, p) || Inv.count(p, Inv.throwaway()) < 9 || !p.onGround()) return false;
+            if (engaged || !danger(bot, p) || Inv.count(p, Inv.throwaway()) < 9 || !p.onGround()) return false;
             active = true;
             cell = PathExec.feet(p);
             phase = 0;
@@ -53,6 +62,7 @@ public final class Turtle {
             bot.log("위험 (체력 " + (int) p.getHealth() + ") → 블록으로 몸을 감싸고 회복");
         }
         ticks++;
+        if (engaged && phase == 0) { if (ticks > 20 * 30) active = false; return false; }
         if (!PathExec.feet(p).equals(cell) && phase < 2) {
             // 밀려났으면 다시 그 자리로
             Vec3 c = Vec3.atBottomCenterOf(cell);

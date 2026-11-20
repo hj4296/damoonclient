@@ -58,6 +58,12 @@ public final class Control {
                 for (var st : p.getArmorSlots()) if (!st.isEmpty()) inv.merge("worn:" + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath(), 1, Integer::sum);
                 if (!p.getOffhandItem().isEmpty()) inv.merge("off:" + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(p.getOffhandItem().getItem()).getPath(), p.getOffhandItem().getCount(), Integer::sum);
                 sb.append("inv=").append(inv).append('\n');
+                StringBuilder near = new StringBuilder();
+                for (var e : mc.level.entitiesForRendering())
+                    if (e instanceof net.minecraft.world.entity.LivingEntity le && le != p && le.isAlive() && le.distanceTo(p) < 32)
+                        near.append(net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(le.getType()).getPath())
+                                .append(String.format("@%.0f(%.0f) ", le.distanceTo(p), le.getHealth()));
+                sb.append("near=").append(near).append('\n');
             }
             Files.writeString(Bot.dir().resolve("status.txt"), sb.toString(), StandardCharsets.UTF_8);
         } catch (Exception ignored) {}
