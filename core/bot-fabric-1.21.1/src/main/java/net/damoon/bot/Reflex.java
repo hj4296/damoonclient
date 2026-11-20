@@ -233,7 +233,7 @@ public final class Reflex {
         for (Entity e : bot.level().entitiesForRendering())
             if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && pointBlank(b, 0) && b.distanceTo(p) < 6 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
         boolean meleeTarget = threat instanceof net.minecraft.world.entity.monster.Blaze bt && Act.reach(p, bt.getBoundingBox()) <= 3.0 && bt.getHealth() <= 7;
-        if (shooter != null && shieldOn && !meleeTarget && near == null && !(building && p.getHealth() > 9)) {
+        if (false && shooter != null && shieldOn && !meleeTarget && near == null && !(building && p.getHealth() > 9)) {
             Inv.selectWeapon(p);
             bot.ctl.lookAt(p, shooter.getBoundingBox().getCenter());
             bot.ctl.use = true;
@@ -255,8 +255,14 @@ public final class Reflex {
         }
         // 블레이즈: 멀리서 날아오는 화염구는 위(incoming)에서 방패로 막음.
         // 여기선 칼이 닿으면 벰 — 단, 가까운 블레이즈가 막 쏘는 순간(모으기 시작 후 약 56~76틱)엔 방패
-        if (threat instanceof net.minecraft.world.entity.monster.Blaze bz && p.getOffhandItem().is(Items.SHIELD)) {
-            Inv.selectWeapon(p);
+        if (threat instanceof net.minecraft.world.entity.monster.Blaze bz0 && p.getOffhandItem().is(Items.SHIELD)) {
+            // (칼은 칼을 쓸 때만 쥠 — 활을 당기는 중에 칼로 바꾸면 당기기가 취소됨)
+            // 칼이 닿는 블레이즈가 있으면 그중 체력이 가장 낮은 것
+            net.minecraft.world.entity.monster.Blaze bz = bz0;
+            float lowHp = 999;
+            for (Entity e : bot.level().entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.monster.Blaze o && o.isAlive() && Act.reach(p, o.getBoundingBox()) <= 3.0
+                        && o.getHealth() < lowHp) { lowHp = o.getHealth(); bz = o; }
             double r = Act.reach(p, bz.getBoundingBox());
             boolean danger = false, soon = false;
             for (Entity e : bot.level().entitiesForRendering())
@@ -266,14 +272,17 @@ public final class Reflex {
                 }
             // 체력이 낮으면 바라본 채 방패 들고 뒷걸음질 (벙커·기둥 안이면 그 자리)
             if (p.getHealth() < 10 && !camp) {
+                Inv.selectWeapon(p);
                 bot.ctl.lookAt(p, bz.getBoundingBox().getCenter());
                 bot.ctl.use = true;
                 if (safeBehind(p)) bot.ctl.back = true;
                 doing = "체력이 낮아 블레이즈를 보며 뒷걸음질";
                 return true;
             }
-            // 칼이 닿으면 벰 (쏘는 순간이 아니면)
-            if (r <= 3.0 && !danger) {
+            // 칼이 닿으면 벰 (실제로 날아오는 화염구는 맨 위 incoming에서 먼저 막음)
+            if (r <= 3.0) {
+                if (!(p.isUsingItem() && p.getUseItem().is(Items.BOW))) Inv.selectWeapon(p);
+                else { bot.ctl.use = false; return true; }
                 bot.ctl.lookAt(p, bz.getBoundingBox().getCenter());
                 if (p.isUsingItem() && p.getAttackStrengthScale(0.5f) >= 0.9f) { bot.ctl.use = false; doing = "방패 내리고 블레이즈 공격"; return true; }
                 if (!p.isUsingItem() && bot.ctl.aimed(p, 20) && Act.attack(bot, bz, 0.9f)) { doing = "블레이즈 공격!"; return true; }
@@ -419,6 +428,13 @@ public final class Reflex {
             if (v.dot(p.getBoundingBox().getCenter().subtract(pos)) <= 0) continue;
             for (int t = 1; t <= maxT; t++) {
                 Vec3 np = pos.add(v);
+                // 벽·천장에 먼저 부딪히면 나한테 안 옴 (벙커·터틀링·기둥 안이면 대부분 여기서 걸러짐)
+                var hit = bot.level().clip(new net.minecraft.world.level.ClipContext(pos, np,
+                        net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, e));
+                if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+                    net.minecraft.world.phys.AABB bx = box0.move(pv.scale(t)).inflate(0.3);
+                    if (!bx.contains(hit.getLocation()) && hit.getLocation().distanceTo(p.getBoundingBox().getCenter()) > 1.6) break;
+                }
                 // 내가 움직이는 것도 예측, 멀리 볼수록 여유를 크게
                 // 가스트 화염구는 근처 아무 데나 맞아도 터지니 넓게
                 double grow = e instanceof net.minecraft.world.entity.projectile.LargeFireball ? 2.2 : 0.45;
@@ -554,7 +570,7 @@ public final class Reflex {
             double d = best.distanceTo(p);
             if (best.getId() != chaseId) { chaseId = best.getId(); chaseTicks = 0; chaseBest = d; }
             if (d < chaseBest - 0.5) { chaseBest = d; chaseTicks = 0; }
-            if (++chaseTicks > 100 && d > 3.5) { ignoreUntil.put(best.getId(), bot.ticks + 20 * 30); return null; }
+            if (++chaseTicks > 100 && d > 3.5 && !(camp && best instanceof net.minecraft.world.entity.monster.Blaze)) { ignoreUntil.put(best.getId(), bot.ticks + 20 * 30); return null; }
         }
         return best;
     }

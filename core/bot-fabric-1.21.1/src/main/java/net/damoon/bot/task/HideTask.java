@@ -24,8 +24,8 @@ public class HideTask extends Task {
     /** 지금 자리에서 숨을 수 있는지 */
     public static boolean canHide(Bot bot) {
         LocalPlayer p = bot.p();
-        return p.onGround() && !p.isInWater() && Inv.count(p, Inv.throwaway()) >= 1
-                && net.damoon.bot.Turtle.holeOk(bot.level(), p, Placer.standCell(p));
+        // 덮개 블록은 파면서 나온 흙·돌로 충분 (맨손이면 흙만 빨리 파짐 — holeOk가 캐는 시간을 봄)
+        return p.onGround() && !p.isInWater() && net.damoon.bot.Turtle.holeOk(bot.level(), p, Placer.standCell(p));
     }
 
     @Override

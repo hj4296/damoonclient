@@ -72,6 +72,7 @@ public final class Archer {
         bot.ctl.speed = 20f;
         bot.ctl.use = true;
         boolean drawn = p.isUsingItem() && p.getUseItem().is(Items.BOW) && p.getTicksUsingItem() >= 21;
+        if (bot.ticks % 10 == 0) bot.dbg(String.format("활: 사용중=%s 손=%s 당김=%d 주손=%s 스냅=%s", p.isUsingItem(), p.getUseItem().getItem(), p.getTicksUsingItem(), p.getMainHandItem().getItem(), snapped));
         if (vel == null) {
             // 가만히 있는 표적: 부드럽게 맞춰서 쏨
             aimedTicks = bot.ctl.aimed(p, 0.4f) ? aimedTicks + 1 : 0;
