@@ -32,6 +32,33 @@ public final class BlazeBunker {
 
     public BlazeBunker(BlockPos spawner) { this.spawner = spawner; }
 
+    /** 공격받는 그 자리에 바로 짓는 피난처 (front = 블레이즈 쪽) */
+    public static BlazeBunker here(ClientLevel l, LocalPlayer p, BlockPos lookAt) {
+        BlockPos c = PathExec.feet(p);
+        var fl = l.getBlockState(c.below());
+        if (!BlockUtil.floor(l, c.getX(), c.getY() - 1, c.getZ(), fl) || BlockUtil.isWater(fl)) return null;
+        if (!l.getBlockState(c.above()).isAir() && !l.getBlockState(c.above()).canBeReplaced()) return null;
+        if (lavaNear(l, c, 1)) return null;
+        Direction f = Direction.getNearest(lookAt.getX() - c.getX(), 0, lookAt.getZ() - c.getZ());
+        BlazeBunker b = new BlazeBunker(lookAt);
+        b.cell = c;
+        b.front = f;
+        b.quick = true;
+        return b;
+    }
+
+    /** 그 자리 피난처인지 (블레이즈가 없으면 나와서 다시 전진) */
+    public boolean quick;
+    private int calm;
+
+    /** 블레이즈가 한동안 없으면 true (피난처를 떠나도 됨) */
+    public boolean calmFor(Bot bot, int ticks) {
+        boolean any = false;
+        for (Entity e : bot.level().entitiesForRendering()) if (e instanceof Blaze b && b.isAlive() && b.distanceTo(bot.p()) < 20) { any = true; break; }
+        calm = any ? 0 : calm + 1;
+        return calm > ticks;
+    }
+
     public BlockPos cell() { return cell; }
 
     /** 벙커 칸 후보: 스포너 10칸 안, 단단한 바닥, 몸 들어갈 2칸, 스포너 쪽이 트여 있고 용암이 가깝지 않음. 내 위치에서 가까운 곳 우선 */

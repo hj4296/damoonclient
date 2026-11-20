@@ -85,12 +85,33 @@ public class NetherTask extends Task {
                 safeSpot = PathExec.feet(p);
                 if (safeSpot.distSqr(spawner) < 18 * 18) safeSpot = portal;
             }
+            // 이동 중에 블레이즈가 쏘아 대면 그 자리에 바로 피난처를 지음 (블레이즈 쪽만 열어 둠)
+            if (bunker == null && Inv.count(p, Inv.throwaway()) >= 12) {
+                net.minecraft.world.entity.monster.Blaze shooter = null;
+                double sd = 1e9;
+                for (var e : l.entitiesForRendering())
+                    if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && b.distanceTo(p) < 20 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
+                if (shooter != null && (shooter.isOnFire() || p.getHealth() < 16)) {
+                    var here = net.damoon.bot.BlazeBunker.here(l, p, shooter.blockPosition());
+                    if (here != null) {
+                        bunker = here;
+                        bot.log("블레이즈 공격 → 이 자리에 피난처를 지음");
+                    }
+                }
+            }
+            if (bunker != null && bunker.quick && bunker.calmFor(bot, 20 * 10) && p.getHealth() >= 18) {
+                bot.log("블레이즈가 없음 → 피난처에서 나와 전진");
+                bunker = null;
+                bot.reflex.camp = false;
+                bot.reflex.building = false;
+            }
             // 판단: 블록이 충분하고 벙커 자리가 있으면 벙커 전술, 아니면 돌격 전술
             if (spawner != null && bunker == null && !bunkerFailed && Inv.count(p, Inv.throwaway()) >= 14) {
                 bunker = new net.damoon.bot.BlazeBunker(spawner);
                 bot.log("판단: 벙커 전술 (블록 " + Inv.count(p, Inv.throwaway()) + "개)");
             }
             if (bunker != null) {
+                // 피난처 안에서는 그 자리 피난처가 블레이즈를 상대 (스포너 근처 벙커면 계속 머묾)
                 net.damoon.bot.BlazeBunker.R br = bunker.tick(bot, rods, RODS);
                 detail = "[벙커] " + bunker.info;
                 if (br == net.damoon.bot.BlazeBunker.R.FAILED) {
