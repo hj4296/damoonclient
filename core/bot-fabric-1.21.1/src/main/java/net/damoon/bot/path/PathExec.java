@@ -198,13 +198,20 @@ public final class PathExec {
         float diff = Math.abs(Mth.wrapDegrees(yaw - p.getYRot()));
         if (hd > 0.12 && (diff < 50 || hd < 0.5)) c.fwd = true;
         boolean straight = to.move == Move.WALK || to.move == Move.DIAG;
-        if (allowSprint && straight && diff < 10 && p.getFoodData().getFoodLevel() > 6 && i + 3 < path.size()) {
+        if (allowSprint && straight && diff < 10 && p.getFoodData().getFoodLevel() > 6 && i + 4 < path.size()) {
             boolean ahead = true;
-            for (int j = i + 2; j < Math.min(path.size(), i + 4); j++) {
+            // 앞에 떨어지는 칸이 있으면 달리지 않음 (탄력으로 착지 지점을 지나쳐 낭떠러지로 떨어지지 않게)
+            for (int j = i + 2; j < Math.min(path.size(), i + 5); j++) {
                 Move m = path.get(j).move;
-                if (m != Move.WALK && m != Move.DIAG && m != Move.DESCEND) { ahead = false; break; }
+                if (m != Move.WALK && m != Move.DIAG) { ahead = false; break; }
             }
             if (ahead) c.sprint = true;
+        }
+        if (to.move == Move.DESCEND) {
+            // 착지 칸 안에 들어왔으면 앞으로 그만 감
+            if (hd < 0.35) c.fwd = false;
+            c.sprint = false;
+            if (p.isSprinting()) c.fwd = hd > 0.6;
         }
         if (to.move == Move.ASCEND && (p.onGround() || p.isInWater()) && (hd < 1.25 || p.horizontalCollision)) c.jump = true;
         if (p.isInWater() && to.y >= Math.floor(p.getY())) c.jump = true;

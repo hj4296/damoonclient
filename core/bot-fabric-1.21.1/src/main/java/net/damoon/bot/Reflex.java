@@ -22,6 +22,8 @@ public final class Reflex {
     /** 작업이 지금은 먹지 말라고 할 때 (예: 드래곤 머리 때리는 중) */
     public boolean holdEating;
     public boolean fightEnabled = true;
+    private net.minecraft.core.BlockPos mlgWater;
+    private int mlgTicks;
 
     Reflex(Bot bot) { this.bot = bot; }
 
@@ -38,6 +40,43 @@ public final class Reflex {
             } else {
                 bot.ctl.use = true;
                 doing = "먹는 중";
+                return true;
+            }
+        }
+
+        // 높은 곳에서 떨어지는 중이면 물 양동이로 착지 (MLG)
+        if (!p.onGround() && !p.isInWater() && p.fallDistance > 4.5 && p.getDeltaMovement().y < -0.5
+                && bot.level().dimension() != net.minecraft.world.level.Level.NETHER && Inv.has(p, Items.WATER_BUCKET)) {
+            Inv.select(p, Inv.is(Items.WATER_BUCKET));
+            bot.ctl.look(p.getYRot(), 90f);
+            bot.ctl.speed = 90f;
+            doing = "물 양동이 낙법!";
+            net.minecraft.core.BlockPos f = p.blockPosition();
+            for (int dy = 1; dy <= 4; dy++) {
+                net.minecraft.core.BlockPos g = f.below(dy);
+                var gs = bot.level().getBlockState(g);
+                if (!gs.getCollisionShape(bot.level(), g).isEmpty()) {
+                    if (p.getY() - (g.getY() + 1) < 2.6 && p.getXRot() > 80) {
+                        net.minecraft.client.Minecraft.getInstance().gameMode.useItem(p, net.minecraft.world.InteractionHand.MAIN_HAND);
+                        mlgWater = g.above();
+                        mlgTicks = 0;
+                    }
+                    break;
+                }
+            }
+            return true;
+        }
+        // 낙법에 쓴 물 다시 퍼 담기
+        if (mlgWater != null) {
+            if (++mlgTicks > 60 || !bot.level().getFluidState(mlgWater).isSource()) { mlgWater = null; }
+            else if (p.onGround() || p.isInWater()) {
+                Inv.select(p, Inv.is(Items.BUCKET));
+                bot.ctl.lookAt(p, net.minecraft.world.phys.Vec3.atCenterOf(mlgWater));
+                if (bot.ctl.aimed(p, 3) && mlgTicks > 6) {
+                    net.minecraft.client.Minecraft.getInstance().gameMode.useItem(p, net.minecraft.world.InteractionHand.MAIN_HAND);
+                    mlgWater = null;
+                }
+                doing = "물 다시 퍼 담는 중";
                 return true;
             }
         }
