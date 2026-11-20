@@ -37,6 +37,11 @@ public final class Reflex {
         doing = "";
         if (p.containerMenu != p.inventoryMenu) return false;
 
+        // 먹는 중이라도 블레이즈가 쏘려 하면 멈추고 방패부터
+        if (eating) {
+            for (Entity e : bot.level().entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isOnFire() && b.distanceTo(p) < 24 && p.hasLineOfSight(b)) { eating = false; break; }
+        }
         // 먹는 중이면 계속
         if (eating) {
             eatTicks++;
@@ -124,14 +129,32 @@ public final class Reflex {
 
         // 가까운 적과 싸우기
         LivingEntity threat = fightEnabled ? threat(p) : null;
+        boolean shieldOn = p.getOffhandItem().is(Items.SHIELD);
+
+        // 화염구 방어: 시야 안의 블레이즈가 쏘기 직전이면 (이동 중이든 뭐든) 그쪽으로 방패를 듦
+        net.minecraft.world.entity.monster.Blaze shooter = null;
+        double sd = 1e9;
+        for (Entity e : bot.level().entitiesForRendering())
+            if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isOnFire() && b.isAlive() && b.distanceTo(p) < 24 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
+        boolean meleeTarget = threat instanceof net.minecraft.world.entity.monster.Blaze bt && Act.reach(p, bt.getBoundingBox()) <= 3.0 && bt.getHealth() <= 7;
+        if (shooter != null && shieldOn && !meleeTarget) {
+            Inv.selectWeapon(p);
+            bot.ctl.lookAt(p, shooter.getBoundingBox().getCenter());
+            bot.ctl.use = true;
+            boolean weakNow = p.getHealth() < 10;
+            if (weakNow && safeBehind(p)) bot.ctl.back = true; // 바라본 채 뒷걸음
+            doing = weakNow ? "방패 들고 뒷걸음질로 물러나는 중" : "화염구를 방패로 막는 중";
+            return true;
+        }
+
         boolean weak = p.getHealth() < 7 || (p.isOnFire() && p.getHealth() < 10);
         if (threat != null && ranged(threat) && weak && threat.distanceTo(p) > 3) {
-            Vec3 away = p.position().subtract(threat.position()).normalize();
-            bot.ctl.lookYaw(p, p.position().add(away.scale(5)), 0f);
-            bot.ctl.fwd = true;
-            bot.ctl.sprint = p.getFoodData().getFoodLevel() > 6;
-            if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
-            doing = "체력이 낮아 " + threat.getName().getString() + " 피하는 중";
+            // 상대를 바라보고 방패를 든 채 뒷걸음질로 물러남 (등을 보이지 않음)
+            Inv.selectWeapon(p);
+            bot.ctl.lookAt(p, threat.getBoundingBox().getCenter());
+            if (shieldOn) bot.ctl.use = true;
+            if (safeBehind(p)) bot.ctl.back = true;
+            doing = "체력이 낮아 " + threat.getName().getString() + "을(를) 보며 뒷걸음질";
             return true;
         }
         // 블레이즈: 불꽃을 모으면(발사 직전) 방패로 막고, 칼이 닿을 때만 벰
@@ -144,13 +167,11 @@ public final class Reflex {
                 if (e instanceof net.minecraft.world.entity.monster.Blaze o && o != bz && o.isOnFire() && o.distanceTo(p) < 10 && p.hasLineOfSight(o)) { danger = true; break; }
             // 칼이 닿는 블레이즈가 막 쏘려는 게 아니거나 거의 죽었으면 공격
             if (bz.isOnFire() && bz.getHealth() > 7) danger = true;
-            // 체력이 낮으면 시야 밖으로 물러나 먹고 회복
-            if (p.getHealth() < 12) {
-                Vec3 away = p.position().subtract(bz.position()).multiply(1, 0, 1).normalize();
-                bot.ctl.lookYaw(p, p.position().add(away.scale(5)), 0f);
-                bot.ctl.fwd = true;
-                if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
-                doing = "체력이 낮아 블레이즈에게서 물러나는 중";
+            // 체력이 낮으면 바라본 채 방패 들고 뒷걸음질
+            if (p.getHealth() < 12 && !camp) {
+                bot.ctl.use = true;
+                if (safeBehind(p)) bot.ctl.back = true;
+                doing = "체력이 낮아 블레이즈를 보며 뒷걸음질";
                 return true;
             }
             // 활이 있으면: 쏘기 직전이 아닐 때 활로 저격 (가까우면 칼)
@@ -258,6 +279,15 @@ public final class Reflex {
     private static long lastHurtStamp(LocalPlayer p) {
         // LivingEntity.lastDamageStamp 는 비공개라 hurtTime으로 근사
         return p.hurtTime > 0 ? p.level().getGameTime() : 0;
+    }
+
+    /** 바라보는 반대쪽(뒤)으로 한 걸음이 안전한지 */
+    static boolean safeBehind(LocalPlayer p) {
+        float y = p.getYRot();
+        p.setYRot(y + 180f);
+        boolean ok = Bot.safeAhead(p);
+        p.setYRot(y);
+        return ok;
     }
 
     static boolean ranged(Entity e) {

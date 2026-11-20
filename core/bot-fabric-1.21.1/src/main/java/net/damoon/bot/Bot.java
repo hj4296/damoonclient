@@ -158,6 +158,7 @@ public final class Bot {
             ctl.fwd = false;
             ctl.sprint = false;
         }
+        if (!pathDriving && ctl.back && !Reflex.safeBehind(mc.player)) ctl.back = false;
         pathDriving = false;
         ctl.apply(mc.player);
         traceHist.addFirst(trace);

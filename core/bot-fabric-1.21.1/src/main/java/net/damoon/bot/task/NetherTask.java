@@ -72,6 +72,8 @@ public class NetherTask extends Task {
             return S.RUNNING;
         }
         int rods = rods(p), pearls = pearls(p);
+        // 네더에선 배고픔을 가득 채워 두어 체력이 계속 회복되게
+        bot.reflex.forceEat = p.getHealth() < 18;
         // 1) 블레이즈 막대
         if (rods < RODS) {
             BlockPos f = PathExec.feet(p);
