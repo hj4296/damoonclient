@@ -179,6 +179,7 @@ public class NetherTask extends Task {
             return explore(bot, "요새 찾기");
         }
         bot.reflex.camp = false;
+        bot.reflex.building = false;
         bot.reflex.forceEat = false;
         // 2) 엔더 진주
         if (pearls < PEARLS) {

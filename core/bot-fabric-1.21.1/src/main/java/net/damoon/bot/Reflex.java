@@ -27,6 +27,8 @@ public final class Reflex {
     private final Archer archer = new Archer();
     /** 자리 지키기 (스포너 옆): 쫓아가지 않고 다가오는 적만 벰 */
     public boolean camp;
+    /** 벙커 짓는 중: 체력이 넉넉하면 방패보다 짓기를 먼저 */
+    public boolean building;
     private net.minecraft.core.BlockPos mlgWater;
     private int mlgTicks;
 
@@ -134,6 +136,7 @@ public final class Reflex {
 
         // 가까운 적과 싸우기
         LivingEntity threat = fightEnabled ? threat(p) : null;
+        if (building && p.getHealth() > 9 && threat != null && Act.reach(p, threat.getBoundingBox()) > 3.0) threat = null;
         boolean shieldOn = p.getOffhandItem().is(Items.SHIELD);
 
         // 화염구 방어: 시야 안의 블레이즈가 쏘기 직전이면 (이동 중이든 뭐든) 그쪽으로 방패를 듦
@@ -142,7 +145,7 @@ public final class Reflex {
         for (Entity e : bot.level().entitiesForRendering())
             if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isOnFire() && b.isAlive() && b.distanceTo(p) < 24 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
         boolean meleeTarget = threat instanceof net.minecraft.world.entity.monster.Blaze bt && Act.reach(p, bt.getBoundingBox()) <= 3.0 && bt.getHealth() <= 7;
-        if (shooter != null && shieldOn && !meleeTarget) {
+        if (shooter != null && shieldOn && !meleeTarget && !(building && p.getHealth() > 9)) {
             Inv.selectWeapon(p);
             bot.ctl.lookAt(p, shooter.getBoundingBox().getCenter());
             bot.ctl.use = true;

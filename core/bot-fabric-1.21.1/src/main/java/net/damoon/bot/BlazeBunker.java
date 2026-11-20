@@ -34,27 +34,25 @@ public final class BlazeBunker {
 
     public BlockPos cell() { return cell; }
 
-    /** 벙커 칸 후보: 스포너 2~3칸 옆, 단단한 바닥, 몸 들어갈 2칸, 스포너 쪽이 트여 있고 용암이 가깝지 않음 */
+    /** 벙커 칸 후보: 스포너 10칸 안, 단단한 바닥, 몸 들어갈 2칸, 스포너 쪽이 트여 있고 용암이 가깝지 않음. 내 위치에서 가까운 곳 우선 */
     public static BlockPos pick(ClientLevel l, LocalPlayer p, BlockPos sp, Direction[] outFront) {
         BlockPos best = null;
         double bs = 1e9;
-        for (int dy = -1; dy <= 1; dy++)
-            for (int dx = -3; dx <= 3; dx++)
-                for (int dz = -3; dz <= 3; dz++) {
-                    int ad = Math.max(Math.abs(dx), Math.abs(dz));
-                    if (ad < 2 || ad > 3) continue;
-                    if (dx != 0 && dz != 0 && Math.abs(dx) != Math.abs(dz) && Math.min(Math.abs(dx), Math.abs(dz)) > 1) continue;
-                    BlockPos c = sp.offset(dx, dy, dz);
-                    var fl = l.getBlockState(c.below());
-                    if (!BlockUtil.floor(l, c.getX(), c.getY() - 1, c.getZ(), fl) || BlockUtil.isWater(fl)) continue;
-                    if (!l.getBlockState(c).isAir() || !l.getBlockState(c.above()).isAir()) continue;
-                    Direction f = Direction.getNearest(sp.getX() - c.getX(), 0, sp.getZ() - c.getZ());
-                    BlockPos o = c.relative(f);
-                    if (!l.getBlockState(o).isAir() || !l.getBlockState(o.above()).isAir()) continue;
-                    if (lavaNear(l, c, 2)) continue;
-                    double score = ad + Math.sqrt(p.distanceToSqr(Vec3.atCenterOf(c))) * 0.05 + Math.abs(dy);
-                    if (score < bs) { bs = score; best = c; outFront[0] = f; }
-                }
+        BlockPos me = PathExec.feet(p);
+        for (BlockPos q : BlockPos.betweenClosed(sp.offset(-10, -3, -10), sp.offset(10, 3, 10))) {
+            BlockPos c = q.immutable();
+            double ds = Math.sqrt(c.distSqr(sp));
+            if (ds < 2 || ds > 10) continue;
+            var fl = l.getBlockState(c.below());
+            if (!BlockUtil.floor(l, c.getX(), c.getY() - 1, c.getZ(), fl) || BlockUtil.isWater(fl)) continue;
+            if (!l.getBlockState(c).isAir() || !l.getBlockState(c.above()).isAir()) continue;
+            Direction f = Direction.getNearest(sp.getX() - c.getX(), 0, sp.getZ() - c.getZ());
+            BlockPos o = c.relative(f);
+            if (!l.getBlockState(o).isAir() || !l.getBlockState(o.above()).isAir()) continue;
+            if (lavaNear(l, c, 2)) continue;
+            double score = Math.sqrt(c.distSqr(me)) * 1.0 + ds * 0.3;
+            if (score < bs) { bs = score; best = c; outFront[0] = f; }
+        }
         return best;
     }
 
@@ -120,6 +118,7 @@ public final class BlazeBunker {
             bot.ctl.sneak = true;
             return R.RUNNING;
         }
+        bot.reflex.building = phase == 1;
         if (phase == 1) {
             if (++buildTicks > 20 * 60) { bot.log("벙커를 다 못 지음 → 그냥 싸움"); phase = 2; }
             for (BlockPos w : walls()) {
@@ -130,6 +129,7 @@ public final class BlazeBunker {
                 return R.RUNNING;
             }
             phase = 2;
+            bot.reflex.building = false;
             bot.log("벙커 완성 → 열린 쪽에서 오는 블레이즈만 상대");
         }
         // 싸우기: 칸 가운데에 서서 스포너 쪽을 봄. 실제 공격·방패는 반사 행동(camp)이 함
