@@ -99,7 +99,7 @@ public final class Tower {
                 return true;
             }
             double dx = base.getX() + 0.5 - p.getX(), dz = base.getZ() + 0.5 - p.getZ();
-            if (p.onGround() && dx * dx + dz * dz > 0.0064) {
+            if (p.onGround() && dx * dx + dz * dz > 0.04 && ticks < 25) {
                 float yaw = (float) (Mth.atan2(dz, dx) * (180.0 / Math.PI)) - 90f;
                 bot.ctl.look(yaw, 60f);
                 bot.ctl.sneak = true;
@@ -126,7 +126,7 @@ public final class Tower {
             // 위에서 싸우기
             if (feet.getY() < top - 1 && p.onGround()) { phase = 0; ticks = 0; return true; }
             bot.ctl.sneak = true;
-            if (closest == null || cd > 8) calm++; else calm = 0;
+            if (closest == null || cd > 10) calm++; else calm = 0;
             if (calm > 60) {
                 phase = 2;
                 ticks = 0;
@@ -167,12 +167,26 @@ public final class Tower {
             if (p.getFoodData().getFoodLevel() < 20 && (p.getHealth() < 18 || p.getFoodData().getFoodLevel() <= 14)) {
                 if (reflex.startEatIfNeeded()) { reflex.doing = "기둥 위에서 먹는 중"; return true; }
             }
+            // 칼이 안 닿는 몹은 활로 쏨 (기둥 위라 안전하게 저격)
+            LivingEntity snipe = null;
+            double sdist = 1e9;
+            for (Entity e : l.entitiesForRendering()) {
+                if (!(e instanceof LivingEntity le) || !Reflex.hostile(e) || e instanceof net.minecraft.world.entity.monster.EnderMan) continue;
+                double d = e.distanceTo(p);
+                if (d < 26 && d < sdist && p.hasLineOfSight(e)) { sdist = d; snipe = le; }
+            }
+            if (snipe != null && Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW)) {
+                Vec3 vel = snipe.position().subtract(snipe.xo, snipe.yo, snipe.zo);
+                if (reflex.archer.tick(bot, snipe.getBoundingBox().getCenter(), vel)) bot.log("기둥 위에서 " + snipe.getName().getString() + "에게 화살");
+                reflex.doing = "기둥 위에서 " + snipe.getName().getString() + " 활로 저격";
+                return true;
+            }
             if (closest != null) bot.ctl.lookAt(p, closest.getEyePosition());
             reflex.doing = "기둥 위에서 기다리는 중";
             return true;
         }
         // phase 2: 발밑 블록을 캐며 내려감
-        if (closest != null && cd < 6 && count >= 1) {
+        if (closest != null && cd < 5 && count >= 1) {
             // 다시 몰려오면 도로 올라감
             phase = 0;
             ticks = 0;

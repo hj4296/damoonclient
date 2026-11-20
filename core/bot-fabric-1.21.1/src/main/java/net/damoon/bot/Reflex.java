@@ -24,7 +24,7 @@ public final class Reflex {
     public boolean fightEnabled = true;
     /** 회복 중: 배고픔을 가득 채워 자연 회복이 되게 */
     public boolean forceEat;
-    private final Archer archer = new Archer();
+    final Archer archer = new Archer();
     /** 자리 지키기 (스포너 옆): 쫓아가지 않고 다가오는 적만 벰 */
     public boolean camp;
     /** 벙커 짓는 중: 체력이 넉넉하면 방패보다 짓기를 먼저 */
@@ -60,6 +60,18 @@ public final class Reflex {
         // 갑옷·방패는 생기면 바로 착용 (어떤 작업 중이든)
         if (bot.ticks % 20 == 7 && !p.isUsingItem()) { Inv.equipArmor(p); Inv.equipShield(p); }
         // 바로 앞의 근접 몹 (위더 스켈레톤 등): 이게 있으면 먹기·우유·불 끄기·화염구 방어보다 방패 싸움이 먼저
+        // 날아오는 화염구·화살: 궤적을 계산해서 나를 맞힐 것만 방패로 막음 (방패는 들고 5틱 뒤부터 막힘)
+        Entity proj = turtle.sealed() || (turtle.active()) || (tower.active() && !tower.onTop(p)) ? null : incoming(p, 13);
+        if (proj != null && p.getOffhandItem().is(Items.SHIELD)) {
+            if (eating) eating = false;
+            Inv.selectWeapon(p);
+            if (p.isUsingItem() && !p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; doing = "투사체! 손에 든 것 내림"; return true; }
+            bot.ctl.lookAt(p, proj.position());
+            bot.ctl.speed = 45f;
+            bot.ctl.use = true;
+            doing = "날아오는 " + proj.getName().getString() + " 방패로 막는 중";
+            return true;
+        }
         boolean safe = turtle.sealed() || tower.active();
         LivingEntity near = safe ? null : nearMelee(p, 4.5);
         if (eating && !safe) {
@@ -190,7 +202,7 @@ public final class Reflex {
         net.minecraft.world.entity.monster.Blaze shooter = null;
         double sd = 1e9;
         for (Entity e : bot.level().entitiesForRendering())
-            if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && inShotWindow(b, 0) && b.distanceTo(p) < 24 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
+            if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && inShotWindow(b, 0) && b.distanceTo(p) < 9 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
         boolean meleeTarget = threat instanceof net.minecraft.world.entity.monster.Blaze bt && Act.reach(p, bt.getBoundingBox()) <= 3.0 && bt.getHealth() <= 7;
         if (shooter != null && shieldOn && !meleeTarget && near == null && !(building && p.getHealth() > 9)) {
             Inv.selectWeapon(p);
@@ -221,7 +233,8 @@ public final class Reflex {
             // 곧 화염구가 날아올 블레이즈가 있으면 위험 (활은 당기는 데 1초 걸리므로 여유를 둠)
             boolean soon = false;
             for (Entity e : bot.level().entitiesForRendering())
-                if (e instanceof net.minecraft.world.entity.monster.Blaze o && o.distanceTo(p) < 24 && p.hasLineOfSight(o)) {
+                if (e instanceof net.minecraft.world.entity.monster.Blaze o && o.distanceTo(p) < 9 && p.hasLineOfSight(o)) {
+                    // 멀리 있는 블레이즈 화염구는 날아오는 걸 보고 막음 (incoming)
                     if (inShotWindow(o, 0)) danger = true;
                     if (inShotWindow(o, 22)) soon = true;
                 }
@@ -322,6 +335,34 @@ public final class Reflex {
         for (Entity e : bot.level().entitiesForRendering())
             if (hostile(e) && !(e instanceof EnderMan) && e.distanceTo(p) < lim && p.hasLineOfSight(e)) return true;
         return false;
+    }
+
+    /** maxT 틱 안에 내 몸에 닿을 화염구·화살 (가장 먼저 닿는 것) */
+    public Entity incoming(LocalPlayer p, int maxT) {
+        net.minecraft.world.phys.AABB box = p.getBoundingBox().inflate(0.45);
+        Entity best = null;
+        int bt = maxT + 1;
+        for (Entity e : bot.level().entitiesForRendering()) {
+            boolean fb = e instanceof net.minecraft.world.entity.projectile.AbstractHurtingProjectile
+                    && !(e instanceof net.minecraft.world.entity.projectile.DragonFireball);
+            boolean ar = e instanceof net.minecraft.world.entity.projectile.AbstractArrow a && a.getDeltaMovement().lengthSqr() > 0.01;
+            if (!fb && !ar) continue;
+            if (e instanceof net.minecraft.world.entity.projectile.Projectile pr && pr.getOwner() == p) continue;
+            if (e.distanceToSqr(p) > 48 * 48) continue;
+            Vec3 pos = e.position(), v = e.getDeltaMovement();
+            if (v.lengthSqr() < 1e-6) v = e.position().subtract(e.xo, e.yo, e.zo);
+            if (v.lengthSqr() < 1e-6) continue;
+            // 나에게서 멀어지는 것(내가 쏜 화살 등)은 무시
+            if (v.dot(p.getBoundingBox().getCenter().subtract(pos)) <= 0) continue;
+            for (int t = 1; t <= Math.min(maxT, bt - 1); t++) {
+                Vec3 np = pos.add(v);
+                if (box.contains(np) || box.clip(pos, np).isPresent()) { bt = t; best = e; break; }
+                pos = np;
+                if (fb) v = v.add(v.normalize().scale(0.1)).scale(0.95);
+                else v = v.scale(0.99).add(0, -0.05, 0);
+            }
+        }
+        return best;
     }
 
     public boolean blazeSoon(LocalPlayer p, net.minecraft.world.entity.monster.Blaze b, int ahead) {
