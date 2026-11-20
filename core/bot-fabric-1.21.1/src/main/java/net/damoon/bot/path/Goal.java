@@ -86,6 +86,12 @@ public interface Goal {
         }
     }
 
+    /** 이 높이 이상으로 올라가기 (땅 위로 나가기) */
+    record Above(int y) implements Goal {
+        public boolean isIn(int a, int b, int c) { return b >= y; }
+        public double h(int a, int b, int c) { return Math.max(0, y - b) * 8.0; }
+    }
+
     /** 이 지점에서 멀어지기 (반경 r 밖이면 성공) */
     record Away(double x, double z, double r) implements Goal {
         public boolean isIn(int a, int b, int c) {

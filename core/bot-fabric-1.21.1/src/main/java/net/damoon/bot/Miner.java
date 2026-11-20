@@ -34,6 +34,8 @@ public final class Miner {
     /** 이 높이보다 아래는 안 캠 (예: 발밑 엔드 돌만 캐서 섬에 구멍 뚫지 않게) */
     public int minY = Integer.MIN_VALUE;
     public String info = "";
+    private final Set<Integer> ignoreDrops = new HashSet<>();
+    private int dropId = -1, dropTicks;
 
     public Miner(Predicate<BlockState> block, Predicate<ItemStack> item, int want, boolean needTool) {
         this.block = block;
@@ -43,6 +45,7 @@ public final class Miner {
     }
 
     public R tick(Bot bot) {
+        bot.trace = "miner";
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
         int have = Inv.count(p, item);
@@ -54,18 +57,30 @@ public final class Miner {
         ItemEntity drop = null;
         double dd = 1e9;
         for (Entity e : l.entitiesForRendering()) {
-            if (e instanceof ItemEntity ie && item.test(ie.getItem()) && ie.onGround()) {
+            if (e instanceof ItemEntity ie && item.test(ie.getItem()) && !ignoreDrops.contains(ie.getId())) {
                 double d = ie.distanceTo(p);
                 if (d < 12 && d < dd && Math.abs(ie.getY() - p.getY()) < 4) { dd = d; drop = ie; }
             }
         }
-        if (drop != null && dd > 1.0) {
-            info = "아이템 줍는 중 (" + have + "/" + want + ")";
-            Act.stopDig(bot);
-            BlockPos ip = drop.blockPosition();
-            Nav.R r = bot.nav.go(new Goal.Near(ip, 1.0));
-            if (r == Nav.R.FAILED) bot.nav.stop();
-            if (r != Nav.R.ARRIVED) return R.RUNNING;
+        if (drop != null) {
+            bot.trace = "miner-drop";
+            if (drop.getId() != dropId) { dropId = drop.getId(); dropTicks = 0; }
+            if (++dropTicks > 20 * 8) {
+                ignoreDrops.add(drop.getId());
+            } else {
+                info = "아이템 줍는 중 (" + have + "/" + want + ")";
+                Act.stopDig(bot);
+                Nav.R r = dd < 2.5 ? Nav.R.ARRIVED : bot.nav.go(new Goal.Near(drop.blockPosition(), 1.0));
+                if (r == Nav.R.FAILED) { bot.nav.stop(); ignoreDrops.add(drop.getId()); }
+                if (r == Nav.R.ARRIVED) {
+                    // 가까우면 아이템 쪽으로 직접 걸어감
+                    bot.nav.stop();
+                    bot.ctl.lookYaw(p, drop.position(), 30f);
+                    bot.ctl.fwd = dd > 0.3;
+                    if (drop.getY() > p.getY() + 0.6 && p.onGround()) bot.ctl.jump = true;
+                }
+                return R.RUNNING;
+            }
         }
         // 2) 캘 블록 찾기
         if (target != null && !block.test(l.getBlockState(target))) {
@@ -74,6 +89,7 @@ public final class Miner {
         if (target == null || ++targetTicks > 20 * 30) {
             if (target != null) bad.add(target.asLong());
             targetTicks = 0;
+            bot.trace = "miner-scan";
             if (scanTick-- > 0) return R.RUNNING;
             scanTick = 10;
             target = find(p, l);
@@ -84,14 +100,26 @@ public final class Miner {
             noFind = 0;
         }
         info = "캐는 중 (" + have + "/" + want + ")";
-        double reach = p.getEyePosition().distanceTo(Vec3.atCenterOf(target));
-        if (reach <= 4.2 && canSee(l, p, target)) {
+        double reach = Act.reach(p, new net.minecraft.world.phys.AABB(target));
+        info = "캐는 중 (" + have + "/" + want + ") 거리 " + String.format("%.1f", reach);
+        bot.trace = "miner-reach " + target.toShortString();
+        if (reach <= 4.8) {
+            bot.trace = "miner-dig";
             bot.nav.stop();
-            if (!Act.dig(bot, target)) bad.add(target.asLong());
+            // 시야를 가리는 블록(잎 등)이 있으면 그것부터 부숨
+            BlockPos dig = target;
+            net.minecraft.world.phys.BlockHitResult hr = l.clip(new net.minecraft.world.level.ClipContext(p.getEyePosition(), Vec3.atCenterOf(target),
+                    net.minecraft.world.level.ClipContext.Block.OUTLINE, net.minecraft.world.level.ClipContext.Fluid.NONE, p));
+            if (hr.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !hr.getBlockPos().equals(target)) {
+                BlockPos h = hr.getBlockPos();
+                BlockState hs = l.getBlockState(h);
+                if (BlockUtil.breakable(l, h.getX(), h.getY(), h.getZ(), hs) && !BlockUtil.fluidNear(l, h.getX(), h.getY(), h.getZ(), true)) dig = h;
+            }
+            if (!Act.dig(bot, dig)) bad.add(target.asLong());
             return R.RUNNING;
         }
         Act.stopDig(bot);
-        Nav.R r = bot.nav.go(new Goal.Reach(target, 3.8));
+        Nav.R r = bot.nav.go(new Goal.Reach(target, 3.6));
         if (r == Nav.R.FAILED) {
             bad.add(target.asLong());
             target = null;
@@ -109,29 +137,33 @@ public final class Miner {
         return false;
     }
 
+    /** 위아래로 몇 칸까지 찾을지 */
+    public int below = 8, above = 10;
+    public int chunks = 2;
+
     private BlockPos find(LocalPlayer p, ClientLevel l) {
         BlockPos c = PathExec.feet(p);
+        int lo = Math.max(minY, c.getY() - below), hi = c.getY() + above;
+        java.util.List<BlockPos> cands = Scan.find(l, c, chunks, lo, hi, block, q -> !bad.contains(q.asLong()), 40);
         BlockPos best = null;
         double bs = 1e9;
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        int r = radius;
-        for (int dy = -8; dy <= 10; dy++) {
-            int y = c.getY() + dy;
-            if (y < minY) continue;
-            for (int dx = -r; dx <= r; dx++)
-                for (int dz = -r; dz <= r; dz++) {
-                    m.set(c.getX() + dx, y, c.getZ() + dz);
-                    BlockState s = l.getBlockState(m);
-                    if (!block.test(s) || bad.contains(m.asLong())) continue;
-                    if (needTool && BlockUtil.breakTicks(p, l, m, s, true, null) >= BlockUtil.INF) continue;
-                    if (BlockUtil.fluidNear(l, m.getX(), m.getY(), m.getZ(), true)) continue;
-                    // 드러난 블록 우선
-                    boolean exposed = false;
-                    for (Direction d : Direction.values()) if (l.getBlockState(m.relative(d)).isAir()) { exposed = true; break; }
-                    double score = Math.sqrt(dx * dx + dz * dz + dy * dy * 2.0) + (exposed ? 0 : 6) + (dy < -1 ? 3 : 0);
-                    if (score < bs) { bs = score; best = m.immutable(); }
-                }
+        for (BlockPos m : cands) {
+            BlockState s = l.getBlockState(m);
+            if (needTool && BlockUtil.breakTicks(p, l, m, s, true, null) >= BlockUtil.INF) continue;
+            if (BlockUtil.fluidNear(l, m.getX(), m.getY(), m.getZ(), true)) continue;
+            boolean exposed = false;
+            for (Direction d : Direction.values()) if (l.getBlockState(m.relative(d)).isAir()) { exposed = true; break; }
+            double dx = m.getX() - c.getX(), dy = m.getY() - c.getY(), dz = m.getZ() - c.getZ();
+            double score = Math.sqrt(dx * dx + dz * dz + dy * dy * 3.0) + (exposed ? 0 : 5) + (dy < -2 ? 4 : 0);
+            if (score < bs) { bs = score; best = m; }
         }
         return best;
+    }
+
+    public boolean busy() { return target != null; }
+
+    /** 이 근처에 캘 게 있는지 (계획용) */
+    public boolean available(Bot bot) {
+        return find(bot.p(), bot.level()) != null;
     }
 }

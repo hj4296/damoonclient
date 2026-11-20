@@ -31,6 +31,7 @@ public final class Nav {
     public PathExec exec() { return exec; }
 
     public void stop() {
+        bot.trace += " NAVSTOP";
         goal = null;
         finder = null;
         exec = null;

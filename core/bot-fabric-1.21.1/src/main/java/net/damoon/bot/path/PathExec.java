@@ -55,6 +55,7 @@ public final class PathExec {
     }
 
     public R tick(Bot bot) {
+        bot.trace += " exec";
         LocalPlayer p = bot.p();
         Level l = p.level();
         Ctl c = bot.ctl;
@@ -105,6 +106,16 @@ public final class PathExec {
                 }
             }
         }
+        // 한 칸 오르기가 계속 안 되면 (점프할 때 머리가 위 블록에 걸림) 그 블록도 캠
+        if (to.move == Move.ASCEND && moveTicks > 40) {
+            for (BlockPos b : new BlockPos[]{to.pos().above(2), from.pos().above(3)}) {
+                BlockState s = l.getBlockState(b);
+                if (!BlockUtil.passable(l, b.getX(), b.getY(), b.getZ(), s) && BlockUtil.breakable(l, b.getX(), b.getY(), b.getZ(), s)
+                        && !BlockUtil.fluidNear(l, b.getX(), b.getY(), b.getZ(), false)) {
+                    if (Act.dig(bot, b)) return R.RUNNING;
+                }
+            }
+        }
         Act.stopDig(bot);
 
         // 2) 움직이기
@@ -115,6 +126,7 @@ public final class PathExec {
                     return R.RUNNING;
                 }
                 c.look(p.getYRot(), 90f);
+                c.sneak = true;
                 if (p.getXRot() < 70f) return R.RUNNING;
                 if (p.onGround() && at(f, from)) c.jump = true;
                 BlockPos at = from.pos();

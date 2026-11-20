@@ -34,6 +34,7 @@ public final class Control {
             Minecraft mc = Minecraft.getInstance();
             LocalPlayer p = mc.player;
             sb.append("screen=").append(mc.screen == null ? "-" : mc.screen.getClass().getSimpleName()).append('\n');
+            sb.append("ticks=").append(bot.ticks).append(" trace=").append(String.join(" | ", bot.traceHist)).append(" exec=").append(bot.nav.exec() == null ? "-" : bot.nav.exec().target().toString()).append('\n');
             sb.append("running=").append(bot.running).append(" victory=").append(bot.victory).append(" deaths=").append(bot.deaths).append('\n');
             if (p != null) {
                 sb.append(String.format("pos=%.1f %.1f %.1f dim=%s hp=%.1f food=%d%n", p.getX(), p.getY(), p.getZ(),

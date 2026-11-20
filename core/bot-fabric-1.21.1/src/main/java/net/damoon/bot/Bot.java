@@ -46,6 +46,9 @@ public final class Bot {
     public boolean victory;
     public long startedAt;
     public final Deque<String> events = new ArrayDeque<>();
+    /** 진단용: 마지막으로 지나간 분기 */
+    public String trace = "";
+    public final Deque<String> traceHist = new ArrayDeque<>();
     private Supplier<Task> restart;
     private int statusTick;
 
@@ -139,6 +142,9 @@ public final class Bot {
             }
         }
         ctl.apply(mc.player);
+        traceHist.addFirst(trace);
+        while (traceHist.size() > 6) traceHist.removeLast();
+        trace = "";
     }
 
     /** 통합 서버에서 관리자 권한으로 명령 실행 (테스트 준비용) */
@@ -185,6 +191,7 @@ public final class Bot {
                 String what = a.length > 1 ? a[1] : "end";
                 switch (what) {
                     case "end" -> start(EndGameTask::new);
+                    case "full" -> start(net.damoon.bot.task.BeatGameTask::new);
                     default -> log("모르는 작업: " + what);
                 }
             }

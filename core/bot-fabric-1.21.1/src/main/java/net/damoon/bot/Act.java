@@ -32,7 +32,8 @@ public final class Act {
         BlockState s = p.level().getBlockState(b);
         Vec3 eye = p.getEyePosition();
         Vec3 ctr = Vec3.atCenterOf(b);
-        if (eye.distanceTo(ctr) > 5.2) return false;
+        // 서버 허용 거리: 블록 상자까지 4.5 + 1.0
+        if (reach(p, new AABB(b)) > 5.3) return false;
         if (p.containerMenu == p.inventoryMenu) Inv.selectTool(p, s);
         bot.ctl.lookAt(p, ctr);
         if (!bot.ctl.aimed(p, 30)) return true;
@@ -58,6 +59,9 @@ public final class Act {
         LocalPlayer p = bot.p();
         if (placeCooldown > 0) return true;
         if (!Inv.select(p, Inv.throwaway())) return false;
+        // 작업대·화로 위에 놓을 때 열리지 않게 웅크린 상태에서만 놓음 (서버가 웅크림을 알도록 한 틱 먼저)
+        bot.ctl.sneak = true;
+        if (!p.isShiftKeyDown()) return true;
         return use(bot, against, face);
     }
 

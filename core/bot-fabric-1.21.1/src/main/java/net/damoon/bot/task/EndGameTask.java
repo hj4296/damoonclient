@@ -394,6 +394,7 @@ public class EndGameTask extends Task {
                     return S.RUNNING;
                 }
                 bot.ctl.look(p.getYRot(), 90f);
+                bot.ctl.sneak = true;
                 if (p.getXRot() < 70) return S.RUNNING;
                 if (p.onGround()) bot.ctl.jump = true;
                 int baseY = (int) Math.floor(p.getY() - 0.2);
