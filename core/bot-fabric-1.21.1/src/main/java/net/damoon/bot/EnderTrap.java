@@ -25,7 +25,7 @@ import java.util.Set;
 public final class EnderTrap {
     public enum R { RUNNING, NONE }
 
-    private int targetId = -1, boatId = -1, placeWait;
+    private int targetId = -1, boatId = -1, placeWait, pushTicks;
     private final Set<Integer> ignore = new HashSet<>();
     private final java.util.Map<Integer, Integer> pickTime = new java.util.HashMap<>();
     private int targetTicks;
@@ -93,79 +93,79 @@ public final class EnderTrap {
         }
         EnderMan em = (EnderMan) t;
         double d = em.distanceTo(p);
-        double reach = Act.reach(p, em.getBoundingBox());
         if (em.isPassenger()) {
-            info = "보트에 갇힌 엔더맨 공격!";
-            Inv.selectWeapon(p);
-            bot.ctl.lookAt(p, em.getBoundingBox().getCenter());
-            if (reach > 2.8) {
-                Nav.R r = bot.nav.go(new Goal.Near(em.blockPosition(), 1.6));
-                if (r == Nav.R.FAILED) bot.nav.stop();
-            } else {
-                bot.nav.stop();
-                Melee.fight(bot, em, false);
-            }
+            // 보트에 탄 엔더맨: 순간이동·이동 불가 → 팔이 안 닿는 끝 거리에서 벰
+            info = "보트에 태운 엔더맨 공격! (" + Melee.fight(bot, em, true) + ")";
+            bot.nav.stop();
+            pushTicks = 0;
             return R.RUNNING;
         }
-        if (!em.isCreepy()) {
-            if (d > 24 || !p.hasLineOfSight(em)) {
-                info = "엔더맨에게 다가가는 중";
-                Nav.R r = bot.nav.go(new Goal.Near(em.blockPosition(), 12));
+        if (em.isCreepy()) {
+            // 이미 화남: 방패·거리 유지·치명타로 싸움
+            bot.nav.stop();
+            info = "화난 엔더맨과 싸우는 중 (" + Melee.fight(bot, em, true) + ")";
+            return R.RUNNING;
+        }
+        // 화나게 하지 않도록 눈이 아니라 다리를 봄
+        Vec3 legs = em.position().add(0, 0.4, 0);
+        if (!hasBoat(p) && boat == null) {
+            info = "보트가 없음";
+            return R.NONE;
+        }
+        if (boat == null) {
+            if (d > 5.0 || !p.hasLineOfSight(em)) {
+                info = "엔더맨에게 다가가는 중 (다리만 봄)";
+                Nav.R r = bot.nav.go(new Goal.Near(em.blockPosition(), 3.5));
                 if (r == Nav.R.FAILED) { bot.nav.stop(); ignore.add(em.getId()); targetId = -1; }
                 return R.RUNNING;
             }
-            info = "엔더맨 눈을 바라봐서 화나게 하는 중";
             bot.nav.stop();
-            bot.ctl.lookAt(p, em.getEyePosition());
-            return R.RUNNING;
-        }
-        // 화남: 다가오는 길목에 보트를 놓음
-        bot.nav.stop();
-        if (placeWait > 0) placeWait--;
-        if (boat == null && hasBoat(p) && p.onGround() && d < 14 && d > 3.2 && placeWait == 0) {
+            if (placeWait > 0) { placeWait--; }
+            // 엔더맨 쪽 1.6칸 앞 바닥에 보트를 놓음
             Vec3 dir = new Vec3(em.getX() - p.getX(), 0, em.getZ() - p.getZ()).normalize();
-            BlockPos floor = BlockPos.containing(p.position().add(dir.scale(1.9))).below();
+            BlockPos floor = BlockPos.containing(p.position().add(dir.scale(1.6))).below();
             var fs = l.getBlockState(floor);
-            if (BlockUtil.floor(l, floor.getX(), floor.getY(), floor.getZ(), fs) && l.getBlockState(floor.above()).isAir()) {
-                info = "엔더맨이 오는 길에 보트 놓는 중";
+            info = "엔더맨 앞에 보트 놓는 중";
+            if (BlockUtil.floor(l, floor.getX(), floor.getY(), floor.getZ(), fs) && l.getBlockState(floor.above()).isAir() && placeWait == 0) {
                 Inv.select(p, s -> s.is(ItemTags.BOATS));
                 Vec3 aim = Vec3.atCenterOf(floor).add(0, 0.5, 0);
                 bot.ctl.lookAt(p, aim);
                 bot.ctl.speed = 60f;
-                if (bot.ctl.aimed(p, 2f)) {
+                if (bot.ctl.aimed(p, 2f) && p.getMainHandItem().is(ItemTags.BOATS)) {
                     Minecraft.getInstance().gameMode.useItem(p, InteractionHand.MAIN_HAND);
-                    placeWait = 10;
+                    placeWait = 8;
                 }
-                return R.RUNNING;
+            } else {
+                bot.ctl.lookAt(p, legs);
             }
-        }
-        if (boat == null && boatId == -1) {
             for (Entity e : l.entitiesForRendering())
-                if (e instanceof Boat b && b.distanceTo(p) < 5 && b.getPassengers().isEmpty()) { boatId = b.getId(); break; }
+                if (e instanceof Boat b && b.distanceTo(p) < 4 && b.getPassengers().isEmpty()) { boatId = b.getId(); pushTicks = 0; break; }
+            return R.RUNNING;
         }
-        // 보트가 엔더맨과 나 사이에 오도록 자리를 옮김 → 다가오던 엔더맨이 보트에 탐
-        if (boat != null && reach > 3.0 && boat.distanceTo(p) < 8) {
-            Vec3 away = new Vec3(boat.getX() - em.getX(), 0, boat.getZ() - em.getZ()).normalize();
-            Vec3 spot = boat.position().add(away.scale(1.4));
-            double sd = Math.hypot(spot.x - p.getX(), spot.z - p.getZ());
-            if (sd > 0.4) {
-                Vec3 dir = new Vec3(spot.x - p.getX(), 0, spot.z - p.getZ()).normalize();
-                // 엔더맨을 보면서 옆걸음/뒷걸음으로 자리 잡기
-                bot.ctl.lookAt(p, em.getBoundingBox().getCenter());
-                double yaw = Math.toRadians(p.getYRot());
-                double fx = -Math.sin(yaw), fz = Math.cos(yaw);
-                double fwd = dir.x * fx + dir.z * fz, side = dir.x * fz - dir.z * fx;
-                bot.ctl.fwd = fwd > 0.3;
-                bot.ctl.back = fwd < -0.3;
-                bot.ctl.left = side > 0.3;
-                bot.ctl.right = side < -0.3;
-                info = "보트를 사이에 두고 자리 잡는 중";
-                return R.RUNNING;
-            }
+        // 보트를 밀어서 엔더맨에게 부딪침 → 빈 보트에 닿은 몹은 자동으로 탐
+        if (++pushTicks > 20 * 15) {
+            info = "보트가 빗나감 → 보트 회수 후 다시";
+            Inv.selectWeapon(p);
+            bot.ctl.lookAt(p, boat.position());
+            if (boat.distanceTo(p) > 2.5) bot.ctl.fwd = true; else Act.attack(bot, boat, 0.5f);
+            if (pushTicks > 20 * 25) pushTicks = 0;
+            return R.RUNNING;
         }
-        // 다가오길 기다림: 방패로 막다가 닿으면 치명타
-        Melee.fight(bot, em, false);
-        info = boat != null ? "보트 함정 앞에서 엔더맨을 기다리는 중" : "화난 엔더맨과 싸우는 중";
+        Vec3 toEm = new Vec3(em.getX() - boat.getX(), 0, em.getZ() - boat.getZ());
+        Vec3 behind = boat.position().subtract(toEm.normalize().scale(1.1));
+        double off = Math.hypot(behind.x - p.getX(), behind.z - p.getZ());
+        bot.ctl.sprint = false;
+        if (off > 0.9 && boat.distanceTo(p) > 1.4) {
+            // 보트 뒤쪽(엔더맨 반대편)으로 돌아감
+            info = "보트 뒤로 돌아가는 중";
+            bot.ctl.lookYaw(p, behind, 20f);
+            bot.ctl.fwd = true;
+        } else {
+            info = "보트를 밀며 달리는 중 → 엔더맨 태우기";
+            bot.ctl.lookYaw(p, em.position(), 25f);
+            bot.ctl.fwd = true;
+            bot.ctl.sprint = p.getFoodData().getFoodLevel() > 6;
+        }
         return R.RUNNING;
     }
 }

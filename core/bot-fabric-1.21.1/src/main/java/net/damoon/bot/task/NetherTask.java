@@ -36,6 +36,7 @@ public class NetherTask extends Task {
     private boolean boatTried;
     private BlockPos safeSpot;
     private net.damoon.bot.BlazeBunker bunker, quick;
+    private int quickAge;
     private boolean bunkerFailed;
     private boolean healing;
     private int fortTicks;
@@ -100,7 +101,9 @@ public class NetherTask extends Task {
                 }
             }
             if (quick != null) {
-                if (quick.calmFor(bot, 20 * 10) && p.getHealth() >= 18) {
+                quickAge++;
+                if ((quick.calmFor(bot, 20 * 10) && p.getHealth() >= 18) || (quickAge > 20 * 60 && p.getHealth() >= 16)) {
+                    quickAge = 0;
                     bot.log("블레이즈가 없음 → 피난처에서 나와 전진");
                     quick = null;
                     bot.reflex.camp = false;
