@@ -134,7 +134,9 @@ public final class Reflex {
             double r = Act.reach(p, bz.getBoundingBox());
             boolean danger = false;
             for (Entity e : bot.level().entitiesForRendering())
-                if (e instanceof net.minecraft.world.entity.monster.Blaze o && o.isOnFire() && o.distanceTo(p) < 20 && p.hasLineOfSight(o)) { danger = true; break; }
+                if (e instanceof net.minecraft.world.entity.monster.Blaze o && o != bz && o.isOnFire() && o.distanceTo(p) < 10 && p.hasLineOfSight(o)) { danger = true; break; }
+            // 칼이 닿는 블레이즈가 막 쏘려는 게 아니거나 거의 죽었으면 공격
+            if (bz.isOnFire() && bz.getHealth() > 7) danger = true;
             // 체력이 낮으면 시야 밖으로 물러나 먹고 회복
             if (p.getHealth() < 12) {
                 Vec3 away = p.position().subtract(bz.position()).multiply(1, 0, 1).normalize();
