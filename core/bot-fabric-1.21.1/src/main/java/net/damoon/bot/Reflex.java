@@ -81,6 +81,25 @@ public final class Reflex {
             }
         }
 
+        // 발밑·주변의 불은 주먹으로 꺼 버림 (블레이즈 화염구가 바닥에 붙인 불 속에 서 있지 않게)
+        {
+            net.minecraft.core.BlockPos f = p.blockPosition();
+            net.minecraft.core.BlockPos fire = null;
+            double fd = 1e9;
+            for (net.minecraft.core.BlockPos q : net.minecraft.core.BlockPos.betweenClosed(f.offset(-2, -1, -2), f.offset(2, 2, 2))) {
+                var st = bot.level().getBlockState(q);
+                if (st.getBlock() instanceof net.minecraft.world.level.block.BaseFireBlock) {
+                    double d = q.distSqr(f);
+                    if (d < fd) { fd = d; fire = q.immutable(); }
+                }
+            }
+            if (fire != null && Act.reach(p, new net.minecraft.world.phys.AABB(fire)) < 4.0) {
+                Act.dig(bot, fire);
+                doing = "불 끄는 중";
+                return true;
+            }
+        }
+
         // 크리퍼가 터지려 하면 도망
         for (Entity e : bot.level().entitiesForRendering()) {
             if (e instanceof Creeper c && c.isAlive() && c.getSwelling(1f) > 0.15f && c.distanceTo(p) < 5) {
