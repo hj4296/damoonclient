@@ -44,6 +44,25 @@ public final class Ballistics {
         return null;
     }
 
+    /** 정확히 닿는 각도가 없으면 가장 가깝게 지나가는 각도 (pitch, 오차) */
+    public static double[] closestPearl(Vec3 from, Vec3 to, double alongVel, double upVel) {
+        gravity = 0.03;
+        addVh = alongVel;
+        addVy = upVel;
+        try {
+            double dx = to.x - from.x, dz = to.z - from.z;
+            double d = Math.sqrt(dx * dx + dz * dz), dy = to.y - from.y;
+            double best = Double.NaN, be = 1e9;
+            for (double deg = -80; deg <= 80; deg += 1) {
+                double[] r = simulate(deg, d, 1.5);
+                if (r == null) continue;
+                double e = Math.abs(r[0] - dy);
+                if (e < be) { be = e; best = deg; }
+            }
+            return Double.isNaN(best) ? null : new double[]{-best, be};
+        } finally { gravity = 0.05; addVh = 0; addVy = 0; }
+    }
+
     /** 마인크래프트 pitch(위가 -)와 비행 틱 수. 못 맞추면 null */
     public static double[] solve(Vec3 from, Vec3 to, double v) {
         double dx = to.x - from.x, dz = to.z - from.z;
