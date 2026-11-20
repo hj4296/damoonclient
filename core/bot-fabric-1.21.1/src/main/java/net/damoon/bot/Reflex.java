@@ -22,6 +22,8 @@ public final class Reflex {
     /** 작업이 지금은 먹지 말라고 할 때 (예: 드래곤 머리 때리는 중) */
     public boolean holdEating;
     public boolean fightEnabled = true;
+    /** 회복 중: 배고픔을 가득 채워 자연 회복이 되게 */
+    public boolean forceEat;
     private net.minecraft.core.BlockPos mlgWater;
     private int mlgTicks;
 
@@ -181,7 +183,7 @@ public final class Reflex {
             int food = p.getFoodData().getFoodLevel();
             float hp = p.getHealth();
             boolean gap = hp <= 10 && Inv.has(p, Items.GOLDEN_APPLE) && !p.hasEffect(MobEffects.REGENERATION);
-            boolean need = food <= 14 || (hp < 14 && food < 20);
+            boolean need = food <= 14 || (hp < 14 && food < 20) || (forceEat && food < 20);
             if (gap || need) {
                 boolean ok = gap ? Inv.select(p, Inv.is(Items.GOLDEN_APPLE)) : selectBestFood(p);
                 if (ok) {

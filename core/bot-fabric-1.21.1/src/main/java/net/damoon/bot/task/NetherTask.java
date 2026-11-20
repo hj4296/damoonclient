@@ -82,6 +82,7 @@ public class NetherTask extends Task {
             if (healing || (spawner != null && p.getHealth() < 13)) {
                 if (!healing) bot.log("체력 " + (int) p.getHealth() + " → 물러나서 회복");
                 healing = p.getHealth() < 19;
+                bot.reflex.forceEat = healing;
                 if (healing) {
                     detail = "물러나서 회복하는 중 (체력 " + (int) p.getHealth() + ")";
                     BlockPos to = safeSpot != null ? safeSpot : portal;
