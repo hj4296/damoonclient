@@ -35,7 +35,7 @@ public final class Miner {
     public int minY = Integer.MIN_VALUE;
     public String info = "";
     private final Set<Integer> ignoreDrops = new HashSet<>();
-    private int dropId = -1, dropTicks;
+    private final java.util.Map<Integer, Integer> dropTime = new java.util.HashMap<>();
 
     public Miner(Predicate<BlockState> block, Predicate<ItemStack> item, int want, boolean needTool) {
         this.block = block;
@@ -64,8 +64,7 @@ public final class Miner {
         }
         if (drop != null) {
             bot.trace = "miner-drop";
-            if (drop.getId() != dropId) { dropId = drop.getId(); dropTicks = 0; }
-            if (++dropTicks > 20 * 8) {
+            if (dropTime.merge(drop.getId(), 1, Integer::sum) > 20 * 8) {
                 ignoreDrops.add(drop.getId());
             } else {
                 info = "아이템 줍는 중 (" + have + "/" + want + ")";

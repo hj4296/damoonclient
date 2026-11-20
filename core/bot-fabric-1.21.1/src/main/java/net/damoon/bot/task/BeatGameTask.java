@@ -393,7 +393,7 @@ public class BeatGameTask extends Task {
     private String hunterKey = "";
     private Hunter hunterFood;
     private final java.util.Set<Integer> lootIgnore = new java.util.HashSet<>();
-    private int lootId = -1, lootTicks;
+    private final java.util.Map<Integer, Integer> lootTime = new java.util.HashMap<>();
     private int goldTicks, flintTicks;
     private boolean builtPortal;
 
@@ -406,8 +406,8 @@ public class BeatGameTask extends Task {
                     || st.is(Items.BLAZE_ROD) || st.is(Items.DIAMOND) || st.is(Items.OBSIDIAN) || st.is(Items.FLINT))) continue;
             double d = ie.distanceTo(p);
             if (d > 10 || d < 0.8 || Math.abs(ie.getY() - p.getY()) > 3 || !ie.onGround() || lootIgnore.contains(ie.getId())) continue;
-            if (ie.getId() != lootId) { lootId = ie.getId(); lootTicks = 0; }
-            if (++lootTicks > 20 * 10) { lootIgnore.add(ie.getId()); bot.nav.stop(); continue; }
+            int t = lootTime.merge(ie.getId(), 1, Integer::sum);
+            if (t > 20 * 10) { lootIgnore.add(ie.getId()); bot.nav.stop(); continue; }
             stage = "줍기: " + st.getHoverName().getString();
             Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0));
             if (r == Nav.R.ARRIVED) { bot.ctl.lookYaw(p, ie.position(), 20f); bot.ctl.fwd = true; }
