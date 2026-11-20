@@ -114,7 +114,16 @@ public final class Reflex {
             boolean danger = false;
             for (Entity e : bot.level().entitiesForRendering())
                 if (e instanceof net.minecraft.world.entity.monster.Blaze o && o.isOnFire() && o.distanceTo(p) < 20 && p.hasLineOfSight(o)) { danger = true; break; }
-            if (r <= 3.0 && !bz.isOnFire()) {
+            // 체력이 낮으면 시야 밖으로 물러나 먹고 회복
+            if (p.getHealth() < 12) {
+                Vec3 away = p.position().subtract(bz.position()).multiply(1, 0, 1).normalize();
+                bot.ctl.lookYaw(p, p.position().add(away.scale(5)), 0f);
+                bot.ctl.fwd = true;
+                if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+                doing = "체력이 낮아 블레이즈에게서 물러나는 중";
+                return true;
+            }
+            if (r <= 3.0 && !danger) {
                 if (p.isUsingItem()) { bot.ctl.use = false; doing = "방패 내리고 블레이즈 공격"; return true; }
                 if (bot.ctl.aimed(p, 20)) Act.attack(bot, bz, 0.9f);
                 doing = "블레이즈 공격!";
