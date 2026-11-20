@@ -29,6 +29,22 @@ public final class Reflex {
     public boolean camp;
     /** 벙커 짓는 중: 체력이 넉넉하면 방패보다 짓기를 먼저 */
     public boolean building;
+    public final Turtle turtle = new Turtle();
+
+    /** 배고픔이 덜 찼으면 먹기 시작 (시작했으면 true) */
+    public boolean startEatIfNeeded() {
+        LocalPlayer p = bot.p();
+        if (eating) return true;
+        int food = p.getFoodData().getFoodLevel();
+        boolean gap = p.getHealth() <= 10 && Inv.has(p, Items.GOLDEN_APPLE) && !p.hasEffect(MobEffects.REGENERATION);
+        if (food >= 20 && !gap) return false;
+        boolean ok = gap ? Inv.select(p, Inv.is(Items.GOLDEN_APPLE)) : selectBestFood(p);
+        if (!ok) return false;
+        eating = true;
+        eatTicks = 0;
+        bot.ctl.use = !(p.isUsingItem() && !p.getUseItem().has(net.minecraft.core.component.DataComponents.FOOD));
+        return true;
+    }
     private net.minecraft.core.BlockPos mlgWater;
     private int mlgTicks;
 
@@ -70,6 +86,9 @@ public final class Reflex {
             doing = "우유 마시는 중 (위더/독 해제)";
             return true;
         }
+
+        // 위험하면 블록으로 몸을 감싸고 회복 (터틀링)
+        if (turtle.tick(bot, this)) return true;
 
         // 엔더 진주로 위기 탈출 (공허·용암·포위)
         if (Pearl.tick(bot)) return true;
