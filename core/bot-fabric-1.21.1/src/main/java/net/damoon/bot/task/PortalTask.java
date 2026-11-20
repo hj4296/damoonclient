@@ -51,6 +51,14 @@ public class PortalTask extends Task {
         return true;
     }
 
+    /** 틀에 이미 놓인 흑요석 수 */
+    public int placedObsidian(ClientLevel l) {
+        if (base == null) return 0;
+        int n = 0;
+        for (int j = 0; j <= 4; j++) for (int i = 0; i < 4; i++) if (frame(i, j) && l.getBlockState(at(i, j)).is(Blocks.OBSIDIAN)) n++;
+        return n;
+    }
+
     private static boolean frame(int i, int j) {
         boolean edgeX = i == 0 || i == 3, edgeY = j == 0 || j == 4;
         return (edgeX || edgeY) && !(edgeX && edgeY);
@@ -66,7 +74,7 @@ public class PortalTask extends Task {
         ClientLevel l = bot.level();
         if (l.dimension() != Level.OVERWORLD) return S.DONE;
         if (wait > 0) { wait--; return S.RUNNING; }
-        if (++ticks > 20 * 60 * 6) return S.FAILED;
+        if (++ticks > 20 * 60 * 6) { bot.log("포털 짓기 시간 초과"); return S.FAILED; }
         if (base == null) {
             BlockPos f = PathExec.feet(p);
             Direction d0 = Direction.fromYRot(p.getYRot());
@@ -108,13 +116,13 @@ public class PortalTask extends Task {
                         if (!s.canBeReplaced()) continue;
                         detail = "모서리 블록 놓는 중";
                         int r = Placer.placeAt(bot, q, Inv.throwaway());
-                        if (r == -1) return S.FAILED;
+                        if (r == -1) { bot.log("포털 모서리를 못 놓음 " + q.toShortString()); return S.FAILED; }
                         if (r == 0) return S.RUNNING;
                     } else if (isFrame) {
                         if (s.is(Blocks.OBSIDIAN)) continue;
                         if (!s.canBeReplaced()) {
                             detail = "틀 자리 비우는 중";
-                            if (!Act.dig(bot, q)) return S.FAILED;
+                            if (!Act.dig(bot, q)) { bot.log("틀 자리를 못 비움 " + q.toShortString()); return S.FAILED; }
                             return S.RUNNING;
                         }
                         Act.stopDig(bot);
@@ -131,7 +139,7 @@ public class PortalTask extends Task {
                         }
                         if (!BlockUtil.passable(l, q.getX(), q.getY(), q.getZ(), s) && !s.isAir()) {
                             detail = "포털 안쪽 비우는 중";
-                            if (!Act.dig(bot, q)) return S.FAILED;
+                            if (!Act.dig(bot, q)) { bot.log("포털 안쪽을 못 비움 " + q.toShortString()); return S.FAILED; }
                             return S.RUNNING;
                         }
                     }
@@ -151,7 +159,7 @@ public class PortalTask extends Task {
                 return S.RUNNING;
             }
             detail = "부싯돌과 부시로 불 붙이는 중";
-            if (!Inv.select(p, Inv.is(Items.FLINT_AND_STEEL))) return S.FAILED;
+            if (!Inv.select(p, Inv.is(Items.FLINT_AND_STEEL))) { bot.log("부싯돌과 부시가 없음"); return S.FAILED; }
             bot.ctl.sneak = false;
             if (p.isShiftKeyDown()) return S.RUNNING;
             BlockPos against = at(1, 0);

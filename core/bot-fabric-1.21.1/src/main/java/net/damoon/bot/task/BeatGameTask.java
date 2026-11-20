@@ -42,6 +42,8 @@ public class BeatGameTask extends Task {
     private final Map<String, Integer> cooldown = new HashMap<>();
     private final EndGameTask end = new EndGameTask();
     private NetherTask nether;
+    private PortalTask portalTask;
+    private int portalFails;
     private StrongholdTask stronghold;
     private String stage = "준비";
     private String detail = "";
@@ -360,7 +362,8 @@ public class BeatGameTask extends Task {
                 if (r == Nav.R.FAILED) bot.nav.stop();
                 return S.RUNNING;
             }
-            if (Inv.count(p, Items.OBSIDIAN) < 10 && !(sub instanceof PortalTask)) {
+            int placedObs = portalTask != null ? portalTask.placedObsidian(l) : 0;
+            if (Inv.count(p, Items.OBSIDIAN) + placedObs < 10 && !(sub instanceof PortalTask)) {
                 stage = "7. 흑요석 만들기 (" + Inv.count(p, Items.OBSIDIAN) + "/10)";
                 S r = run(bot, "obsidian", () -> new ObsidianTask(10));
                 if (cool(bot, "obsidian")) {
@@ -372,7 +375,11 @@ public class BeatGameTask extends Task {
                 return r;
             }
             stage = "7. 네더 포털 짓기";
-            return run(bot, "portal", PortalTask::new);
+            if (portalTask == null || portalFails > 3) { portalTask = new PortalTask(); portalFails = 0; }
+            final PortalTask pt = portalTask;
+            S r = run(bot, "portal", () -> pt);
+            if (sub == null && cool(bot, "portal")) { portalFails++; cooldown.remove("portal"); }
+            return r;
         }
 
         // ---- 9. 엔드 준비: 엔더의 눈, 활과 화살 ----
