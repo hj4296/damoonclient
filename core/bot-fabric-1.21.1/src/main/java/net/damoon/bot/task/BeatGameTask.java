@@ -43,6 +43,7 @@ public class BeatGameTask extends Task {
     private final EndGameTask end = new EndGameTask();
     private NetherTask nether;
     private PortalTask portalTask;
+    private Hunter sheep;
     private net.damoon.bot.EnderTrap trap;
     private int portalFails;
     private StrongholdTask stronghold;
@@ -181,6 +182,11 @@ public class BeatGameTask extends Task {
         Predicate<ItemStack> planks = s -> s.is(ItemTags.PLANKS);
         int cobble = Inv.count(p, s -> s.is(Items.COBBLESTONE) || s.is(Items.COBBLED_DEEPSLATE) || s.is(Items.BLACKSTONE));
 
+        // ---- 밤: 침대가 있으면 자서 밤을 건너뜀 ----
+        if ((BedTask.night(l) && BedTask.hasBed(p) && !cool(bot, "bed")) || sub instanceof BedTask) {
+            stage = "밤 — 침대에서 자기";
+            return run(bot, "bed", BedTask::new);
+        }
         // ---- 0. 급할 때: 먹을 게 떨어짐 → 땅 위로 올라가 사냥 ----
         int foodNow = foodCount(p);
         if (foodNow < 2 && (p.getFoodData().getFoodLevel() < 17 || p.getHealth() < 12) && tier >= 1) {
@@ -251,6 +257,21 @@ public class BeatGameTask extends Task {
         if (!Inv.has(p, Items.FURNACE) && cobble >= 8 && !cool(bot, "furnace")) {
             stage = "2. 화로";
             return run(bot, "furnace", () -> new CraftTask(Items.FURNACE, 1));
+        }
+        // ---- 2-1. 침대 (밤을 건너뛰어 밤 몹을 피함): 양털 3개 ----
+        if (tier >= 2 && !BedTask.hasBed(p) && !cool(bot, "bed-make")) {
+            Item bedItem = BedTask.bedFor(p);
+            if (bedItem != null) {
+                stage = "2. 침대 만들기";
+                return run(bot, "bedcraft", () -> new CraftTask(bedItem, 1));
+            }
+            stage = "2. 침대용 양털 (양 잡기)";
+            if (sheep == null) sheep = new Hunter(e -> e instanceof net.minecraft.world.entity.animal.Sheep sh && !sh.isBaby() && !sh.isSheared(),
+                    st -> st.is(ItemTags.WOOL) || st.has(net.minecraft.core.component.DataComponents.FOOD));
+            Hunter.R r = sheep.tick(bot);
+            detail = sheep.info;
+            if (r == Hunter.R.NONE) { fail(bot, "bed-make", 20 * 60 * 3); bot.nav.stop(); }
+            return S.RUNNING;
         }
         // ---- 3. 음식 ----
         int food = foodCount(p);

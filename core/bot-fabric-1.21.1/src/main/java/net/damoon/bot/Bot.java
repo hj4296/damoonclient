@@ -259,6 +259,7 @@ public final class Bot {
             }
             case "setup" -> Setup.run(this, a.length > 1 ? a[1] : "end");
             case "cmd" -> server(line.trim().substring(4));
+            case "respawn" -> { if (mc().screen instanceof DeathScreen && p() != null) { p().respawn(); mc().setScreen(null); } }
             case "gamma" -> { gamma = a.length < 2 || !a[1].equals("off"); log("감마 " + (gamma ? "켬 (1500%)" : "끔")); }
             case "probe" -> {
                 if (p() == null) return;
