@@ -54,7 +54,7 @@ public final class Setup {
             case "s8" -> {
                 // 시험용: 네더 포털 직전 상태
                 run(bot, "s6");
-                bot.server("give @s diamond_pickaxe", "give @s golden_helmet", "give @s flint_and_steel", "give @s obsidian 10");
+                bot.server("give @s diamond_pickaxe", "give @s golden_helmet", "give @s flint_and_steel", "give @s obsidian 10", "give @s bow", "give @s arrow 64");
                 bot.log("시험용: 포털 직전 상태로 지급");
             }
             case "s9" -> {

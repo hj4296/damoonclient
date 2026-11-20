@@ -110,9 +110,18 @@ public class NetherTask extends Task {
                 }
                 // 스포너 바로 옆에 붙어 서서 생기는 블레이즈를 바로 벰
                 detail = "블레이즈 스포너 옆에서 기다리는 중 (" + rods + "/" + RODS + ")";
-                if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(spawner)) > 2.6 * 2.6) {
+                // 활이 있으면 스포너에서 조금 떨어져(약 8칸) 쏘고, 없으면 바로 옆에 붙음
+                boolean bow = Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW);
+                double want = bow ? 9 : 2.6;
+                if (bow && p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(spawner)) <= want * want) {
+                    bot.reflex.camp = true;
+                    bot.nav.stop();
+                    bot.ctl.lookAt(p, net.minecraft.world.phys.Vec3.atCenterOf(spawner).add(0, 1, 0));
+                    return S.RUNNING;
+                }
+                if (p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(spawner)) > want * want) {
                     bot.reflex.camp = false;
-                    Nav.R nr = bot.nav.go(new Goal.Reach(spawner, 1.5));
+                    Nav.R nr = bot.nav.go(bow ? new Goal.Near(spawner, 7) : new Goal.Reach(spawner, 1.5));
                     if (nr == Nav.R.FAILED) { bot.nav.stop(); bot.nav.go(new Goal.Near(spawner, 3)); }
                 } else {
                     bot.reflex.camp = true;

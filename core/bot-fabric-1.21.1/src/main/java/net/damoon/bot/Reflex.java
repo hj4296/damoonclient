@@ -24,6 +24,7 @@ public final class Reflex {
     public boolean fightEnabled = true;
     /** 회복 중: 배고픔을 가득 채워 자연 회복이 되게 */
     public boolean forceEat;
+    private final Archer archer = new Archer();
     /** 자리 지키기 (스포너 옆): 쫓아가지 않고 다가오는 적만 벰 */
     public boolean camp;
     private net.minecraft.core.BlockPos mlgWater;
@@ -152,11 +153,22 @@ public final class Reflex {
                 doing = "체력이 낮아 블레이즈에게서 물러나는 중";
                 return true;
             }
+            // 활이 있으면: 쏘기 직전이 아닐 때 활로 저격 (가까우면 칼)
+            boolean hasBow = Inv.has(p, Items.BOW) && (Inv.has(p, Items.ARROW) || Inv.has(p, Items.SPECTRAL_ARROW));
+            if (hasBow && !danger && r > 3.0 && bz.distanceTo(p) < 28 && p.hasLineOfSight(bz)) {
+                if (p.isUsingItem() && p.getMainHandItem().is(Items.SHIELD) == false && !p.getUseItem().is(Items.BOW)) { bot.ctl.use = false; return true; }
+                Vec3 vel = bz.position().subtract(bz.xo, bz.yo, bz.zo);
+                if (archer.tick(bot, bz.getBoundingBox().getCenter(), vel)) bot.log("블레이즈에 화살 발사");
+                doing = "블레이즈 활로 저격";
+                return true;
+            }
+            if (danger && p.isUsingItem() && p.getUseItem().is(Items.BOW)) { bot.ctl.use = false; archer.reset(); return true; }
             if (r <= 3.0 && !danger) {
                 if (p.isUsingItem()) { bot.ctl.use = false; doing = "방패 내리고 블레이즈 공격"; return true; }
                 if (bot.ctl.aimed(p, 20)) Act.attack(bot, bz, 0.9f);
                 doing = "블레이즈 공격!";
             } else {
+                Inv.selectWeapon(p);
                 bot.ctl.use = true;
                 if (!danger && r > 3.0 && !camp) bot.ctl.fwd = true;
                 doing = danger ? "방패로 화염구 막는 중" : "방패 들고 블레이즈에게 다가가는 중";
