@@ -37,6 +37,20 @@ public class PortalTask extends Task {
 
     private BlockPos at(int i, int j) { return base.relative(along, i).above(j); }
 
+    private net.damoon.bot.Digger digger;
+
+    /** 틀과 그 주변 2칸에 물·용암이 없는지 */
+    private static boolean dry(ClientLevel l, BlockPos b, Direction a) {
+        for (int i = -2; i <= 5; i++)
+            for (int j = -1; j <= 6; j++)
+                for (int k = -2; k <= 2; k++) {
+                    Direction side = a.getClockWise();
+                    BlockPos q = b.relative(a, i).above(j).relative(side, k);
+                    if (!l.getBlockState(q).getFluidState().isEmpty()) return false;
+                }
+        return true;
+    }
+
     private static boolean frame(int i, int j) {
         boolean edgeX = i == 0 || i == 3, edgeY = j == 0 || j == 4;
         return (edgeX || edgeY) && !(edgeX && edgeY);
@@ -55,9 +69,21 @@ public class PortalTask extends Task {
         if (++ticks > 20 * 60 * 6) return S.FAILED;
         if (base == null) {
             BlockPos f = PathExec.feet(p);
-            Direction d = Direction.fromYRot(p.getYRot());
-            along = d.getClockWise();
-            base = f.relative(d, 2).relative(along.getOpposite(), 1);
+            Direction d0 = Direction.fromYRot(p.getYRot());
+            for (int k = 0; k < 4 && base == null; k++) {
+                Direction d = k == 0 ? d0 : (k == 1 ? d0.getClockWise() : k == 2 ? d0.getCounterClockWise() : d0.getOpposite());
+                Direction a = d.getClockWise();
+                BlockPos b = f.relative(d, 2).relative(a.getOpposite(), 1);
+                if (dry(l, b, a)) { base = b; along = a; }
+            }
+            if (base == null) {
+                // 물·용암이 없는 곳으로 조금 옮겨 감
+                if (digger == null) digger = new net.damoon.bot.Digger(d0);
+                detail = "물·용암 없는 포털 자리 찾는 중";
+                digger.tick(bot, net.damoon.bot.Digger.Mode.TUNNEL);
+                return S.RUNNING;
+            }
+            Act.stopDig(bot);
             bot.log("포털 자리: " + base.toShortString());
         }
         bot.nav.stop();
@@ -97,6 +123,12 @@ public class PortalTask extends Task {
                         if (r == -1) { bot.log("흑요석을 못 놓음 " + q.toShortString()); return S.FAILED; }
                         if (r == 0) return S.RUNNING;
                     } else {
+                        if (!s.getFluidState().isEmpty()) {
+                            detail = "포털 안 물 막는 중";
+                            int r = Placer.placeAt(bot, q, Inv.throwaway());
+                            if (r == -1) return S.FAILED;
+                            return S.RUNNING;
+                        }
                         if (!BlockUtil.passable(l, q.getX(), q.getY(), q.getZ(), s) && !s.isAir()) {
                             detail = "포털 안쪽 비우는 중";
                             if (!Act.dig(bot, q)) return S.FAILED;
@@ -110,6 +142,8 @@ public class PortalTask extends Task {
             bot.log("포털 틀 완성");
         }
         if (phase == 1) {
+            for (int j = 1; j <= 3; j++) for (int i = 1; i <= 2; i++)
+                if (!l.getBlockState(at(i, j)).getFluidState().isEmpty()) { phase = 0; return S.RUNNING; }
             if (l.getBlockState(at(1, 1)).is(Blocks.NETHER_PORTAL)) {
                 phase = 2;
                 portalAt = at(1, 1);

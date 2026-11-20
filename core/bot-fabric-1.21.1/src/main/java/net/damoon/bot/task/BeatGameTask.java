@@ -348,7 +348,17 @@ public class BeatGameTask extends Task {
                 stage = "7. 부싯돌과 부시";
                 return run(bot, "fns", () -> new CraftTask(Items.FLINT_AND_STEEL, 1));
             }
-            if (Inv.count(p, Items.OBSIDIAN) < 10 && !builtPortal) {
+            // 이미 불 붙은 포털이 근처에 있으면 바로 들어감
+            BlockPos lit = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 2, PathExec.feet(p).getY() - 20, PathExec.feet(p).getY() + 20, st -> st.is(Blocks.NETHER_PORTAL), null);
+            if (lit != null) {
+                stage = "7. 네더 포털로 들어가는 중";
+                BlockPos fp = PathExec.feet(p);
+                if (l.getBlockState(fp).is(Blocks.NETHER_PORTAL)) { bot.nav.stop(); detail = "포털 안에서 기다리는 중"; return S.RUNNING; }
+                Nav.R r = bot.nav.go(new Goal.Block(lit.getX(), lit.getY(), lit.getZ(), true));
+                if (r == Nav.R.FAILED) bot.nav.stop();
+                return S.RUNNING;
+            }
+            if (Inv.count(p, Items.OBSIDIAN) < 10 && !(sub instanceof PortalTask)) {
                 stage = "7. 흑요석 만들기 (" + Inv.count(p, Items.OBSIDIAN) + "/10)";
                 S r = run(bot, "obsidian", () -> new ObsidianTask(10));
                 if (cool(bot, "obsidian")) {
@@ -360,7 +370,6 @@ public class BeatGameTask extends Task {
                 return r;
             }
             stage = "7. 네더 포털 짓기";
-            builtPortal = true;
             return run(bot, "portal", PortalTask::new);
         }
 
