@@ -21,6 +21,26 @@ public final class Turtle {
     private int phase, ticks;
 
     public boolean active() { return active; }
+    /** 구멍 모드: 발밑 3칸을 파고 들어가 위를 덮음 (적이 이미 붙었을 때) */
+    private boolean hole;
+
+    /** 발밑 3칸을 파도 안전한지: 캘 수 있고, 사방이 막혀 있고, 그 아래가 단단하고, 용암·물이 없음 */
+    static boolean holeOk(ClientLevel l, LocalPlayer p, BlockPos f) {
+        for (int d = 1; d <= 3; d++) {
+            BlockPos b = f.below(d);
+            var s = l.getBlockState(b);
+            if (s.isAir() || !s.getFluidState().isEmpty() || !BlockUtil.breakable(l, b.getX(), b.getY(), b.getZ(), s)) return false;
+            if (BlockUtil.breakTicks(p, l, b, s, false, null) > 30) return false;
+            for (Direction h : Direction.Plane.HORIZONTAL) {
+                BlockPos n = b.relative(h);
+                var ns = l.getBlockState(n);
+                if (ns.getCollisionShape(l, n).isEmpty() || !ns.getFluidState().isEmpty()) return false;
+            }
+        }
+        BlockPos fl = f.below(4);
+        var fs = l.getBlockState(fl);
+        return !fs.getCollisionShape(l, fl).isEmpty() && !BlockUtil.isLava(fs);
+    }
     /** 벽·천장을 다 막고 안에서 회복 중 */
     public boolean sealed() { return active && phase == 1; }
 
@@ -45,23 +65,83 @@ public final class Turtle {
         return false;
     }
 
+    private boolean holeTick(Bot bot, Reflex reflex, LocalPlayer p, ClientLevel l) {
+        BlockPos ft = PathExec.feet(p);
+        int depth = cell.getY() - ft.getY();
+        if (phase == 0) {
+            reflex.doing = "발밑 파고 숨는 중 (" + Math.max(0, depth) + "/3)";
+            if (ticks > 20 * 12 || Math.abs(ft.getX() - cell.getX()) + Math.abs(ft.getZ() - cell.getZ()) > 0) {
+                Act.stopDig(bot);
+                active = false;
+                return false;
+            }
+            if (!p.onGround()) return true;
+            if (depth >= 3) {
+                BlockPos cv = cell.below();
+                int r = Placer.placeAt(bot, cv, Inv.throwaway());
+                if (r == 1) {
+                    phase = 1;
+                    Act.stopDig(bot);
+                    reflex.doing = "구멍 속에서 회복 중";
+                } else if (r == -1 && ticks > 20 * 10) active = false;
+                return true;
+            }
+            bot.ctl.look(p.getYRot(), 90f);
+            bot.ctl.speed = 60f;
+            Act.dig(bot, ft.below());
+            return true;
+        }
+        if (phase == 1) {
+            reflex.forceEat = true;
+            boolean angry = false;
+            for (Entity e : l.entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.monster.EnderMan em && em.isCreepy() && em.distanceTo(p) < 20) angry = true;
+            if (((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) && !(angry && ticks < 20 * 60)) || ticks > 20 * 90) {
+                phase = 2;
+                reflex.forceEat = false;
+                bot.log("회복 완료 (체력 " + (int) p.getHealth() + ") → 덮개를 부수고 나감");
+            } else {
+                reflex.doing = "구멍 속에서 회복 중 (체력 " + (int) p.getHealth() + ")";
+                return reflex.startEatIfNeeded() || true;
+            }
+        }
+        // 덮개 부수기 → 나머지는 길찾기가 기둥 쌓기로 올라감
+        BlockPos cv = cell.below();
+        var cs = l.getBlockState(cv);
+        if (!cs.isAir() && BlockUtil.breakable(l, cv.getX(), cv.getY(), cv.getZ(), cs) && ticks < 20 * 130) {
+            Act.dig(bot, cv);
+            reflex.doing = "덮개 부수는 중";
+            return true;
+        }
+        Act.stopDig(bot);
+        active = false;
+        return false;
+    }
+
     /** 이번 틱을 썼으면 true. heal 단계에서는 먹기를 위해 Reflex가 이어서 처리 */
     public boolean tick(Bot bot, Reflex reflex, Entity near) {
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
         // 근접 몹이 바로 붙어 있으면 (그 칸엔 벽을 못 놓고, 짓는 동안 맞음) 먼저 방패로 밀어내고 나서 지음
-        boolean engaged = near != null && near.distanceTo(p) < 3.2;
+        boolean engaged = near != null && near.distanceTo(p) < 3.8;
         if (!active) {
-            if (engaged || !danger(bot, p) || Inv.count(p, Inv.throwaway()) < 9 || !p.onGround()) return false;
+            if (!danger(bot, p) || !p.onGround()) return false;
+            BlockPos f0 = PathExec.feet(p);
+            // 적이 이미 붙어 있으면 벽은 못 지으니 발밑을 파고 들어감 (2칸만 내려가도 몹 팔이 안 닿음)
+            boolean useHole = false; // 구멍 숨기는 몹이 같이 떨어져 들어와서 끔 (holeOk 참고)
+            if (engaged && !useHole) return false;
+            if (!useHole && Inv.count(p, Inv.throwaway()) < 9) return false;
             active = true;
-            cell = PathExec.feet(p);
+            hole = useHole;
+            cell = f0;
             phase = 0;
             ticks = 0;
             bot.nav.stop();
             Act.stopDig(bot);
-            bot.log("위험 (체력 " + (int) p.getHealth() + ") → 블록으로 몸을 감싸고 회복");
+            bot.log("위험 (체력 " + (int) p.getHealth() + ") → " + (hole ? "적이 붙어 있어 발밑 3칸 파고 들어가 덮고 회복" : "블록으로 몸을 감싸고 회복"));
         }
         ticks++;
+        if (hole) return holeTick(bot, reflex, p, l);
         if (engaged && phase == 0) { if (ticks > 20 * 30) active = false; return false; }
         if (!PathExec.feet(p).equals(cell) && phase < 2) {
             // 밀려났으면 다시 그 자리로
@@ -82,7 +162,7 @@ public final class Turtle {
             }
             for (BlockPos w : walls()) {
                 if (!l.getBlockState(w).canBeReplaced()) continue;
-                int r = Placer.placeAt(bot, w, Inv.throwaway());
+                int r = Placer.placeAt(bot, w, Inv.wall(p));
                 if (r == -1) continue;
                 return true;
             }
@@ -92,7 +172,11 @@ public final class Turtle {
         }
         if (phase == 1) {
             reflex.forceEat = true;
-            if ((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) || ticks > 20 * 90) {
+            boolean angry = false;
+            for (Entity e : l.entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.monster.EnderMan em && em.isCreepy() && em.distanceTo(p) < 20) angry = true;
+            // 화난 엔더맨이 밖에 있으면 화가 풀릴 때까지 안에서 기다림
+            if (((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) && !(angry && ticks < 20 * 60)) || ticks > 20 * 90) {
                 phase = 2;
                 reflex.forceEat = false;
                 bot.log("회복 완료 (체력 " + (int) p.getHealth() + ") → 벽을 부수고 나감");

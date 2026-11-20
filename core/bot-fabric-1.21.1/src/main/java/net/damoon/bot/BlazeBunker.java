@@ -77,7 +77,8 @@ public final class BlazeBunker {
             BlockPos o = c.relative(f);
             if (!l.getBlockState(o).isAir() || !l.getBlockState(o.above()).isAir()) continue;
             if (lavaNear(l, c, 2)) continue;
-            double score = Math.sqrt(c.distSqr(me)) * 1.0 + ds * 0.3;
+            // 스포너 가까이(블레이즈가 생기는 곳 바로 옆) 우선: 생기자마자 칼이 닿음
+            double score = Math.sqrt(c.distSqr(me)) * 0.25 + ds * 2.0 + Math.abs(c.getY() - sp.getY()) * 1.5;
             if (score < bs) { bs = score; best = c; outFront[0] = f; }
         }
         return best;
@@ -152,7 +153,7 @@ public final class BlazeBunker {
             for (BlockPos w : walls()) {
                 if (!l.getBlockState(w).canBeReplaced()) continue;
                 info = "벙커 짓는 중 (스포너 주변·천장 막기)";
-                int r = Placer.placeAt(bot, w, Inv.throwaway());
+                int r = Placer.placeAt(bot, w, Inv.wall(p));
                 if (r == -1) continue;
                 return R.RUNNING;
             }

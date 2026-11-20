@@ -24,7 +24,7 @@ import net.minecraft.world.phys.Vec3;
 public final class Tower {
     private boolean active;
     private BlockPos base;
-    private int height, phase, ticks, calm, hits;
+    private int height, phase, ticks, calm, hits, lastDescLog = -10000;
     public String info = "";
 
     public boolean active() { return active; }
@@ -41,6 +41,10 @@ public final class Tower {
                 && !(e instanceof net.minecraft.world.entity.monster.Vex);
     }
 
+    private static boolean tower(LocalPlayer p) {
+        return p.onGround() && !p.isInWater() && !p.isInLava() && Inv.count(p, Inv.throwaway()) >= 4;
+    }
+
     private static boolean clear(ClientLevel l, BlockPos b) {
         var s = l.getBlockState(b);
         return s.getCollisionShape(l, b).isEmpty() && s.getFluidState().isEmpty() && !BlockUtil.hurts(s);
@@ -55,7 +59,7 @@ public final class Tower {
         LivingEntity closest = null;
         double cd = 1e9;
         for (Entity e : l.entitiesForRendering()) {
-            if (!groundMelee(e)) continue;
+            if (!groundMelee(e) || e instanceof net.minecraft.world.entity.monster.EnderMan) continue;
             double d = e.distanceTo(p);
             if (d > 10 || Math.abs(e.getY() - p.getY()) > 4) continue;
             if (d > 5 && !p.hasLineOfSight(e)) continue;
@@ -63,14 +67,40 @@ public final class Tower {
             if (e instanceof WitherSkeleton || e instanceof net.minecraft.world.entity.monster.EnderMan) wither = true;
             if (d < cd) { cd = d; closest = (LivingEntity) e; }
         }
+        boolean ranged = false;
         if (!active) {
-            boolean want = count >= 2 || (count >= 1 && p.getHealth() < 10 && cd < 7);
+            for (Entity e : l.entitiesForRendering())
+                if (Reflex.hostile(e) && Reflex.ranged(e) && e.distanceTo(p) < 20 && p.hasLineOfSight(e)) { ranged = true; break; }
+        }
+        if (!active) {
+            // 근접 몹이 여럿이거나, 위더 스켈레톤이 오거나, 원거리 몹과 같이 오거나, 체력이 낮으면 (아직 3칸 넘게 떨어져 있을 때 미리)
+            boolean want = count >= 2 || (count >= 1 && (wither || ranged || p.getHealth() < 12) && cd < 9);
+            if (want && cd < 3.8) return false; // 이미 붙었으면 먼저 방패로 밀어냄
+            // 화난 엔더맨이 있으면 기둥 대신 방패 싸움 (순간이동해서 옆으로 옴)
+            for (Entity e : l.entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.monster.EnderMan em && em.isCreepy() && em.distanceTo(p) < 16) return false;
+            if (want && !tower(p) && bot.ticks % 40 == 0) bot.dbg("기둥 조건: 블록 " + Inv.count(p, Inv.throwaway()) + " 땅 " + p.onGround());
             if (!want || !p.onGround() || p.isInWater() || p.isInLava() || Inv.count(p, Inv.throwaway()) < 4) return false;
             BlockPos f = PathExec.feet(p);
             int h = clear(l, f.above(2)) && clear(l, f.above(3)) && clear(l, f.above(4)) ? 3
                     : (!wither && clear(l, f.above(2)) && clear(l, f.above(3))) ? 2 : 0;
             if (h == 0) return false;
             if (!BlockUtil.floor(l, f.getX(), f.getY() - 1, f.getZ(), l.getBlockState(f.below()))) return false;
+            // 주변 2칸 안에 낭떠러지(아래 3칸 안에 바닥 없음)가 있으면 밀려 떨어질 수 있으니 안 쌓음
+            for (int ox = -2; ox <= 2; ox++) for (int oz = -2; oz <= 2; oz++) {
+                if (ox == 0 && oz == 0) continue;
+                boolean ground = false;
+                for (int dy = 1; dy <= 3 && !ground; dy++) {
+                    BlockPos q = f.offset(ox, -dy, oz);
+                    var qs = l.getBlockState(q);
+                    if (BlockUtil.isLava(qs)) break;
+                    if (!qs.getCollisionShape(l, q).isEmpty()) ground = true;
+                }
+                if (!ground && !(l.getBlockState(f.offset(ox, 0, oz)).getCollisionShape(l, f.offset(ox, 0, oz)).isEmpty() == false)) {
+                    if (bot.ticks % 40 == 0) bot.dbg("기둥 안 쌓음: 가장자리 " + f.offset(ox, 0, oz).toShortString());
+                    return false;
+                }
+            }
             active = true;
             base = f;
             height = h;
@@ -85,6 +115,7 @@ public final class Tower {
         ticks++;
         BlockPos feet = PathExec.feet(p);
         int top = base.getY() + height;
+        if (p.getY() < base.getY() - 0.5) { active = false; bot.log("기둥 밑으로 떨어짐 → 다시 판단"); return false; }
         if (Math.abs(feet.getX() - base.getX()) > 0 || Math.abs(feet.getZ() - base.getZ()) > 0) {
             // 밀려 떨어짐
             if (p.onGround()) { active = false; bot.log("기둥에서 밀려남 → 다시 판단"); return false; }
@@ -93,6 +124,11 @@ public final class Tower {
             info = "기둥 쌓는 중 (" + (feet.getY() - base.getY()) + "/" + height + ")";
             reflex.doing = info;
             if (ticks > 20 * 8) { active = false; bot.log("기둥을 못 쌓음"); return false; }
+            if (closest != null && cd < 2.3 && feet.getY() - base.getY() < 2 && p.onGround()) {
+                active = false;
+                bot.log("쌓는 중에 붙음 → 방패부터");
+                return false;
+            }
             if (p.onGround() && feet.getY() >= top) {
                 phase = 1;
                 ticks = 0;
@@ -130,7 +166,7 @@ public final class Tower {
             if (calm > 60) {
                 phase = 2;
                 ticks = 0;
-                bot.log("잠잠해짐 → 기둥 캐며 내려감");
+                if (bot.ticks - lastDescLog > 400) { bot.log("잠잠해짐 → 기둥 캐며 내려감"); lastDescLog = bot.ticks; }
                 return true;
             }
             // 사거리 안의 몹 중 가장 가까운 것
@@ -187,8 +223,9 @@ public final class Tower {
         }
         // phase 2: 발밑 블록을 캐며 내려감
         if (closest != null && cd < 5 && count >= 1) {
-            // 다시 몰려오면 도로 올라감
-            phase = 0;
+            // 다시 몰려오면: 아직 꼭대기면 그대로 싸움, 조금 내려왔으면 다시 쌓음
+            phase = feet.getY() >= top ? 1 : 0;
+            calm = 0;
             ticks = 0;
             return true;
         }

@@ -39,7 +39,7 @@ public class NetherTask extends Task {
     private int quickAge;
     private boolean bunkerFailed;
     private boolean healing;
-    private int fortTicks;
+    private int fortTicks, rackGiveUp;
     private final java.util.Set<Long> visited = new java.util.HashSet<>();
 
     @Override public String name() { return "네더"; }
@@ -65,11 +65,24 @@ public class NetherTask extends Task {
             bot.log("네더 도착! 돌아갈 포털: " + portal.toShortString());
         }
         // 다리 놓을 블록이 모자라면 네더랙 캐기
-        if (Inv.count(p, Inv.throwaway()) < 24 || rack != null) {
-            if (rack == null) rack = new Miner(s -> s.is(Blocks.NETHERRACK), Inv.is(Items.NETHERRACK), Inv.count(p, Items.NETHERRACK) + 64, true);
+        if ((Inv.count(p, Inv.throwaway()) < 24 && bot.ticks > rackGiveUp) || rack != null) {
+            if (rack == null) {
+                // 네더랙(나일리움도 캐면 네더랙), 블랙스톤, 현무암, 영혼 흙 — 무엇이든 발판용
+                rack = new Miner(s -> s.is(Blocks.NETHERRACK) || s.is(Blocks.WARPED_NYLIUM) || s.is(Blocks.CRIMSON_NYLIUM)
+                        || s.is(Blocks.BLACKSTONE) || s.is(Blocks.BASALT) || s.is(Blocks.SOUL_SOIL),
+                        Inv.throwaway(), Inv.count(p, Inv.throwaway()) + 64, true);
+                rack.radius = 40;
+                rack.chunks = 3;
+                rack.below = 12;
+                rack.above = 12;
+            }
             Miner.R r = rack.tick(bot);
             detail = "다리용 네더랙 캐는 중 " + rack.info;
-            if (r != Miner.R.RUNNING) rack = null;
+            if (r == Miner.R.FAILED) {
+                rack = null;
+                // 블록이 조금이라도 있으면 일단 진행, 없으면 20초 돌아다닌 뒤 다시 찾음
+                rackGiveUp = bot.ticks + (Inv.count(p, Inv.throwaway()) >= 8 ? 20 * 120 : 20 * 20);
+            } else if (r != Miner.R.RUNNING) rack = null;
             return S.RUNNING;
         }
         int rods = rods(p), pearls = pearls(p);

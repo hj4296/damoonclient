@@ -208,11 +208,23 @@ public final class Bot {
     public boolean pathDriving;
 
     /** 바라보는 쪽으로 한 걸음 앞이 안전한지 (3칸 안에 바닥이 있고 용암·불이 아님) */
+    /** (x, z) 쪽으로 한 걸음이 안전한지 (용암·낭떠러지 아님) */
+    public static boolean safeAheadToward(LocalPlayer p, double x, double z) {
+        double dx = x - p.getX(), dz = z - p.getZ();
+        double len = Math.sqrt(dx * dx + dz * dz);
+        if (len < 1e-3) return true;
+        return safeDir(p, dx / len, dz / len);
+    }
+
     public static boolean safeAhead(LocalPlayer p) {
+        double yaw = Math.toRadians(p.getYRot());
+        return safeDir(p, -Math.sin(yaw), Math.cos(yaw));
+    }
+
+    private static boolean safeDir(LocalPlayer p, double dirx, double dirz) {
         if (!p.onGround()) return true;
         net.minecraft.world.level.Level l = p.level();
-        double yaw = Math.toRadians(p.getYRot());
-        double fx = p.getX() - Math.sin(yaw) * 0.9, fz = p.getZ() + Math.cos(yaw) * 0.9;
+        double fx = p.getX() + dirx * 0.9, fz = p.getZ() + dirz * 0.9;
         int y = (int) Math.floor(p.getY() + 0.05);
         net.minecraft.core.BlockPos at = net.minecraft.core.BlockPos.containing(fx, y, fz);
         for (int dy = 0; dy <= 1; dy++) {

@@ -39,6 +39,15 @@ public final class Inv {
         return s -> !s.isEmpty() && THROWAWAY.contains(s.getItem());
     }
 
+    /** 폭발에 강한 벽 블록 (가스트 화염구에 안 부서짐) 우선, 없으면 아무 발판 블록 */
+    public static final Set<Item> STRONG = Set.of(Items.COBBLESTONE, Items.COBBLED_DEEPSLATE, Items.STONE, Items.BLACKSTONE,
+            Items.DEEPSLATE, Items.END_STONE, Items.ANDESITE, Items.DIORITE, Items.GRANITE, Items.TUFF, Items.BASALT);
+
+    public static Predicate<ItemStack> wall(net.minecraft.client.player.LocalPlayer p) {
+        Predicate<ItemStack> strong = s -> !s.isEmpty() && STRONG.contains(s.getItem());
+        return count(p, strong) > 0 ? strong : throwaway();
+    }
+
     public static Predicate<ItemStack> food() {
         return s -> !s.isEmpty() && s.has(DataComponents.FOOD) && !BAD_FOOD.contains(s.getItem());
     }
