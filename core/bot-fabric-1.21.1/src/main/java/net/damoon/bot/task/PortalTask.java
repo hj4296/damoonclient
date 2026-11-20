@@ -86,7 +86,7 @@ public class PortalTask extends Task {
             Act.stopDig(bot);
             bot.log("포털 자리: " + base.toShortString());
         }
-        bot.nav.stop();
+        if (phase < 2) bot.nav.stop();
         if (phase == 0) {
             // 바닥 받침, 틀 자리 비우기, 블록 놓기
             for (int i = 0; i < 4; i++) {
