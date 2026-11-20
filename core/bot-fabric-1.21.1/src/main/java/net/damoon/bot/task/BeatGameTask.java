@@ -169,7 +169,9 @@ public class BeatGameTask extends Task {
         // ---- 1. 나무 ----
         int sticks = Inv.count(p, Items.STICK);
         int needSticks = Math.max(0, 8 - sticks);
-        int needPlanks = (Inv.has(p, Items.CRAFTING_TABLE) ? 0 : 4) + (tier == 0 ? 3 : 0) + (int) Math.ceil(needSticks / 4.0) * 2;
+        // 처음(땅 위에 있을 때) 넉넉히 모아 두고, 나중엔 막대기가 정말 없을 때만 나무를 구하러 감
+        int needPlanks = tier < 2 ? 40
+                : (sticks < 3 ? 2 : 0) + (Inv.has(p, Items.CRAFTING_TABLE) || Inv.count(p, planks) >= 4 ? 0 : 4);
         if (tier < 3 && planksEq(p) < needPlanks) {
             stage = "1. 나무 모으기";
             int wantLogs = Inv.count(p, logs) + (int) Math.ceil((needPlanks - planksEq(p)) / 4.0) + 1;
