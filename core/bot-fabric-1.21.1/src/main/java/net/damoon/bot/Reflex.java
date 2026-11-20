@@ -110,6 +110,14 @@ public final class Reflex {
             Vec3 aim = threat.position().add(0, threat.getBbHeight() * 0.7, 0);
             bot.ctl.lookAt(p, aim);
             double r = Act.reach(p, threat.getBoundingBox());
+            // 활 쏘는 몹에게 다가갈 때는 방패를 들고 감
+            if (ranged(threat) && r > 3.0 && p.getOffhandItem().is(Items.SHIELD)) {
+                bot.ctl.use = true;
+                bot.ctl.fwd = true;
+                if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+                doing = "방패 들고 " + threat.getName().getString() + "에게 다가가는 중";
+                return true;
+            }
             if (r > 2.6) {
                 bot.ctl.fwd = true;
                 bot.ctl.sprint = r > 5 && p.getFoodData().getFoodLevel() > 6;

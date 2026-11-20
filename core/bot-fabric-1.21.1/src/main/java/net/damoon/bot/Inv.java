@@ -152,4 +152,14 @@ public final class Inv {
         FoodProperties fp = s.get(DataComponents.FOOD);
         return fp == null ? 0 : fp.nutrition();
     }
+
+    /** 방패를 왼손에 듦 (이미 들었으면 true) */
+    public static boolean equipShield(LocalPlayer p) {
+        if (p.getOffhandItem().is(Items.SHIELD)) return true;
+        if (p.containerMenu != p.inventoryMenu) return false;
+        int i = find(p, is(Items.SHIELD));
+        if (i < 0) return false;
+        Minecraft.getInstance().gameMode.handleInventoryMouseClick(p.inventoryMenu.containerId, menuSlot(i), 40, ClickType.SWAP, p);
+        return true;
+    }
 }

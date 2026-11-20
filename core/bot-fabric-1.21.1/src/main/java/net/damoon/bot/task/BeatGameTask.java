@@ -129,7 +129,7 @@ public class BeatGameTask extends Task {
             S s = end.tick(bot);
             return s == S.DONE ? S.DONE : S.RUNNING;
         }
-        if (bot.ticks % 20 == 0) Inv.equipArmor(p);
+        if (bot.ticks % 20 == 0) { Inv.equipArmor(p); Inv.equipShield(p); }
         if (sub != null) { bot.trace = "sub " + subKey; return run(bot, subKey, () -> sub); }
         if (l.dimension() == Level.NETHER) {
             stage = "8. 네더";
@@ -253,8 +253,18 @@ public class BeatGameTask extends Task {
             int want = Inv.count(p, Items.IRON_INGOT) + Inv.count(p, Items.RAW_IRON);
             return run(bot, "smeltiron", () -> new SmeltTask(is(Items.RAW_IRON), Items.IRON_INGOT, want));
         }
-        Item[] gear = {Items.IRON_PICKAXE, Items.IRON_SWORD, Items.BUCKET, Items.IRON_CHESTPLATE, Items.IRON_LEGGINGS, Items.IRON_BOOTS};
+        Item[] gear = {Items.IRON_PICKAXE, Items.IRON_SWORD, Items.SHIELD, Items.BUCKET, Items.IRON_CHESTPLATE, Items.IRON_LEGGINGS, Items.IRON_BOOTS};
         for (Item g : gear) {
+            if (g == Items.SHIELD && p.getOffhandItem().is(Items.SHIELD)) continue;
+            if (g == Items.SHIELD && Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) < 6) {
+                if (Inv.count(p, logs) >= 2 && !cool(bot, "shieldplanks")) {
+                    Item pl = plankFor(p);
+                    int want = Inv.count(p, planks) + 8;
+                    stage = "5. 방패용 판자";
+                    return run(bot, "shieldplanks", () -> new CraftTask(pl, want));
+                }
+                continue;
+            }
             if (!Inv.has(p, g) && !worn(p, g) && !cool(bot, "g" + g)) {
                 if (g == Items.BUCKET && (Inv.has(p, Items.WATER_BUCKET) || Inv.has(p, Items.LAVA_BUCKET))) continue;
                 stage = "5. 철 장비: " + g.getDescription().getString();
@@ -486,7 +496,7 @@ public class BeatGameTask extends Task {
 
     private static int ironInGear(LocalPlayer p) {
         int n = 0;
-        Object[][] cost = {{Items.IRON_PICKAXE, 3}, {Items.IRON_SWORD, 2}, {Items.BUCKET, 3}, {Items.WATER_BUCKET, 3}, {Items.LAVA_BUCKET, 3},
+        Object[][] cost = {{Items.IRON_PICKAXE, 3}, {Items.IRON_SWORD, 2}, {Items.SHIELD, 1}, {Items.BUCKET, 3}, {Items.WATER_BUCKET, 3}, {Items.LAVA_BUCKET, 3},
                 {Items.IRON_CHESTPLATE, 8}, {Items.IRON_LEGGINGS, 7}, {Items.IRON_BOOTS, 4}, {Items.IRON_HELMET, 5}};
         for (Object[] c : cost) {
             Item it = (Item) c[0];
