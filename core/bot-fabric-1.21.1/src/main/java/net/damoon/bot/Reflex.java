@@ -39,10 +39,11 @@ public final class Reflex {
         doing = "";
         if (p.containerMenu != p.inventoryMenu) return false;
 
-        // 먹는 중이라도 블레이즈가 쏘려 하면 멈추고 방패부터
+        trackBlazes(p);
+        // 먹는 중이라도 곧 화염구가 날아오면 멈추고 방패부터
         if (eating) {
             for (Entity e : bot.level().entitiesForRendering())
-                if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isOnFire() && b.distanceTo(p) < 24 && p.hasLineOfSight(b)) { eating = false; break; }
+                if (e instanceof net.minecraft.world.entity.monster.Blaze b && inShotWindow(b, 8) && b.distanceTo(p) < 24 && p.hasLineOfSight(b)) { eating = false; break; }
         }
         // 먹는 중이면 계속 (단, 방패 등 다른 걸 쓰고 있으면 먼저 손을 떼야 먹기 시작됨)
         if (eating && p.isUsingItem() && !p.getUseItem().has(net.minecraft.core.component.DataComponents.FOOD)) {
@@ -148,11 +149,12 @@ public final class Reflex {
         if (building && p.getHealth() > 9 && threat != null && Act.reach(p, threat.getBoundingBox()) > 3.0) threat = null;
         boolean shieldOn = p.getOffhandItem().is(Items.SHIELD);
 
-        // 화염구 방어: 시야 안의 블레이즈가 쏘기 직전이면 (이동 중이든 뭐든) 그쪽으로 방패를 듦
+        // 블레이즈 공격 타이밍 읽기: 불꽃을 모으기 시작한 뒤 약 3초(60틱)부터 1초 동안 화염구 3발 (trackBlazes는 위에서)
+        // 화염구 방어: 실제로 화염구가 날아오는 때에만 그 블레이즈 쪽으로 방패를 듦 (나머지 시간엔 공격)
         net.minecraft.world.entity.monster.Blaze shooter = null;
         double sd = 1e9;
         for (Entity e : bot.level().entitiesForRendering())
-            if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isOnFire() && b.isAlive() && b.distanceTo(p) < 24 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
+            if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && inShotWindow(b, 0) && b.distanceTo(p) < 24 && p.hasLineOfSight(b) && b.distanceTo(p) < sd) { sd = b.distanceTo(p); shooter = b; }
         boolean meleeTarget = threat instanceof net.minecraft.world.entity.monster.Blaze bt && Act.reach(p, bt.getBoundingBox()) <= 3.0 && bt.getHealth() <= 7;
         if (shooter != null && shieldOn && !meleeTarget && !(building && p.getHealth() > 9)) {
             Inv.selectWeapon(p);
@@ -180,10 +182,14 @@ public final class Reflex {
             bot.ctl.lookAt(p, bz.getBoundingBox().getCenter());
             double r = Act.reach(p, bz.getBoundingBox());
             boolean danger = false;
+            // 곧 화염구가 날아올 블레이즈가 있으면 위험 (활은 당기는 데 1초 걸리므로 여유를 둠)
+            boolean soon = false;
             for (Entity e : bot.level().entitiesForRendering())
-                if (e instanceof net.minecraft.world.entity.monster.Blaze o && o != bz && o.isOnFire() && o.distanceTo(p) < 10 && p.hasLineOfSight(o)) { danger = true; break; }
-            // 칼이 닿는 블레이즈가 막 쏘려는 게 아니거나 거의 죽었으면 공격
-            if (bz.isOnFire() && bz.getHealth() > 7) danger = true;
+                if (e instanceof net.minecraft.world.entity.monster.Blaze o && o.distanceTo(p) < 24 && p.hasLineOfSight(o)) {
+                    if (inShotWindow(o, 0)) danger = true;
+                    if (inShotWindow(o, 22)) soon = true;
+                }
+            if (bz.getHealth() <= 7 && Act.reach(p, bz.getBoundingBox()) <= 3.0) danger = false;
             // 체력이 낮으면 바라본 채 방패 들고 뒷걸음질
             if (p.getHealth() < 12 && !camp) {
                 bot.ctl.use = true;
@@ -193,7 +199,7 @@ public final class Reflex {
             }
             // 활이 있으면: 쏘기 직전이 아닐 때 활로 저격 (가까우면 칼)
             boolean hasBow = Inv.has(p, Items.BOW) && (Inv.has(p, Items.ARROW) || Inv.has(p, Items.SPECTRAL_ARROW));
-            if (hasBow && !danger && r > 3.0 && bz.distanceTo(p) < 28 && p.hasLineOfSight(bz)) {
+            if (hasBow && !danger && (!soon || p.isUsingItem() && p.getUseItem().is(Items.BOW)) && r > 3.0 && bz.distanceTo(p) < 28 && p.hasLineOfSight(bz)) {
                 if (p.isUsingItem() && p.getMainHandItem().is(Items.SHIELD) == false && !p.getUseItem().is(Items.BOW)) { bot.ctl.use = false; return true; }
                 Vec3 vel = bz.position().subtract(bz.xo, bz.yo, bz.zo);
                 if (archer.tick(bot, bz.getBoundingBox().getCenter(), vel)) bot.log("블레이즈에 화살 발사");
@@ -281,6 +287,28 @@ public final class Reflex {
     private static long lastHurtStamp(LocalPlayer p) {
         // LivingEntity.lastDamageStamp 는 비공개라 hurtTime으로 근사
         return p.hurtTime > 0 ? p.level().getGameTime() : 0;
+    }
+
+    private final java.util.Map<Integer, Integer> chargeStart = new java.util.HashMap<>();
+
+    private void trackBlazes(LocalPlayer p) {
+        java.util.Set<Integer> seen = new java.util.HashSet<>();
+        for (Entity e : bot.level().entitiesForRendering()) {
+            if (!(e instanceof net.minecraft.world.entity.monster.Blaze b) || !b.isAlive()) continue;
+            seen.add(b.getId());
+            if (b.isOnFire()) chargeStart.putIfAbsent(b.getId(), bot.ticks);
+            else chargeStart.remove(b.getId());
+        }
+        chargeStart.keySet().retainAll(seen);
+    }
+
+    /** 이 블레이즈가 (지금 + ahead 틱 뒤에) 화염구를 쏘는 구간인지. 모으기 시작 후 약 55~85틱 */
+    private boolean inShotWindow(net.minecraft.world.entity.monster.Blaze b, int ahead) {
+        Integer st = chargeStart.get(b.getId());
+        if (st == null) return false;
+        int age = bot.ticks - st;
+        for (int a = age; a <= age + ahead; a++) if (a >= 52 && a <= 88) return true;
+        return age > 88 && b.isOnFire();
     }
 
     /** 바라보는 반대쪽(뒤)으로 한 걸음이 안전한지 */
