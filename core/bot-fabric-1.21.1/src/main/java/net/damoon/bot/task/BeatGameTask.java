@@ -349,7 +349,9 @@ public class BeatGameTask extends Task {
                 return run(bot, "fns", () -> new CraftTask(Items.FLINT_AND_STEEL, 1));
             }
             // 이미 불 붙은 포털이 근처에 있으면 바로 들어감
-            BlockPos lit = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 2, PathExec.feet(p).getY() - 20, PathExec.feet(p).getY() + 20, st -> st.is(Blocks.NETHER_PORTAL), null);
+            // 맨 아래 칸(아래가 포털이 아닌 칸)만 — 그래야 그 안에 설 수 있음
+            BlockPos lit = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 2, PathExec.feet(p).getY() - 20, PathExec.feet(p).getY() + 20,
+                    st -> st.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
             if (lit != null) {
                 stage = "7. 네더 포털로 들어가는 중";
                 BlockPos fp = PathExec.feet(p);

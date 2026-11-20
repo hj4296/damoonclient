@@ -52,7 +52,7 @@ public class NetherTask extends Task {
         if (l.dimension() != Level.NETHER) return S.DONE;
         if (portal == null) {
             BlockPos f = PathExec.feet(p);
-            portal = Scan.nearest(l, f, 1, f.getY() - 4, f.getY() + 4, s -> s.is(Blocks.NETHER_PORTAL), null);
+            portal = Scan.nearest(l, f, 1, f.getY() - 4, f.getY() + 4, s -> s.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
             if (portal == null) portal = f;
             bot.log("네더 도착! 돌아갈 포털: " + portal.toShortString());
         }
