@@ -31,6 +31,8 @@ public class NetherTask extends Task {
     private int exploreLeg, exploreTicks;
     private String detail = "";
     private BlockPos fortWalk;
+    private BlockPos safeSpot;
+    private boolean healing;
     private int fortTicks;
     private final java.util.Set<Long> visited = new java.util.HashSet<>();
 
@@ -71,6 +73,25 @@ public class NetherTask extends Task {
             BlockPos spawner = Scan.nearest(l, f, 6, l.getMinBuildHeight(), l.getMaxBuildHeight(), s -> s.is(Blocks.SPAWNER), b -> isBlazeSpawner(l, b));
             if (blazes == null) blazes = new Hunter(e -> e instanceof Blaze, Inv.is(Items.BLAZE_ROD));
             blazes.range = 24;
+            if (spawner != null && safeSpot == null) {
+                // 처음 스포너를 본 자리(아직 멀리 있을 때)를 안전한 후퇴 지점으로 기억
+                safeSpot = PathExec.feet(p);
+                if (safeSpot.distSqr(spawner) < 18 * 18) safeSpot = portal;
+            }
+            // 체력이 낮으면 후퇴해서 먹고 회복한 뒤 돌아옴
+            if (healing || (spawner != null && p.getHealth() < 13)) {
+                if (!healing) bot.log("체력 " + (int) p.getHealth() + " → 물러나서 회복");
+                healing = p.getHealth() < 19;
+                if (healing) {
+                    detail = "물러나서 회복하는 중 (체력 " + (int) p.getHealth() + ")";
+                    BlockPos to = safeSpot != null ? safeSpot : portal;
+                    Nav.R nr = bot.nav.go(new Goal.Near(to, 3));
+                    if (nr == Nav.R.FAILED) bot.nav.stop();
+                    if (p.getFoodData().getFoodLevel() >= 20 && nr == Nav.R.ARRIVED) bot.ctl.sneak = true;
+                    return S.RUNNING;
+                }
+                bot.log("회복 완료 → 다시 블레이즈 잡으러");
+            }
             if (spawner != null) {
                 // 블레이즈는 날아다니므로 쫓아가지 않고 스포너 근처에 서서 다가오는 블레이즈를 상대 (반사 행동이 싸움)
                 for (var e : l.entitiesForRendering()) {
