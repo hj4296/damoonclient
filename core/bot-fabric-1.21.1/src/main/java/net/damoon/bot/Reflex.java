@@ -106,6 +106,25 @@ public final class Reflex {
             doing = "체력이 낮아 " + threat.getName().getString() + " 피하는 중";
             return true;
         }
+        // 블레이즈: 불꽃을 모으면(발사 직전) 방패로 막고, 칼이 닿을 때만 벰
+        if (threat instanceof net.minecraft.world.entity.monster.Blaze bz && p.getOffhandItem().is(Items.SHIELD)) {
+            Inv.selectWeapon(p);
+            bot.ctl.lookAt(p, bz.getBoundingBox().getCenter());
+            double r = Act.reach(p, bz.getBoundingBox());
+            boolean danger = false;
+            for (Entity e : bot.level().entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.monster.Blaze o && o.isOnFire() && o.distanceTo(p) < 20 && p.hasLineOfSight(o)) { danger = true; break; }
+            if (r <= 3.0 && !bz.isOnFire()) {
+                if (p.isUsingItem()) { bot.ctl.use = false; doing = "방패 내리고 블레이즈 공격"; return true; }
+                if (bot.ctl.aimed(p, 20)) Act.attack(bot, bz, 0.9f);
+                doing = "블레이즈 공격!";
+            } else {
+                bot.ctl.use = true;
+                if (!danger && r > 3.0) bot.ctl.fwd = true;
+                doing = danger ? "방패로 화염구 막는 중" : "방패 들고 블레이즈에게 다가가는 중";
+            }
+            return true;
+        }
         if (threat != null) {
             Inv.selectWeapon(p);
             Vec3 aim = threat.position().add(0, threat.getBbHeight() * 0.7, 0);
