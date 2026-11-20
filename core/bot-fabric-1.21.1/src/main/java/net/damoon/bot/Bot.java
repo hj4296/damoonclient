@@ -46,6 +46,10 @@ public final class Bot {
     public boolean victory;
     /** 감마팩 (밝기 1500%) */
     public boolean gamma = true;
+    /** 마지막으로 죽은 곳 (떨어뜨린 물건 되찾기) */
+    public net.minecraft.core.BlockPos deathPos;
+    public net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> deathDim;
+    public int deathTick;
     public long startedAt;
     public final Deque<String> events = new ArrayDeque<>();
     /** 진단용: 마지막으로 지나간 분기 */
@@ -109,6 +113,9 @@ public final class Bot {
 
         if (mc.screen instanceof PauseScreen) mc.setScreen(null);
         if (mc.screen instanceof DeathScreen) {
+            deathPos = mc.player.blockPosition();
+            deathDim = mc.level.dimension();
+            deathTick = ticks;
             deaths++;
             log("죽었다… 다시 시작 (" + deaths + "번째)");
             mc.player.respawn();

@@ -15,6 +15,14 @@ public final class Control {
 
     public static void poll(Bot bot) {
         if (++pollTick % 10 != 0) return;
+        // 월드에 들어오면 바로 자동 시작 (bot/autostart.txt 에 작업 이름)
+        try {
+            Path a = Bot.dir().resolve("autostart.txt");
+            if (!bot.running && Minecraft.getInstance().player != null && Minecraft.getInstance().screen == null && Files.exists(a)) {
+                String what = Files.readString(a, StandardCharsets.UTF_8).trim();
+                if (!what.isEmpty()) bot.command("start " + what);
+            }
+        } catch (Exception ignored) {}
         try {
             Path f = Bot.dir().resolve("cmd.txt");
             if (!Files.exists(f)) return;
@@ -41,6 +49,16 @@ public final class Control {
                         p.level().dimension().location().getPath(), p.getHealth(), p.getFoodData().getFoodLevel()));
             }
             for (String h : bot.hud()) sb.append(h.replaceAll("§.", "")).append('\n');
+            if (p != null) {
+                java.util.Map<String, Integer> inv = new java.util.TreeMap<>();
+                for (int i = 0; i < 36; i++) {
+                    var st = p.getInventory().items.get(i);
+                    if (!st.isEmpty()) inv.merge(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath(), st.getCount(), Integer::sum);
+                }
+                for (var st : p.getArmorSlots()) if (!st.isEmpty()) inv.merge("worn:" + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath(), 1, Integer::sum);
+                if (!p.getOffhandItem().isEmpty()) inv.merge("off:" + net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(p.getOffhandItem().getItem()).getPath(), p.getOffhandItem().getCount(), Integer::sum);
+                sb.append("inv=").append(inv).append('\n');
+            }
             Files.writeString(Bot.dir().resolve("status.txt"), sb.toString(), StandardCharsets.UTF_8);
         } catch (Exception ignored) {}
     }

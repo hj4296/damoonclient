@@ -141,7 +141,36 @@ public class BeatGameTask extends Task {
         return overworld(bot, p, l);
     }
 
+    /** 죽은 자리로 돌아가 떨어뜨린 물건 줍기 (아이템은 5분 뒤 사라지므로 4분 안에) */
+    private S recover(Bot bot, LocalPlayer p, ClientLevel l) {
+        if (bot.deathPos == null || bot.deathDim != l.dimension()) return null;
+        if (bot.ticks - bot.deathTick > 20 * 60 * 4) { bot.deathPos = null; return null; }
+        BlockPos d = bot.deathPos;
+        double dist = Math.sqrt(p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(d)));
+        if (dist > 600) { bot.deathPos = null; return null; }
+        stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";
+        if (dist > 6) {
+            Nav.R r = bot.nav.go(new Goal.Near(d, 3));
+            if (r == Nav.R.FAILED) { bot.nav.stop(); bot.deathPos = null; }
+            return S.RUNNING;
+        }
+        for (var e : l.entitiesForRendering()) {
+            if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(d)) < 10
+                    && lootTime.merge(ie.getId(), 1, Integer::sum) < 20 * 8) {
+                detail = "떨어뜨린 " + ie.getItem().getHoverName().getString() + " 줍는 중";
+                if (ie.distanceTo(p) < 2.5) { bot.nav.stop(); bot.ctl.lookYaw(p, ie.position(), 20f); bot.ctl.fwd = true; if (ie.getY() > p.getY() + 0.6 && p.onGround()) bot.ctl.jump = true; }
+                else { Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0)); if (r == Nav.R.FAILED) bot.nav.stop(); }
+                return S.RUNNING;
+            }
+        }
+        bot.log("떨어뜨린 물건 되찾기 끝");
+        bot.deathPos = null;
+        return null;
+    }
+
     private S overworld(Bot bot, LocalPlayer p, ClientLevel l) {
+        S rec = recover(bot, p, l);
+        if (rec != null) return rec;
         bot.trace = "overworld";
         int tier = tier(p);
         Predicate<ItemStack> logs = s -> s.is(ItemTags.LOGS);
