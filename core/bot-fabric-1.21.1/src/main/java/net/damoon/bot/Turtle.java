@@ -30,8 +30,10 @@ public final class Turtle {
     }
 
     private static boolean danger(Bot bot, LocalPlayer p) {
-        if (p.getHealth() >= 9) return false;
+        float hp = p.getHealth();
+        if (hp >= 14) return false;
         if (p.isOnFire()) return true;
+        if (hp >= 12) return false;
         for (Entity e : bot.level().entitiesForRendering()) if (Reflex.hostile(e) && e.distanceTo(p) < 14) return true;
         return false;
     }

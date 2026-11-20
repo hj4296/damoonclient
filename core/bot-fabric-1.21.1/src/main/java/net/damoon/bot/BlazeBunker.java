@@ -92,9 +92,10 @@ public final class BlazeBunker {
     /** 막아야 할 칸들 (순서대로: 아래부터 쌓아 올리고 천장은 마지막) */
     private List<BlockPos> walls() {
         List<BlockPos> out = new ArrayList<>();
+        // 앞쪽은 머리 높이 창문 하나만 남김 (발 높이·윗칸은 막음) → 다른 방향 화염구는 벽이 막고 블레이즈는 못 들어옴
         for (int y = 0; y <= 2; y++)
             for (Direction h : Direction.Plane.HORIZONTAL) {
-                if (h == front) continue;
+                if (h == front && y == 1) continue;
                 out.add(cell.relative(h).above(y));
             }
         out.add(cell.above(2));
