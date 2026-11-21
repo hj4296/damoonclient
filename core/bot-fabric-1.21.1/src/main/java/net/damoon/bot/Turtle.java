@@ -84,7 +84,9 @@ public final class Turtle {
             return false;
         }
         // 먹을 게 없고 배고프면 갇혀 있어도 체력이 안 참 → 적이 정말 가까울 때만 (아니면 사냥하러 가야 함)
-        double r = canHeal(p) ? 14 : 6;
+        // 밤엔 밖이 더 위험하니 먹을 게 없어도 감싸고 아침까지 버팀
+        boolean night = net.damoon.bot.task.BedTask.night(bot.level());
+        double r = canHeal(p) || night ? 14 : 6;
         for (Entity e : bot.level().entitiesForRendering()) if (Reflex.hostile(e) && e.distanceTo(p) < r) return true;
         return false;
     }
@@ -125,8 +127,13 @@ public final class Turtle {
             boolean angry = false;
             for (Entity e : l.entitiesForRendering())
                 if (e instanceof net.minecraft.world.entity.monster.EnderMan em && em.isCreepy() && em.distanceTo(p) < 20) angry = true;
-            boolean hopeless = !canHeal(p) && ticks > 20 * 8 && !(angry && ticks < 20 * 60);
-            if (((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) && !(angry && ticks < 20 * 60)) || ticks > 20 * 90 || hopeless) {
+            boolean night = net.damoon.bot.task.BedTask.night(l);
+            boolean foeNear = false;
+            for (Entity e : l.entitiesForRendering()) if (Reflex.hostile(e) && e.distanceTo(p) < 10) { foeNear = true; break; }
+            // 먹을 게 없으면 체력이 안 차니 낮이고 주변이 조용하면 나가서 먹을 것을 구함 (밤엔 아침까지 안에서 버팀)
+            boolean hopeless = !canHeal(p) && ticks > 20 * 8 && !night && !foeNear && !(angry && ticks < 20 * 60);
+            boolean timeout = ticks > 20 * 90 && (canHeal(p) || !night || ticks > 20 * 60 * 8);
+            if (((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) && !(angry && ticks < 20 * 60)) || timeout || hopeless) {
                 phase = 2;
                 reflex.forceEat = false;
                 // 나오자마자 다시 갇히지 않게 잠시 쉼 (그 사이 먹을 것을 구함)

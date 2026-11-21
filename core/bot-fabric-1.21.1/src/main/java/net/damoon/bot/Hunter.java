@@ -38,12 +38,16 @@ public final class Hunter {
                 && !((LivingEntity) e).isBaby();
     }
 
+    /** 전리품마다 쫓은 시간 (못 줍는 자리에 있으면 10초 뒤 포기) */
+    private final java.util.Map<Integer, Integer> lootTime = new java.util.HashMap<>();
+
     public R tick(Bot bot) {
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
         // 떨어진 전리품
         for (Entity e : l.entitiesForRendering()) {
-            if (e instanceof ItemEntity ie && loot.test(ie.getItem()) && ie.distanceTo(p) < 10 && ie.distanceTo(p) > 1.0 && Math.abs(ie.getY() - p.getY()) < 3) {
+            if (e instanceof ItemEntity ie && loot.test(ie.getItem()) && ie.distanceTo(p) < 10 && ie.distanceTo(p) > 1.0 && Math.abs(ie.getY() - p.getY()) < 3
+                    && lootTime.merge(ie.getId(), 1, Integer::sum) < 20 * 10) {
                 info = "전리품 줍는 중";
                 Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 0.9));
                 if (r != Nav.R.FAILED) return R.RUNNING;
