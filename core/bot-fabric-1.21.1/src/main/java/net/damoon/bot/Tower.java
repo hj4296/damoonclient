@@ -27,6 +27,8 @@ public final class Tower {
     private int height, phase, ticks, calm, hits, lastDescLog = -10000;
     public String info = "";
 
+    private boolean forcedDown;
+    private int cooldownUntil;
     public boolean active() { return active; }
 
     /** 기둥 꼭대기에 서 있음 (근접 몹이 못 때림) */
@@ -82,7 +84,7 @@ public final class Tower {
             for (Entity e : l.entitiesForRendering())
                 if (e instanceof net.minecraft.world.entity.monster.EnderMan em && em.isCreepy() && em.distanceTo(p) < 16) return false;
             if (want && !tower(p) && bot.ticks % 40 == 0) bot.dbg("기둥 조건: 블록 " + Inv.count(p, Inv.throwaway()) + " 땅 " + p.onGround());
-            if (!want || !p.onGround() || p.isInWater() || p.isInLava() || Inv.count(p, Inv.throwaway()) < 4) return false;
+            if (!want || bot.ticks < cooldownUntil || !p.onGround() || p.isInWater() || p.isInLava() || Inv.count(p, Inv.throwaway()) < 4) return false;
             BlockPos f = Placer.standCell(p);
             int h = clear(l, f.above(2)) && clear(l, f.above(3)) && clear(l, f.above(4)) ? 3
                     : (!wither && clear(l, f.above(2)) && clear(l, f.above(3))) ? 2 : 0;
@@ -167,6 +169,7 @@ public final class Tower {
             if (closest == null || cd > 10) calm++; else calm = 0;
             // 몹이 밑에서 서성이기만 하고 안 다가오면 끝이 없음 → 1분 넘게 위에 있었으면 내려가 방패·칼로 상대
             if (calm > 60 || ticks > 20 * 60) {
+                forcedDown = calm <= 60;
                 phase = 2;
                 ticks = 0;
                 if (bot.ticks - lastDescLog > 400) { bot.log("잠잠해짐 → 기둥 캐며 내려감"); lastDescLog = bot.ticks; }
@@ -225,7 +228,7 @@ public final class Tower {
             return true;
         }
         // phase 2: 발밑 블록을 캐며 내려감
-        if (closest != null && cd < 5 && count >= 1) {
+        if (closest != null && cd < 5 && count >= 1 && !forcedDown) {
             // 다시 몰려오면: 아직 꼭대기면 그대로 싸움, 조금 내려왔으면 다시 쌓음
             phase = feet.getY() >= top ? 1 : 0;
             calm = 0;
@@ -235,6 +238,9 @@ public final class Tower {
         if (feet.getY() <= base.getY() || ticks > 20 * 20) {
             Act.stopDig(bot);
             active = false;
+            // 시간이 다 돼 내려왔으면 잠시 다시 쌓지 않음 (내려가자마자 다시 올라가던 반복)
+            if (forcedDown) cooldownUntil = bot.ticks + 20 * 30;
+            forcedDown = false;
             bot.log("기둥에서 내려옴");
             return false;
         }
