@@ -27,6 +27,8 @@ public final class Reflex {
     final Archer archer = new Archer();
     /** 자리 지키기 (스포너 옆): 쫓아가지 않고 다가오는 적만 벰 */
     public boolean camp;
+    /** 싸우지 않고 물러나는 중 (작업이 길을 감) */
+    public boolean retreat;
     private int lavaTicks;
     /** 벙커 짓는 중: 체력이 넉넉하면 방패보다 짓기를 먼저 */
     public boolean building;
@@ -419,6 +421,8 @@ public final class Reflex {
         // 가까운 적과 싸우기
         LivingEntity threat = fightEnabled ? (near != null ? near : threat(p)) : null;
         if (building && p.getHealth() > 9 && threat != null && Act.reach(p, threat.getBoundingBox()) > 3.0) threat = null;
+        // 물러나는 중(할 일을 마치고 포털로, 방패 없이 피함)엔 칼이 닿는 적만 상대하고 나머지는 무시하고 길을 감
+        if (retreat && threat != null && Act.reach(p, threat.getBoundingBox()) > 3.0) threat = null;
         boolean shieldOn = p.getOffhandItem().is(Items.SHIELD);
 
         // 블레이즈 공격 타이밍 읽기: 불꽃을 모으기 시작한 뒤 약 3초(60틱)부터 1초 동안 화염구 3발 (trackBlazes는 위에서)

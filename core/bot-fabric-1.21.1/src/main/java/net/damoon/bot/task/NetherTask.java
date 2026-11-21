@@ -68,6 +68,7 @@ public class NetherTask extends Task {
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
         if (l.dimension() != Level.NETHER) return S.DONE;
+        bot.reflex.retreat = false;
         if (portal == null) {
             BlockPos f = PathExec.feet(p);
             portal = Scan.nearest(l, f, 1, f.getY() - 4, f.getY() + 4, s -> s.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
@@ -87,6 +88,7 @@ public class NetherTask extends Task {
             bot.reflex.camp = false;
             bot.reflex.building = false;
             detail = "먹을 게 없음 → 포털로 돌아가는 중";
+            bot.reflex.retreat = true;
             Nav.R nr = bot.nav.go(new Goal.Block(portal.getX(), portal.getY(), portal.getZ(), true));
             if (nr == Nav.R.FAILED) bot.nav.stop();
             return S.RUNNING;
@@ -112,6 +114,7 @@ public class NetherTask extends Task {
             bot.reflex.building = false;
             BlockPos to = safeSpot != null ? safeSpot : portal;
             detail = "방패가 없음 → 조용한 곳으로 물러나 방패 만들기";
+            bot.reflex.retreat = true;
             Nav.R nr = bot.nav.go(new Goal.Near(to, 3));
             if (nr != Nav.R.RUNNING) { bot.nav.stop(); safeSpot = portal; }
             return S.RUNNING;
@@ -358,6 +361,9 @@ public class NetherTask extends Task {
         }
         // 3) 포털로 돌아가기
         detail = "포털로 돌아가는 중";
+        bot.reflex.retreat = true;
+        bot.reflex.camp = false;
+        bot.reflex.building = false;
         Nav.R nr = bot.nav.go(new Goal.Block(portal.getX(), portal.getY(), portal.getZ(), true));
         if (nr == Nav.R.FAILED) bot.nav.stop();
         return S.RUNNING;
