@@ -38,6 +38,8 @@ public class ObsidianTask extends Task {
     private final Set<Long> badLava = new HashSet<>();
     private final Set<Long> badWater = new HashSet<>();
     private int waterTries;
+    private final Set<Long> badCover = new HashSet<>();
+    private final java.util.Map<Long, Integer> coverTries = new java.util.HashMap<>();
     /** 물을 부었는데 그대로 용암인 횟수 (손이 안 닿는 등) */
     private final java.util.Map<Long, Integer> pourFails = new java.util.HashMap<>();
     private String detail = "";
@@ -105,6 +107,32 @@ public class ObsidianTask extends Task {
             return S.RUNNING;
         }
 
+        // 흑요석 위·옆에 용암이 있으면 (캐면 떨어진 흑요석이 타 버림) 먼저 돌로 덮음
+        if (Inv.count(p, Inv.throwaway()) > 0) {
+            BlockPos cover = null;
+            double cd = 1e9;
+            for (BlockPos b : Scan.find(l, PathExec.feet(p), 2, p.getBlockY() - 10, p.getBlockY() + 10, s -> s.is(Blocks.OBSIDIAN),
+                    b -> { BlockState below = l.getBlockState(b.below()); return below.getFluidState().isEmpty() && !below.isAir(); }, 24)) {
+                for (Direction d : new Direction[]{Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST}) {
+                    BlockPos q = b.relative(d);
+                    if (!BlockUtil.isLava(l.getBlockState(q)) || badCover.contains(q.asLong())) continue;
+                    double dd = p.distanceToSqr(Vec3.atCenterOf(q));
+                    if (dd < cd) { cd = dd; cover = q; }
+                }
+            }
+            if (cover != null) {
+                detail = "흑요석 옆 용암을 돌로 덮는 중";
+                if (Act.reach(p, new net.minecraft.world.phys.AABB(cover)) > 4.0) {
+                    Nav.R r = bot.nav.go(new Goal.Reach(cover, 3.3));
+                    if (r == Nav.R.FAILED) { bot.nav.stop(); badCover.add(cover.asLong()); }
+                    return S.RUNNING;
+                }
+                bot.nav.stop();
+                int r = net.damoon.bot.Placer.placeAt(bot, cover, Inv.throwaway());
+                if (r == -1 || coverTries.merge(cover.asLong(), 1, Integer::sum) > 60) badCover.add(cover.asLong());
+                return S.RUNNING;
+            }
+        }
         // 캘 수 있는 흑요석이 있으면 캠
         int needMore = want - have;
         List<BlockPos> obs = Scan.find(l, PathExec.feet(p), 2, p.getBlockY() - 16, p.getBlockY() + 16, s -> s.is(Blocks.OBSIDIAN), b -> safeObsidian(l, b), 32);
