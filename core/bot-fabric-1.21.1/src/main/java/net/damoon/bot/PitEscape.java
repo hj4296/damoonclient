@@ -108,7 +108,12 @@ public final class PitEscape {
         if (pass(l, floor)) {
             // 앞이 동굴로 뚫려 발판이 없음 → 블록을 놓거나 방향 바꿈
             int r = Placer.placeAt(bot, floor, Inv.throwaway());
-            if (r == -1) { turn(bot, "발판이 없음"); return turns <= 8; }
+            if (r == -1) {
+                // 뚫린 동굴이라 앞에 디딜 곳을 못 만들면 발밑에 쌓아 한 칸 올라감
+                if (force && blocks > 0 && pass(l, f.above(2))) return pillar(bot, p, l, f, 2);
+                turn(bot, "발판이 없음");
+                return turns <= 8;
+            }
             return true;
         }
         info = "한 계단 오르는 중 (y " + f.getY() + " → " + surf + ")";

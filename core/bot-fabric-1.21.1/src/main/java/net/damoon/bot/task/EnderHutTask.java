@@ -68,7 +68,7 @@ public class EnderHutTask extends Task {
 
     private int pearls(LocalPlayer p) { return Inv.count(p, Items.ENDER_PEARL) + Inv.count(p, Items.ENDER_EYE); }
 
-    private net.damoon.bot.PitEscape stairs;
+    private net.damoon.bot.Climb stairs;
 
     @Override
     public S tick(Bot bot) {
@@ -84,8 +84,8 @@ public class EnderHutTask extends Task {
                 detail = "엔더맨 굴 지을 땅 위로 올라가는 중";
                 // 깊으면 길찾기 대신 계단을 파서 곧장 올라감 (동굴 속 길찾기는 너무 오래 걸려 계속 처음부터 다시 함)
                 if (stairs != null || f.getY() < top - 12) {
-                    if (stairs == null) { stairs = new net.damoon.bot.PitEscape(); stairs.force = true; }
-                    if (stairs.tick(bot)) { detail = "땅 위로 계단 파며 올라가는 중 — " + stairs.info; ticks = 0; return S.RUNNING; }
+                    if (stairs == null) stairs = new net.damoon.bot.Climb();
+                    if (stairs.tick(bot, top - 1)) { detail = "엔더맨 굴 지을 땅 위로 — " + stairs.info; ticks = 0; return S.RUNNING; }
                     stairs = null;
                     return S.RUNNING;
                 }
