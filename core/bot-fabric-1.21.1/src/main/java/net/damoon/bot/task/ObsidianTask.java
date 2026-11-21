@@ -38,6 +38,8 @@ public class ObsidianTask extends Task {
     private final Set<Long> badLava = new HashSet<>();
     private final Set<Long> badWater = new HashSet<>();
     private int waterTries;
+    private BlockPos viewLava;
+    private int viewDigTicks;
     private final Set<Long> badCover = new HashSet<>();
     private final java.util.Map<Long, Integer> coverTries = new java.util.HashMap<>();
     /** 물을 부었는데 그대로 용암인 횟수 (손이 안 닿는 등) */
@@ -185,7 +187,13 @@ public class ObsidianTask extends Task {
         }
         bot.nav.stop();
         int v = clearView(bot, aim, lava.below(), net.minecraft.world.level.ClipContext.Fluid.NONE);
-        if (v == 0) { detail = "용암 앞을 막은 블록 캐는 중"; return S.RUNNING; }
+        if (v == 0) {
+            detail = "용암 앞을 막은 블록 캐는 중";
+            // 흐르는 용암과 물이 만나 돌이 계속 생기는 자리면 끝이 없음 → 이 용암은 포기
+            if (lava.equals(viewLava)) { if (++viewDigTicks > 20 * 12) { badLava.add(lava.asLong()); lava = null; viewDigTicks = 0; Act.stopDig(bot); } }
+            else { viewLava = lava; viewDigTicks = 0; }
+            return S.RUNNING;
+        }
         if (v < 0) { badLava.add(lava.asLong()); lava = null; return S.RUNNING; }
         if (useBucket(bot, Items.WATER_BUCKET, aim)) {
             water = lava;
