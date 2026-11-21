@@ -39,8 +39,9 @@ public final class Digger {
         ClientLevel l = bot.level();
         BlockPos f = PathExec.feet(p);
         if (!p.onGround() && !p.isInWater()) return true;
-        if (f.equals(lastFeet)) {
-            if (++stuck > 20 * 20) { turn(bot, "막힘"); stuck = 0; }
+        // 물에서 위아래로 출렁여도 '움직였다'고 보지 않게: 옆으로 옮겼거나 더 내려갔을 때만 진전
+        if (lastFeet != null && f.getX() == lastFeet.getX() && f.getZ() == lastFeet.getZ() && f.getY() >= lastFeet.getY()) {
+            if (++stuck > 20 * 20) { turn(bot, "막힘"); stuck = 0; lastFeet = null; }
         } else { stuck = 0; lastFeet = f; }
 
         BlockPos front = f.relative(dir);
@@ -64,6 +65,10 @@ public final class Digger {
         }
         BlockState fs = l.getBlockState(floor);
         if (BlockUtil.isLava(fs)) { turn(bot, "아래 용암"); return true; }
+        // 지하 물(대수층)로 파고들면 계단을 못 만들고 물속에서 떠다니기만 함 → 다른 쪽으로
+        boolean water = BlockUtil.isWater(fs);
+        for (BlockPos c : clear) if (BlockUtil.isWater(l.getBlockState(c))) water = true;
+        if (water) { turn(bot, "물"); return true; }
 
         for (BlockPos c : clear) {
             BlockState s = l.getBlockState(c);
