@@ -455,9 +455,9 @@ public class BeatGameTask extends Task {
             // 맨 아래 칸(아래가 포털이 아닌 칸)만 — 그래야 그 안에 설 수 있음
             BlockPos lit = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 2, PathExec.feet(p).getY() - 20, PathExec.feet(p).getY() + 20,
                     st -> st.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
-            // 네더에 들어가기 전 음식을 넉넉히 (네더엔 먹을 게 거의 없음)
-            if (lit != null && foodCount(p) < 10 && !cool(bot, "netherfood")) {
-                stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/10)";
+            // 네더에 들어가기 전 음식을 넉넉히 (네더엔 먹을 게 거의 없음) — 포털을 짓기 전에 (짓자마자 들어가 버리므로)
+            if (foodCount(p) < 12 && !cool(bot, "netherfood") && !(sub instanceof PortalTask)) {
+                stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/12)";
                 if (Inv.count(p, rawMeat()) >= 3 && hasFuel(p) && !cool(bot, "cook")) {
                     Item out = cookedFor(p);
                     int want = Inv.count(p, out) + Inv.count(p, rawMeat());

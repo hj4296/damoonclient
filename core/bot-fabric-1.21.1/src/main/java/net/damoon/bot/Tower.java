@@ -74,7 +74,9 @@ public final class Tower {
         }
         if (!active) {
             // 근접 몹이 여럿이거나, 위더 스켈레톤이 오거나, 원거리 몹과 같이 오거나, 체력이 낮으면 (아직 3칸 넘게 떨어져 있을 때 미리)
-            boolean want = count >= 2 || (count >= 1 && (wither || ranged || p.getHealth() < 12) && cd < 9);
+            // 방패가 있으면 위더 스켈레톤 하나는 방패로 막으며 칼로 상대 (기둥은 쌓는 사이 맞고 밀려 떨어짐)
+            boolean shield = p.getOffhandItem().is(net.minecraft.world.item.Items.SHIELD);
+            boolean want = count >= 2 || (count >= 1 && ((wither && !shield) || ranged || p.getHealth() < 12) && cd < 9);
             if (want && cd < 3.8) return false; // 이미 붙었으면 먼저 방패로 밀어냄
             // 화난 엔더맨이 있으면 기둥 대신 방패 싸움 (순간이동해서 옆으로 옴)
             for (Entity e : l.entitiesForRendering())
