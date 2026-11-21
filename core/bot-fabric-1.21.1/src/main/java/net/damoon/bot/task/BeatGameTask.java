@@ -43,7 +43,7 @@ public class BeatGameTask extends Task {
     private String exploreFor = "";
     private int exploreUntil;
     private net.damoon.bot.PitEscape pit;
-    private int netherFoodSince;
+    private int netherFoodSince, bowSearch;
     private final Map<String, Integer> cooldown = new HashMap<>();
     private final EndGameTask end = new EndGameTask();
     private NetherTask nether;
@@ -627,7 +627,13 @@ public class BeatGameTask extends Task {
             if (hunter == null || !"spider".equals(hunterKey)) { hunter = new Hunter(e -> e instanceof net.minecraft.world.entity.monster.Spider, is(Items.STRING)); hunterKey = "spider"; }
             Hunter.R r = hunter.tick(bot);
             detail = hunter.info;
-            if (r == Hunter.R.NONE) { fail(bot, "bow", 20 * 60 * 3); bot.log("거미가 안 보임 → 활 없이 먼저 요새로"); }
+            if (r == Hunter.R.NONE) {
+                // 활은 블레이즈 잡기에 꼭 필요함 (칼은 떠 있는 블레이즈에 안 닿음) → 15분까지는 거미·거미줄을 찾아 돌아다님
+                if (bowSearch == 0) bowSearch = bot.ticks;
+                if (bot.ticks - bowSearch > 20 * 60 * 15) { fail(bot, "bow", 20 * 60 * 30); bot.log("15분 동안 실을 못 구함 → 활 없이 감"); return S.RUNNING; }
+                // 거미는 어두운 곳(동굴·밤)에 많음
+                return explore(bot, "거미");
+            }
             return S.RUNNING;
         }
         int arrows = Inv.count(p, Items.ARROW);
