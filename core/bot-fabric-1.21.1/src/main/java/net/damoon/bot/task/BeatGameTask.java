@@ -106,6 +106,23 @@ public class BeatGameTask extends Task {
         return S.RUNNING;
     }
 
+    /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
+    private int surfaceY = Integer.MIN_VALUE, surfaceUntil;
+
+    private boolean surfaceTrip(Bot bot, BlockPos f, int top, boolean need) {
+        if (surfaceY == Integer.MIN_VALUE || bot.ticks > surfaceUntil) {
+            surfaceY = Integer.MIN_VALUE;
+            if (!need) return false;
+            surfaceY = top - 1;
+            surfaceUntil = bot.ticks + 20 * 90;
+        }
+        if (f.getY() >= surfaceY && bot.p().onGround()) { surfaceY = Integer.MIN_VALUE; return false; }
+        Nav.R r = bot.nav.go(new Goal.Above(surfaceY));
+        if (r == Nav.R.FAILED) { bot.nav.stop(); surfaceY = Integer.MIN_VALUE; surfaceUntil = bot.ticks + 20 * 20; }
+        if (r == Nav.R.ARRIVED) surfaceY = Integer.MIN_VALUE;
+        return r != Nav.R.FAILED;
+    }
+
     /** 멀리 걸어가서 새 지역 보기 */
     private S explore(Bot bot, String why) {
         LocalPlayer p = bot.p();
@@ -222,10 +239,8 @@ public class BeatGameTask extends Task {
             stage = "먹을 게 없음 → 사냥하러";
             BlockPos fp = PathExec.feet(p);
             int top = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, fp.getX(), fp.getZ());
-            if (fp.getY() < top - 4 && l.getBrightness(net.minecraft.world.level.LightLayer.SKY, fp) < 8) {
+            if (surfaceTrip(bot, fp, top, fp.getY() < top - 4 && l.getBrightness(net.minecraft.world.level.LightLayer.SKY, fp) < 8)) {
                 detail = "땅 위로 올라가는 중";
-                Nav.R r = bot.nav.go(new Goal.Above(top - 1));
-                if (r == Nav.R.FAILED) bot.nav.stop();
                 return S.RUNNING;
             }
             if (hunterFood == null) hunterFood = new Hunter(Hunter.foodAnimals(), st -> st.has(net.minecraft.core.component.DataComponents.FOOD) || st.is(Items.FEATHER));
@@ -246,10 +261,8 @@ public class BeatGameTask extends Task {
             // 땅속이면 먼저 땅 위로
             BlockPos f = PathExec.feet(p);
             int top = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, f.getX(), f.getZ());
-            if (f.getY() < top - 4 && (miner == null || !minerKey.equals("logs") || !miner.busy())) {
+            if (surfaceTrip(bot, f, top, f.getY() < top - 4 && (miner == null || !minerKey.equals("logs") || !miner.busy()))) {
                 detail = "땅 위로 올라가는 중";
-                Nav.R r = bot.nav.go(new Goal.Above(top - 1));
-                if (r == Nav.R.FAILED) bot.nav.stop();
                 return S.RUNNING;
             }
             return mine(bot, "logs", s -> s.is(BlockTags.LOGS), logs, wantLogs, false, 6, 20);
