@@ -422,10 +422,12 @@ public class BeatGameTask extends Task {
             }
         }
         // 예비 방패 하나 (화살을 막다 보면 닳아 부서짐 — 부서지는 순간 바로 바꿔 듦)
-        if (p.getOffhandItem().is(Items.SHIELD) && !Inv.has(p, Items.SHIELD) && Inv.count(p, Items.IRON_INGOT) >= 1
+        // (Inv.count는 왼손도 셈)
+        if (p.getOffhandItem().is(Items.SHIELD) && Inv.count(p, Items.SHIELD) < 2 && Inv.count(p, Items.IRON_INGOT) >= 1
                 && Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6 && !cool(bot, "spareshield")) {
             stage = "5. 예비 방패";
-            return run(bot, "spareshield", () -> new CraftTask(Items.SHIELD, 1));
+            int wantSh = Inv.count(p, Items.SHIELD) + 1;
+            return run(bot, "spareshield", () -> new CraftTask(Items.SHIELD, wantSh));
         }
         // 줍기: 근처에 떨어진 쓸 만한 것 (실, 깃털, 화살, 활, 진주 등)
         S loot = loot(bot, p, l);
@@ -487,8 +489,8 @@ public class BeatGameTask extends Task {
                 }
             }
             // 예비 방패 (화염구를 막다 보면 방패가 닳아 부서짐)
-            int shields = Inv.count(p, Items.SHIELD) + (p.getOffhandItem().is(Items.SHIELD) ? 1 : 0);
-            if (shields < 4 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
+            int shields = Inv.count(p, Items.SHIELD); // 왼손 포함
+            if (shields < 3 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
                 if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "7. 예비 방패"; return run(bot, "shield2", () -> new CraftTask(Items.SHIELD, Inv.count(p, Items.SHIELD) + 1)); }
                 if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "7. 예비 방패용 판자"; return run(bot, "shield2planks", () -> new CraftTask(pl, want)); }
                 // 판자도 나무도 없으면 나무를 구함 (네더에서 방패가 부서지면 새로 못 만듦). 못 찾으면 5분 뒤 다시

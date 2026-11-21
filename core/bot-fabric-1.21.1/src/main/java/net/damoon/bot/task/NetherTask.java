@@ -112,9 +112,9 @@ public class NetherTask extends Task {
         // 방패가 없고 새로 만들 재료(판자 6·철 1)도 없으면: 방패 없이 블레이즈와 싸우지 않고 오버월드로 돌아가 만들어 옴
         boolean canCraftShield = Inv.count(p, Items.IRON_INGOT) >= 1 && Inv.count(p, s -> s.is(net.minecraft.tags.ItemTags.PLANKS)) >= 6;
         // 예비 방패가 없는데 만들 재료도 없으면 (블레이즈 싸움 중 부서지면 끝): 아직 막대를 다 못 모았으면 한 번 돌아가서 예비를 만들어 옴 (20분에 한 번까지)
-        int shieldsAll = Inv.count(p, Items.SHIELD) + (p.getOffhandItem().is(Items.SHIELD) ? 1 : 0);
+        int shieldsAll = Inv.count(p, Items.SHIELD); // 왼손 포함
         if (!shieldTrip && hasShield && shieldsAll < 2 && !canCraftShield && bot.ticks > nextSpareTrip && Inv.count(p, Items.BLAZE_ROD) < RODS
-                && calmAround(l, p) && !bot.reflex.turtle.sealed()) {
+                && !bot.reflex.turtle.sealed()) {
             nextSpareTrip = bot.ticks + 20 * 60 * 20;
             spareTrip = true;
             bot.log("예비 방패가 없고 만들 재료도 없음 → 오버월드로 돌아가 예비 방패를 만들어 옴");
