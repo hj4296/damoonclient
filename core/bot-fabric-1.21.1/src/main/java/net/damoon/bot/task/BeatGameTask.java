@@ -448,7 +448,8 @@ public class BeatGameTask extends Task {
             int placedObs = portalTask != null ? portalTask.placedObsidian(l) : 0;
             if (Inv.count(p, Items.OBSIDIAN) + placedObs < 10 && !(sub instanceof PortalTask)) {
                 stage = "7. 흑요석 만들기 (" + Inv.count(p, Items.OBSIDIAN) + "/10)";
-                S r = run(bot, "obsidian", () -> new ObsidianTask(10));
+                // 실패한 뒤 쉬는 동안엔 다시 만들지 않음 (매 틱 새로 만들고 실패하던 문제)
+                S r = cool(bot, "obsidian") && !(sub instanceof ObsidianTask) ? S.RUNNING : run(bot, "obsidian", () -> new ObsidianTask(10));
                 if (cool(bot, "obsidian")) {
                     // 근처에 용암이 없으면 더 깊이 내려가서 찾음
                     if (digger == null) digger = new Digger(Direction.fromYRot(p.getYRot()));

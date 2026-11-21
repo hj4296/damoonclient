@@ -38,6 +38,8 @@ public class ObsidianTask extends Task {
     private final Set<Long> badLava = new HashSet<>();
     private final Set<Long> badWater = new HashSet<>();
     private int waterTries;
+    /** 물을 부었는데 그대로 용암인 횟수 (손이 안 닿는 등) */
+    private final java.util.Map<Long, Integer> pourFails = new java.util.HashMap<>();
     private String detail = "";
 
     public ObsidianTask(int want) { this.want = want; }
@@ -85,14 +87,19 @@ public class ObsidianTask extends Task {
 
         // 물을 부어 놨으면 다시 퍼 담기
         if (water != null) {
-            if (!l.getFluidState(water).is(FluidTags.WATER) || !l.getFluidState(water).isSource()) { water = null; return S.RUNNING; }
+            if (!l.getFluidState(water).is(FluidTags.WATER) || !l.getFluidState(water).isSource()) {
+                // 부은 물이 안 보임 = 실제로 안 부어짐 → 같은 용암에 계속 헛손질하지 않게
+                if (l.getFluidState(water).is(FluidTags.LAVA) && pourFails.merge(water.asLong(), 1, Integer::sum) >= 2) badLava.add(water.asLong());
+                water = null;
+                return S.RUNNING;
+            }
             detail = "물 다시 퍼 담는 중";
-            if (Act.reach(p, new net.minecraft.world.phys.AABB(water)) > 4.0) {
-                bot.nav.go(new Goal.Reach(water, 3.0));
+            Vec3 aimP = Vec3.atCenterOf(water).add(0, 0.3, 0);
+            if (Act.reach(p, new net.minecraft.world.phys.AABB(water)) > 4.0 || p.getEyePosition().distanceTo(aimP) > 4.2) {
+                bot.nav.go(new Goal.Reach(water, 2.5));
                 return S.RUNNING;
             }
             bot.nav.stop();
-            Vec3 aimP = Vec3.atCenterOf(water).add(0, 0.3, 0);
             if (clearView(bot, aimP, water, net.minecraft.world.level.ClipContext.Fluid.SOURCE_ONLY) == 0) return S.RUNNING;
             if (useBucket(bot, Items.BUCKET, aimP)) { wait = 5; if (++tries > 30) water = null; }
             return S.RUNNING;
@@ -140,14 +147,15 @@ public class ObsidianTask extends Task {
             tries = 0;
         }
         detail = "용암에 물 붓기 (흑요석 " + have + "/" + want + ")";
-        if (Act.reach(p, new net.minecraft.world.phys.AABB(lava)) > 3.8) {
-            Nav.R r = bot.nav.go(new Goal.Reach(lava, 3.2));
-            if (r == Nav.R.FAILED) { bot.nav.stop(); badLava.add(lava.asLong()); lava = null; }
+        // 용암 아래 블록의 윗면을 겨냥 → 물이 그 용암 자리에 놓이고 옆 용암 원천들이 흑요석이 됨
+        Vec3 aim = Vec3.atCenterOf(lava.below()).add(0, 0.5, 0);
+        // 양동이는 눈에서 4.5칸까지만 닿음: 겨냥점(용암 칸 바닥 가운데)이 멀면 더 다가감
+        if (Act.reach(p, new net.minecraft.world.phys.AABB(lava)) > 3.8 || p.getEyePosition().distanceTo(aim) > 4.2) {
+            Nav.R r = bot.nav.go(new Goal.Reach(lava, 2.4));
+            if (r == Nav.R.FAILED || (r == Nav.R.ARRIVED && p.getEyePosition().distanceTo(aim) > 4.2)) { bot.nav.stop(); badLava.add(lava.asLong()); lava = null; }
             return S.RUNNING;
         }
         bot.nav.stop();
-        // 용암 아래 블록의 윗면을 겨냥 → 물이 그 용암 자리에 놓이고 옆 용암 원천들이 흑요석이 됨
-        Vec3 aim = Vec3.atCenterOf(lava.below()).add(0, 0.5, 0);
         int v = clearView(bot, aim, lava.below(), net.minecraft.world.level.ClipContext.Fluid.NONE);
         if (v == 0) { detail = "용암 앞을 막은 블록 캐는 중"; return S.RUNNING; }
         if (v < 0) { badLava.add(lava.asLong()); lava = null; return S.RUNNING; }
