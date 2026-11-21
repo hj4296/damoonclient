@@ -59,7 +59,12 @@ public final class Reflex {
     public boolean tick() {
         LocalPlayer p = bot.p();
         doing = "";
-        if (p.containerMenu != p.inventoryMenu) return false;
+        if (p.containerMenu != p.inventoryMenu) {
+            // 제작대·화로 창을 연 채로 맞고 있으면(뒤에서 좀비 등) 창을 닫고 싸움
+            if (p.hurtTime == 0 && nearMelee(p, 3.0) == null) return false;
+            p.closeContainer();
+            bot.dbg("창을 연 채 위험 → 창을 닫고 싸움");
+        }
 
         trackBlazes(p);
         // 갑옷·방패는 생기면 바로 착용 (어떤 작업 중이든)
@@ -591,7 +596,8 @@ public final class Reflex {
             if (e instanceof EnderMan && bot.ticks < ignoreEndermenUntil) continue;
             if (e instanceof net.minecraft.world.entity.monster.Slime || e instanceof net.minecraft.world.entity.monster.Ghast) continue;
             double d = e.distanceTo(p);
-            if (d >= bd || Math.abs(e.getY() - p.getY()) > 2.5 || !p.hasLineOfSight(e)) continue;
+            // 바로 붙어 있으면 (굴 모서리 등으로 시선이 안 닿아도) 때릴 수 있으니 상대함
+            if (d >= bd || Math.abs(e.getY() - p.getY()) > 2.5 || (d > 1.6 && !p.hasLineOfSight(e))) continue;
             bd = d;
             best = (LivingEntity) e;
         }
