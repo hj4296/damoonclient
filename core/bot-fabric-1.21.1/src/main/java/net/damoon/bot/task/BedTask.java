@@ -63,7 +63,8 @@ public class BedTask extends Task {
             if (at != null) { bed = at; wait = 4; return S.RUNNING; }
             // 놓을 방향을 바꿔 봄
             if (++tries % 20 == 0) bot.ctl.look(p.getYRot() + 90, 30f);
-            return tries > 200 ? S.FAILED : S.RUNNING;
+            if (tries > 200) { nextTry = bot.ticks + 20 * 60 * 3; return S.FAILED; }
+            return S.RUNNING;
         }
         // 여러 번 눌러도 못 누우면 (침대가 막힘·몹이 근처) 침대를 다시 챙겨 다른 곳에 놓거나 포기
         if (useTries > 6) {

@@ -497,8 +497,17 @@ public class BeatGameTask extends Task {
                 if (cool(bot, "obsidian")) {
                     // 근처에 용암이 없으면 더 깊이 내려가서 찾음
                     if (digger == null) digger = new Digger(Direction.fromYRot(p.getYRot()));
-                    digger.tick(bot, PathExec.feet(p).getY() > -50 ? Digger.Mode.STAIRS : Digger.Mode.TUNNEL);
-                    detail = "용암을 찾아 이동 — " + digger.info;
+                    BlockPos df = PathExec.feet(p);
+                    if (bot.ticks % 400 == 0 && digger.recentTurns < 4) digger.recentTurns = 0;
+                    if (digger.recentTurns >= 4) {
+                        // 사방이 물(지하 대수층)이라 계단을 못 팜 → 길찾기로 동굴을 따라 다른 곳으로
+                        Nav.R nr = bot.nav.go(new Goal.Below(Math.max(-50, df.getY() - 10)));
+                        if (nr != Nav.R.RUNNING) { digger.recentTurns = 0; bot.nav.stop(); if (nr == Nav.R.FAILED) digger = new Digger(Direction.fromYRot(p.getYRot() + 90)); }
+                        detail = "용암을 찾아 이동 — 물을 피해 동굴로";
+                    } else {
+                        digger.tick(bot, df.getY() > -50 ? Digger.Mode.STAIRS : Digger.Mode.TUNNEL);
+                        detail = "용암을 찾아 이동 — " + digger.info;
+                    }
                 }
                 return r;
             }
