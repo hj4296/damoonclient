@@ -137,6 +137,28 @@ public class BeatGameTask extends Task {
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil;
     private int shieldWoodSince;
+    /** 오버월드 쪽 네더 포털 자리 (기억 파일에도 적어 둠) — 멀리 나갔다가 포털을 새로 짓지 않고 돌아오게 */
+    private BlockPos owPortal;
+    private boolean owPortalLoaded;
+
+    private BlockPos knownOverworldPortal(ClientLevel l) {
+        if (!owPortalLoaded) { owPortal = net.damoon.bot.Memory.getPos("overworldPortal"); owPortalLoaded = true; }
+        if (owPortal != null && l.isLoaded(owPortal) && !l.getBlockState(owPortal).is(Blocks.NETHER_PORTAL)) {
+            BlockPos found = null;
+            for (BlockPos q : BlockPos.betweenClosed(owPortal.offset(-2, -2, -2), owPortal.offset(2, 2, 2)))
+                if (l.getBlockState(q).is(Blocks.NETHER_PORTAL)) { found = q.immutable(); break; }
+            if (found == null) { owPortal = null; net.damoon.bot.Memory.put("overworldPortal", null); }
+            else owPortal = found;
+        }
+        return owPortal;
+    }
+
+    private void rememberOverworldPortal(BlockPos b) {
+        if (b.equals(owPortal)) return;
+        owPortal = b;
+        owPortalLoaded = true;
+        net.damoon.bot.Memory.putPos("overworldPortal", b);
+    }
     private net.damoon.bot.Climb surfClimb;
 
     private boolean surfaceTrip(Bot bot, BlockPos f, int top, boolean need) {
@@ -199,6 +221,11 @@ public class BeatGameTask extends Task {
         }
         if (bot.ticks % 20 == 0) { Inv.equipArmor(p); Inv.equipShield(p); }
         if (bot.ticks % 20 == 10) Inv.dropJunk(p);
+        // 흑요석·포털 짓기 중인데 이미 지은 포털이 있으면 그만둠 (멀리 있을 때 시작했던 경우)
+        if ((sub instanceof ObsidianTask || sub instanceof PortalTask) && l.dimension() == Level.OVERWORLD && knownOverworldPortal(l) != null) {
+            bot.log("이미 지은 포털이 있음 " + owPortal.toShortString() + " → " + subKey + " 그만두고 그리로");
+            sub = null; subKey = ""; bot.nav.stop();
+        }
         if (sub != null) { bot.trace = "sub " + subKey; return run(bot, subKey, () -> sub); }
         if (l.dimension() == Level.NETHER) {
             stage = "8. 네더";
@@ -518,6 +545,9 @@ public class BeatGameTask extends Task {
             // 맨 아래 칸(아래가 포털이 아닌 칸)만 — 그래야 그 안에 설 수 있음
             BlockPos lit = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 2, PathExec.feet(p).getY() - 20, PathExec.feet(p).getY() + 20,
                     st -> st.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
+            // 근처에 안 보여도 전에 지은(나온) 포털이 그대로 있으면 거기로 돌아감 (새로 짓지 않음)
+            if (lit != null) rememberOverworldPortal(lit);
+            else lit = knownOverworldPortal(l);
             // 네더에 들어가기 전 음식을 넉넉히 (네더엔 먹을 게 거의 없음) — 포털을 짓기 전에 (짓자마자 들어가 버리므로)
             if (foodCount(p) < 20 && !cool(bot, "netherfood") && !(sub instanceof PortalTask)) {
                 stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/20)";
