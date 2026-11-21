@@ -90,9 +90,29 @@ public final class Reflex {
             if (Math.abs(diff) <= 140) faceYaw = a1 + diff / 2;
             else proj = null;
         }
+        // 활을 당기고 있는 스켈레톤(쇠뇌를 장전한 약탈자)이 나를 보고 있으면 쏘기 전에 미리 그쪽으로 방패를 듦
+        // — 화살은 2~3틱 만에 날아오는데 방패는 들고 5틱 뒤부터 막히므로, 날아오는 걸 보고 들면 늦음.
+        // 쏘고 난 뒤(다음 발까지 약 2초)엔 방패를 내리고 달려가서 벰 (아래 threat 쪽)
+        LivingEntity aimer = proj == null && p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed()
+                && !(tower.active() && !tower.onTop(p)) ? aimingAtMe(p) : null;
+        if (aimer != null && bot.ticks % 20 == 0) bot.dbg("활 당기는 " + aimer.getName().getString() + String.format(" %.1f칸 → 미리 방패", aimer.distanceTo(p)));
+        if (aimer != null && nearMelee(p, 3.0) == null) {
+            if (eating) { eating = false; bot.ctl.use = false; }
+            boolean wasDrawing = p.isUsingItem() && p.getUseItem().is(Items.BOW);
+            Inv.selectWeapon(p);
+            if (wasDrawing) archer.reset();
+            if (p.isUsingItem() && !p.getUseItem().is(Items.SHIELD) && !wasDrawing) { bot.ctl.use = false; doing = "쏘려는 " + aimer.getName().getString() + " → 손에 든 것 내림"; return true; }
+            bot.ctl.lookAt(p, aimer.getEyePosition());
+            bot.ctl.speed = 45f;
+            bot.ctl.use = true;
+            if (aimer.distanceTo(p) > 2.5 && ranged(aimer) && fightEnabled && !retreat && Bot.safeAheadToward(p, aimer.getX(), aimer.getZ())) bot.ctl.moveToward(p, aimer.position());
+            doing = "활 당기는 " + aimer.getName().getString() + " 쪽으로 미리 방패";
+            return true;
+        }
         // 방금 화살을 쏴서 맞힌 몹(스켈레톤 등)이 있으면 그쪽을 계속 보며 방패를 듦 — 화살은 3틱 만에 날아와서 보고 나서 돌면 늦음
+        // (활을 당기는 게 보이면 위에서 처리. 여긴 당기는 게 안 보이는데 맞고 있을 때 — 가까우면 아래에서 달려가 벰)
         if (proj == null && p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed() && bot.lastAttacker instanceof LivingEntity sh
-                && sh.isAlive() && ranged(sh) && bot.ticks - bot.lastAttackTick < 20 * 5 && sh.distanceTo(p) < 20
+                && sh.isAlive() && ranged(sh) && bot.ticks - bot.lastAttackTick < 20 * 5 && sh.distanceTo(p) < 20 && sh.distanceTo(p) > 6
                 && p.hasLineOfSight(sh) && nearMelee(p, 3.0) == null && !(sh instanceof net.minecraft.world.entity.monster.Blaze)) {
             if (eating) { eating = false; bot.ctl.use = false; }
             boolean wasDrawing = p.isUsingItem() && p.getUseItem().is(Items.BOW);
@@ -550,10 +570,19 @@ public final class Reflex {
             if (ranged(threat) && r > 3.0 && shieldOn) {
                 Inv.selectWeapon(p);
                 bot.ctl.lookAt(p, threat.getBoundingBox().getCenter());
-                bot.ctl.use = true;
-                if (!camp) bot.ctl.fwd = true;
-                if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
-                doing = "방패 들고 " + threat.getName().getString() + "에게 다가가는 중";
+                // 활을 당기는 중이면 위(aimingAtMe)에서 방패를 듦. 여기 왔으면 막 쏜 뒤라 다음 발까지 틈 → 방패를 내리고 달려감
+                // (방패를 든 채 걸으면 속도가 1/5이라 뒷걸음치는 스켈레톤을 못 따라잡음)
+                boolean witch = threat instanceof net.minecraft.world.entity.monster.Witch;
+                if (witch) bot.ctl.use = true;
+                else if (p.isUsingItem() && p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; doing = "쏜 뒤 틈 → 방패 내리고 달려감"; return true; }
+                if (!camp) {
+                    if (Bot.safeAheadToward(p, threat.getX(), threat.getZ())) {
+                        bot.ctl.fwd = true;
+                        bot.ctl.sprint = !witch && p.getFoodData().getFoodLevel() > 6;
+                        if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+                    } else bot.nav.go(new net.damoon.bot.path.Goal.Near(threat.blockPosition(), 2.0));
+                }
+                doing = (witch ? "방패 들고 " : "틈 사이 달려서 ") + threat.getName().getString() + "에게 다가가는 중";
                 return true;
             }
             // 활이 있으면 멀리 있는 근접 몹(위더 스켈레톤 등)은 먼저 활로 쏨
@@ -790,6 +819,40 @@ public final class Reflex {
                 || e instanceof net.minecraft.world.entity.monster.Witch || e instanceof net.minecraft.world.entity.monster.Blaze;
     }
 
+    /** 나를 보고 활을 당기는 스켈레톤류 / 쇠뇌를 장전 중이거나 장전해 둔 약탈자 (16칸 안, 보임). 가장 가까운 것 */
+    private int aimId = -1, aimSince, aimLast;
+
+    private LivingEntity aimingAtMe(LocalPlayer p) {
+        LivingEntity best = null;
+        double bd = 16;
+        for (Entity e : bot.level().entitiesForRendering()) {
+            if (!(e instanceof LivingEntity le) || !le.isAlive()) continue;
+            boolean drawing;
+            if (e instanceof net.minecraft.world.entity.monster.AbstractSkeleton sk && !(e instanceof net.minecraft.world.entity.monster.WitherSkeleton))
+                drawing = sk.isUsingItem() && sk.getUseItem().getItem() instanceof net.minecraft.world.item.BowItem;
+            else if (e instanceof net.minecraft.world.entity.monster.Pillager pl)
+                drawing = pl.isChargingCrossbow() || net.minecraft.world.item.CrossbowItem.isCharged(pl.getMainHandItem());
+            else if (e instanceof net.minecraft.world.entity.monster.Drowned dr)
+                // 삼지창 든 드라운드는 던지기 자세(아이템 사용) 동안 계속 던짐. 15초 넘게 막기만 하면 30초 무시 (물속에 있어 못 잡을 때 멈춤 방지)
+                drawing = dr.isUsingItem() && dr.getMainHandItem().is(Items.TRIDENT) && bot.ticks >= ignoreUntil.getOrDefault(-dr.getId() - 1, 0);
+            else continue;
+            if (!drawing) continue;
+            double d = e.distanceTo(p);
+            if (d >= bd || !p.hasLineOfSight(e)) continue;
+            if (e instanceof net.minecraft.world.entity.monster.Drowned) {
+                if (aimId != e.getId() || bot.ticks - aimLast > 60) { aimId = e.getId(); aimSince = bot.ticks; }
+                aimLast = bot.ticks;
+                if (bot.ticks - aimSince > 20 * 15) { ignoreUntil.put(-e.getId() - 1, bot.ticks + 20 * 30); continue; }
+            }
+            // 나를 보고 있는지 (머리 방향)
+            double yaw = Math.toDegrees(Math.atan2(p.getZ() - e.getZ(), p.getX() - e.getX())) - 90;
+            if (Math.abs(net.minecraft.util.Mth.wrapDegrees(yaw - le.getYHeadRot())) > 45) continue;
+            bd = d;
+            best = le;
+        }
+        return best;
+    }
+
     private LivingEntity threat(LocalPlayer p) {
         LivingEntity best = null;
         double bd = 1e9;
@@ -797,6 +860,7 @@ public final class Reflex {
         var src = p.getLastDamageSource();
         if (src != null && src.getEntity() instanceof LivingEntity atk && atk.isAlive() && atk != p
                 && !(atk instanceof EnderMan && bot.ticks < ignoreEndermenUntil)
+                && !(ranged(atk) && bot.ticks < ignoreUntil.getOrDefault(atk.getId(), 0))
                 && bot.level().getGameTime() - lastHurtStamp(p) < 60 && atk.distanceTo(p) < 6 && p.hasLineOfSight(atk)) {
             return atk;
         }
