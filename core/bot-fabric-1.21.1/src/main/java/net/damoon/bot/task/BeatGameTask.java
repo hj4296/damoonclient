@@ -109,6 +109,7 @@ public class BeatGameTask extends Task {
 
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil;
+    private net.damoon.bot.PitEscape surfStairs;
 
     private boolean surfaceTrip(Bot bot, BlockPos f, int top, boolean need) {
         if (surfaceY == Integer.MIN_VALUE || bot.ticks > surfaceUntil) {
@@ -117,7 +118,15 @@ public class BeatGameTask extends Task {
             surfaceY = top - 1;
             surfaceUntil = bot.ticks + 20 * 90;
         }
-        if (f.getY() >= surfaceY && bot.p().onGround()) { surfaceY = Integer.MIN_VALUE; return false; }
+        if (f.getY() >= surfaceY && bot.p().onGround()) { surfaceY = Integer.MIN_VALUE; surfStairs = null; return false; }
+        // 깊은 땅속이면 길찾기 대신 계단을 파서 곧장 올라감 (동굴 속 길찾기는 너무 오래 걸림)
+        if (surfStairs != null || f.getY() < surfaceY - 14) {
+            if (surfStairs == null) { surfStairs = new net.damoon.bot.PitEscape(); surfStairs.force = true; }
+            if (surfStairs.tick(bot)) { surfaceUntil = bot.ticks + 20 * 60; return true; }
+            surfStairs = null;
+            surfaceY = Integer.MIN_VALUE;
+            return false;
+        }
         Nav.R r = bot.nav.go(new Goal.Above(surfaceY));
         if (r == Nav.R.FAILED) { bot.nav.stop(); surfaceY = Integer.MIN_VALUE; surfaceUntil = bot.ticks + 20 * 20; }
         if (r == Nav.R.ARRIVED) surfaceY = Integer.MIN_VALUE;
