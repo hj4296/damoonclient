@@ -66,6 +66,16 @@ public class BeatGameTask extends Task {
 
     private void fail(Bot bot, String key, int ticks) { cooldown.put(key, bot.ticks + ticks); }
 
+    /** 나무 모으기 (땅속이면 먼저 땅 위로) — 판자가 모자라 방패 등을 못 만들 때 */
+    private S gatherWood(Bot bot, int moreLogs) {
+        LocalPlayer p = bot.p();
+        BlockPos f = PathExec.feet(p);
+        int top = bot.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, f.getX(), f.getZ());
+        if (surfaceTrip(bot, f, top, f.getY() < top - 4 && (miner == null || !minerKey.equals("logs") || !miner.busy()))) { detail = "땅 위로 올라가는 중"; return S.RUNNING; }
+        Predicate<ItemStack> lg = s -> s.is(ItemTags.LOGS);
+        return mine(bot, "logs", s -> s.is(BlockTags.LOGS), lg, Inv.count(p, lg) + moreLogs, false, 6, 20);
+    }
+
     /** 하위 작업 실행 (같은 key면 이어서) */
     private S run(Bot bot, String key, java.util.function.Supplier<Task> make) {
         // 방금 실패한 작업(재료 부족 등)을 틱마다 다시 시도하지 않음:
@@ -126,6 +136,7 @@ public class BeatGameTask extends Task {
 
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil;
+    private int shieldWoodSince;
     private net.damoon.bot.Climb surfClimb;
 
     private boolean surfaceTrip(Bot bot, BlockPos f, int top, boolean need) {
@@ -354,6 +365,7 @@ public class BeatGameTask extends Task {
         if (!p.getOffhandItem().is(Items.SHIELD) && !Inv.has(p, Items.SHIELD) && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shieldnow")) {
             if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "방패가 부서짐 → 새 방패"; return run(bot, "shieldnow", () -> new CraftTask(Items.SHIELD, 1)); }
             if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "새 방패용 판자"; return run(bot, "shieldnowplanks", () -> new CraftTask(pl, want)); }
+            if (l.dimension() == Level.OVERWORLD) { stage = "새 방패용 나무 모으기"; return gatherWood(bot, 4); }
         }
         // ---- 3. 음식 ----
         int food = foodCount(p);
@@ -479,7 +491,15 @@ public class BeatGameTask extends Task {
             if (shields < 4 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
                 if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "7. 예비 방패"; return run(bot, "shield2", () -> new CraftTask(Items.SHIELD, Inv.count(p, Items.SHIELD) + 1)); }
                 if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "7. 예비 방패용 판자"; return run(bot, "shield2planks", () -> new CraftTask(pl, want)); }
+                // 판자도 나무도 없으면 나무를 구함 (네더에서 방패가 부서지면 새로 못 만듦). 못 찾으면 5분 뒤 다시
+                if (l.dimension() == Level.OVERWORLD) {
+                    stage = "7. 예비 방패용 나무 모으기";
+                    if (shieldWoodSince == 0) shieldWoodSince = bot.ticks;
+                    if (bot.ticks - shieldWoodSince > 20 * 60 * 4) { fail(bot, "shield2", 20 * 60 * 5); shieldWoodSince = 0; }
+                    return gatherWood(bot, 4);
+                }
             }
+            shieldWoodSince = 0;
             if (!Inv.has(p, Items.FLINT_AND_STEEL)) {
                 if (Inv.count(p, Items.FLINT) < 1) {
                     stage = "7. 부싯돌 (자갈 캐기)";

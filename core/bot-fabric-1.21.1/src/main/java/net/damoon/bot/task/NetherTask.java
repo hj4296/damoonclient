@@ -34,7 +34,8 @@ public class NetherTask extends Task {
     private net.damoon.bot.EnderTrap trap;
     private CraftTask boatCraft;
     private CraftTask shieldCraft;
-    private boolean foodTrip;
+    private boolean foodTrip, shieldTrip, spareTrip;
+    private static int nextSpareTrip;
     private int shieldRetry;
     private boolean boatTried;
     private BlockPos safeSpot;
@@ -108,6 +109,27 @@ public class NetherTask extends Task {
             }
             return S.RUNNING;
         }
+        // 방패가 없고 새로 만들 재료(판자 6·철 1)도 없으면: 방패 없이 블레이즈와 싸우지 않고 오버월드로 돌아가 만들어 옴
+        boolean canCraftShield = Inv.count(p, Items.IRON_INGOT) >= 1 && Inv.count(p, s -> s.is(net.minecraft.tags.ItemTags.PLANKS)) >= 6;
+        // 예비 방패가 없는데 만들 재료도 없으면 (블레이즈 싸움 중 부서지면 끝): 아직 막대를 다 못 모았으면 한 번 돌아가서 예비를 만들어 옴 (20분에 한 번까지)
+        int shieldsAll = Inv.count(p, Items.SHIELD) + (p.getOffhandItem().is(Items.SHIELD) ? 1 : 0);
+        if (!shieldTrip && hasShield && shieldsAll < 2 && !canCraftShield && bot.ticks > nextSpareTrip && Inv.count(p, Items.BLAZE_ROD) < RODS
+                && calmAround(l, p) && !bot.reflex.turtle.sealed()) {
+            nextSpareTrip = bot.ticks + 20 * 60 * 20;
+            spareTrip = true;
+            bot.log("예비 방패가 없고 만들 재료도 없음 → 오버월드로 돌아가 예비 방패를 만들어 옴");
+        }
+        if ((!hasShield && !canCraftShield || spareTrip) && !bot.reflex.turtle.sealed()) {
+            if (!shieldTrip && !spareTrip) { shieldTrip = true; bot.log("방패가 부서졌고 만들 재료가 없음 → 포털로 돌아가 오버월드에서 만들어 옴"); }
+            bot.reflex.camp = false;
+            bot.reflex.building = false;
+            bot.reflex.retreat = true;
+            detail = "방패 재료 없음 → 포털로 돌아가는 중";
+            Nav.R nr = bot.nav.go(new Goal.Block(portal.getX(), portal.getY(), portal.getZ(), true));
+            if (nr == Nav.R.FAILED) bot.nav.stop();
+            return S.RUNNING;
+        }
+        shieldTrip = false;
         if (!hasShield && Inv.count(p, Items.IRON_INGOT) >= 1 && Inv.count(p, s -> s.is(net.minecraft.tags.ItemTags.PLANKS)) >= 6
                 && !bot.reflex.turtle.sealed() && !calmAround(l, p)) {
             // 방패 없이 싸우지 않고, 조용한 곳(처음 스포너를 본 자리나 포털 쪽)으로 물러나서 만듦
