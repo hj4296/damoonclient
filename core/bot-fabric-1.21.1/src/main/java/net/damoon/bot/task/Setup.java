@@ -80,6 +80,11 @@ public final class Setup {
             bot.log("월드 안에서는 새 월드를 못 만듦 (title 먼저)");
             return;
         }
+        // 새 월드: 이전 월드의 기록(죽은 횟수·죽은 자리·진행 기억)을 지움
+        bot.deaths = 0;
+        bot.deathPos = null;
+        bot.pastNether = false;
+        bot.framesWithEyes = 0;
         LevelSettings ls = new LevelSettings(name, GameType.SURVIVAL, false, Difficulty.NORMAL, true, new GameRules(), WorldDataConfiguration.DEFAULT);
         bot.log("새 월드 생성: " + name + " (시드 " + seed + ")");
         mc.createWorldOpenFlows().createFreshLevel(name, ls, new WorldOptions(seed, true, false), WorldPresets::createNormalWorldDimensions, mc.screen);
