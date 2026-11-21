@@ -83,8 +83,15 @@ public final class Turtle {
                 if (e instanceof net.minecraft.world.entity.monster.WitherSkeleton && e.distanceTo(p) < 6) return true;
             return false;
         }
-        for (Entity e : bot.level().entitiesForRendering()) if (Reflex.hostile(e) && e.distanceTo(p) < 14) return true;
+        // 먹을 게 없고 배고프면 갇혀 있어도 체력이 안 참 → 적이 정말 가까울 때만 (아니면 사냥하러 가야 함)
+        double r = canHeal(p) ? 14 : 6;
+        for (Entity e : bot.level().entitiesForRendering()) if (Reflex.hostile(e) && e.distanceTo(p) < r) return true;
         return false;
+    }
+
+    /** 체력이 저절로 차거나(배고픔 18 이상) 먹을 게 있음 */
+    static boolean canHeal(LocalPlayer p) {
+        return p.getFoodData().getFoodLevel() >= 18 || Inv.count(p, Inv.food()) > 0;
     }
 
     private boolean holeTick(Bot bot, Reflex reflex, LocalPlayer p, ClientLevel l) {
@@ -118,9 +125,12 @@ public final class Turtle {
             boolean angry = false;
             for (Entity e : l.entitiesForRendering())
                 if (e instanceof net.minecraft.world.entity.monster.EnderMan em && em.isCreepy() && em.distanceTo(p) < 20) angry = true;
-            if (((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) && !(angry && ticks < 20 * 60)) || ticks > 20 * 90) {
+            boolean hopeless = !canHeal(p) && ticks > 20 * 8 && !(angry && ticks < 20 * 60);
+            if (((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) && !(angry && ticks < 20 * 60)) || ticks > 20 * 90 || hopeless) {
                 phase = 2;
                 reflex.forceEat = false;
+                // 나오자마자 다시 갇히지 않게 잠시 쉼 (그 사이 먹을 것을 구함)
+                cooldownUntil = bot.ticks + 20 * 60;
                 bot.log("회복 완료 (체력 " + (int) p.getHealth() + ") → 덮개를 부수고 나감");
             } else {
                 reflex.doing = "구멍 속에서 회복 중 (체력 " + (int) p.getHealth() + ")";
