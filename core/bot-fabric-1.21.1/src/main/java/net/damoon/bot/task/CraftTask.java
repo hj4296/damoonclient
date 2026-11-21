@@ -36,7 +36,7 @@ public class CraftTask extends Task {
     private final int count;
     private int step, wait, tries;
     private CraftTask sub;
-    private BlockPos table;
+    private BlockPos table, roomDig;
     private String detail = "";
     private BlockPos placed;
     private int pickTicks;
@@ -142,10 +142,27 @@ public class CraftTask extends Task {
                         return S.RUNNING;
                     }
                     detail = "작업대 놓는 중";
+                    // 좁은 굴이라 놓을 칸이 없으면 옆 벽을 한 칸 파서 자리를 만듦
+                    if (roomDig != null) {
+                        if (!l.getBlockState(roomDig).getCollisionShape(l, roomDig).isEmpty()) { detail = "작업대 놓을 자리 파는 중"; net.damoon.bot.Act.dig(bot, roomDig); return S.RUNNING; }
+                        net.damoon.bot.Act.stopDig(bot);
+                        roomDig = null;
+                    }
+                    if (tries % 20 == 19) {
+                        BlockPos ft = net.damoon.bot.path.PathExec.feet(p);
+                        for (net.minecraft.core.Direction d : net.minecraft.core.Direction.Plane.HORIZONTAL) {
+                            BlockPos c = ft.relative(d);
+                            var cs = l.getBlockState(c);
+                            if (cs.getCollisionShape(l, c).isEmpty() || !net.damoon.bot.BlockUtil.breakable(l, c.getX(), c.getY(), c.getZ(), cs)
+                                    || net.damoon.bot.BlockUtil.fluidNear(l, c.getX(), c.getY(), c.getZ(), false)) continue;
+                            roomDig = c;
+                            break;
+                        }
+                    }
                     table = Placer.placeNear(bot, Items.CRAFTING_TABLE);
                 if (table != null) placed = table;
                     if (table != null) wait = 3;
-                    if (table == null && ++tries > 80) { bot.log("작업대 놓을 자리가 없음"); return S.FAILED; }
+                    if (table == null && ++tries > 200) { bot.log("작업대 놓을 자리가 없음"); return S.FAILED; }
                     return S.RUNNING;
                 }
                 detail = "작업대 여는 중";
