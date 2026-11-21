@@ -185,8 +185,16 @@ public final class Reflex {
                     double a = k * Math.PI / 8;
                     Vec3 d = new Vec3(Math.cos(a), 0, Math.sin(a));
                     boolean ok = true;
-                    for (double t = 1.0; t <= 3.0 && ok; t += 1.0)
+                    for (double t = 1.0; t <= 4.0 && ok; t += 1.0) {
                         if (!Bot.safeAheadToward(p, p.getX() + d.x * t, p.getZ() + d.z * t)) ok = false;
+                        // 벽에 막히지 않고 실제로 걸어갈 수 있는 쪽 (발·머리 높이가 비었거나 한 칸 오르면 되는 곳)
+                        net.minecraft.core.BlockPos c = net.minecraft.core.BlockPos.containing(p.getX() + d.x * t, p.getY() + 0.1, p.getZ() + d.z * t);
+                        var lv = bot.level();
+                        boolean feetFree = lv.getBlockState(c).getCollisionShape(lv, c).isEmpty();
+                        boolean headFree = lv.getBlockState(c.above()).getCollisionShape(lv, c.above()).isEmpty();
+                        boolean stepUp = !feetFree && headFree && lv.getBlockState(c.above(2)).getCollisionShape(lv, c.above(2)).isEmpty();
+                        if (!(feetFree && headFree) && !stepUp) ok = false;
+                    }
                     if (ok && d.dot(away) > bestDot) { bestDot = d.dot(away); pick = d; }
                 }
                 bot.nav.stop();
