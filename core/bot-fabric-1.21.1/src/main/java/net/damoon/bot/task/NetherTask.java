@@ -81,19 +81,6 @@ public class NetherTask extends Task {
                 bot.log("돌아갈 포털 (기억): " + portal.toShortString());
             }
         }
-        // 방패가 부서졌으면 (화염구·화살을 막다 닳음) 판자와 철로 바로 새로 만듦 — 방패 없이 블레이즈와 싸우면 불에 탐
-        boolean hasShield = p.getOffhandItem().is(Items.SHIELD) || Inv.has(p, Items.SHIELD);
-        if (shieldCraft != null || (!hasShield && bot.ticks > shieldRetry && Inv.count(p, Items.IRON_INGOT) >= 1
-                && Inv.count(p, s -> s.is(net.minecraft.tags.ItemTags.PLANKS)) >= 6 && !bot.reflex.turtle.sealed())) {
-            if (shieldCraft == null) { shieldCraft = new CraftTask(Items.SHIELD, 1); bot.log("방패가 부서짐 → 새로 만듦"); }
-            S r = shieldCraft.tick(bot);
-            detail = "방패 새로 만드는 중";
-            if (r != S.RUNNING) {
-                if (r == S.FAILED) shieldRetry = bot.ticks + 20 * 30;
-                shieldCraft = null;
-            }
-            return S.RUNNING;
-        }
         // 먹을 게 하나도 없고 체력이 저절로 안 차면 (배고픔 17 이하) 오버월드로 돌아가 사냥해 옴
         if (BeatGameTask.foodCount(p) == 0 && (p.getFoodData().getFoodLevel() < 18 || p.getHealth() < 10)) {
             if (!foodTrip) { foodTrip = true; bot.log("먹을 게 없음 → 포털로 돌아가 오버월드에서 음식을 구해 옴"); }
@@ -105,6 +92,30 @@ public class NetherTask extends Task {
             return S.RUNNING;
         }
         foodTrip = false;
+        // 방패가 부서졌으면 (화염구·화살을 막다 닳음) 판자와 철로 바로 새로 만듦 — 방패 없이 블레이즈와 싸우면 불에 탐
+        boolean hasShield = p.getOffhandItem().is(Items.SHIELD) || Inv.has(p, Items.SHIELD);
+        if (shieldCraft != null || (!hasShield && bot.ticks > shieldRetry && Inv.count(p, Items.IRON_INGOT) >= 1
+                && Inv.count(p, s -> s.is(net.minecraft.tags.ItemTags.PLANKS)) >= 6 && !bot.reflex.turtle.sealed() && calmAround(l, p))) {
+            if (shieldCraft == null) { shieldCraft = new CraftTask(Items.SHIELD, 1); bot.log("방패가 부서짐 → 새로 만듦"); }
+            S r = shieldCraft.tick(bot);
+            detail = "방패 새로 만드는 중";
+            if (r != S.RUNNING) {
+                if (r == S.FAILED) shieldRetry = bot.ticks + 20 * 30;
+                shieldCraft = null;
+            }
+            return S.RUNNING;
+        }
+        if (!hasShield && Inv.count(p, Items.IRON_INGOT) >= 1 && Inv.count(p, s -> s.is(net.minecraft.tags.ItemTags.PLANKS)) >= 6
+                && !bot.reflex.turtle.sealed() && !calmAround(l, p)) {
+            // 방패 없이 싸우지 않고, 조용한 곳(처음 스포너를 본 자리나 포털 쪽)으로 물러나서 만듦
+            bot.reflex.camp = false;
+            bot.reflex.building = false;
+            BlockPos to = safeSpot != null ? safeSpot : portal;
+            detail = "방패가 없음 → 조용한 곳으로 물러나 방패 만들기";
+            Nav.R nr = bot.nav.go(new Goal.Near(to, 3));
+            if (nr != Nav.R.RUNNING) { bot.nav.stop(); safeSpot = portal; }
+            return S.RUNNING;
+        }
         // 다리 놓을 블록이 모자라면 네더랙 캐기
         if ((Inv.count(p, Inv.throwaway()) < 24 && bot.ticks > rackGiveUp) || rack != null) {
             if (rack == null) {
@@ -353,6 +364,16 @@ public class NetherTask extends Task {
     }
 
     private boolean trapBoatLost() { return true; }
+
+    /** 블레이즈 20칸·다른 적 12칸 안에 없음 (작업대를 펴고 만들 수 있을 만큼 안전) */
+    private static boolean calmAround(ClientLevel l, LocalPlayer p) {
+        for (var e : l.entitiesForRendering()) {
+            if (!(e instanceof net.minecraft.world.entity.LivingEntity le) || !le.isAlive()) continue;
+            if (e instanceof Blaze && e.distanceTo(p) < 20) return false;
+            if (net.damoon.bot.Reflex.hostile(e) && e.distanceTo(p) < 12) return false;
+        }
+        return true;
+    }
 
     private static boolean isBlazeSpawner(ClientLevel l, BlockPos b) {
         BlockEntity be = l.getBlockEntity(b);

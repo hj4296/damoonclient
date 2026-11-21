@@ -431,7 +431,7 @@ public class BeatGameTask extends Task {
             }
             // 예비 방패 (화염구를 막다 보면 방패가 닳아 부서짐)
             int shields = Inv.count(p, Items.SHIELD) + (p.getOffhandItem().is(Items.SHIELD) ? 1 : 0);
-            if (shields < 2 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
+            if (shields < 3 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
                 if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "7. 예비 방패"; return run(bot, "shield2", () -> new CraftTask(Items.SHIELD, Inv.count(p, Items.SHIELD) + 1)); }
                 if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "7. 예비 방패용 판자"; return run(bot, "shield2planks", () -> new CraftTask(pl, want)); }
             }
@@ -611,7 +611,7 @@ public class BeatGameTask extends Task {
             return S.RUNNING;
         }
         int arrows = Inv.count(p, Items.ARROW);
-        if (Inv.has(p, Items.BOW) && arrows < 16 && !cool(bot, "arrows")) {
+        if (Inv.has(p, Items.BOW) && arrows < 32 && !cool(bot, "arrows")) {
             if (Inv.count(p, Items.FLINT) > 0 && Inv.count(p, Items.FEATHER) > 0 && Inv.count(p, Items.STICK) > 0) {
                 stage = no + ". 화살 만들기";
                 return run(bot, "arrow", () -> new CraftTask(Items.ARROW, arrows + 4));
