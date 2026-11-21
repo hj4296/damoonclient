@@ -33,6 +33,8 @@ public class NetherTask extends Task {
     private BlockPos fortWalk;
     private net.damoon.bot.EnderTrap trap;
     private CraftTask boatCraft;
+    private CraftTask shieldCraft;
+    private int shieldRetry;
     private boolean boatTried;
     private BlockPos safeSpot;
     private net.damoon.bot.BlazeBunker bunker, quick;
@@ -70,6 +72,19 @@ public class NetherTask extends Task {
             portal = Scan.nearest(l, f, 1, f.getY() - 4, f.getY() + 4, s -> s.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
             if (portal == null) portal = f;
             bot.log("네더 도착! 돌아갈 포털: " + portal.toShortString());
+        }
+        // 방패가 부서졌으면 (화염구·화살을 막다 닳음) 판자와 철로 바로 새로 만듦 — 방패 없이 블레이즈와 싸우면 불에 탐
+        boolean hasShield = p.getOffhandItem().is(Items.SHIELD) || Inv.has(p, Items.SHIELD);
+        if (shieldCraft != null || (!hasShield && bot.ticks > shieldRetry && Inv.count(p, Items.IRON_INGOT) >= 1
+                && Inv.count(p, s -> s.is(net.minecraft.tags.ItemTags.PLANKS)) >= 6 && !bot.reflex.turtle.sealed())) {
+            if (shieldCraft == null) { shieldCraft = new CraftTask(Items.SHIELD, 1); bot.log("방패가 부서짐 → 새로 만듦"); }
+            S r = shieldCraft.tick(bot);
+            detail = "방패 새로 만드는 중";
+            if (r != S.RUNNING) {
+                if (r == S.FAILED) shieldRetry = bot.ticks + 20 * 30;
+                shieldCraft = null;
+            }
+            return S.RUNNING;
         }
         // 다리 놓을 블록이 모자라면 네더랙 캐기
         if ((Inv.count(p, Inv.throwaway()) < 24 && bot.ticks > rackGiveUp) || rack != null) {
