@@ -269,6 +269,12 @@ public class BeatGameTask extends Task {
     }
 
     private S overworld(Bot bot, LocalPlayer p, ClientLevel l) {
+        // 포털 근처에 오면(네더에서 돌아옴 등) 자리를 기억해 둠 — 멀리 나갔다가도 새로 짓지 않고 돌아오게
+        if (bot.ticks % 40 == 3) {
+            BlockPos ft = PathExec.feet(p);
+            BlockPos np = net.damoon.bot.Scan.nearest(l, ft, 1, ft.getY() - 8, ft.getY() + 8, st -> st.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
+            if (np != null) rememberOverworldPortal(np);
+        }
         S rec = recover(bot, p, l);
         if (rec != null) return rec;
         bot.trace = "overworld";

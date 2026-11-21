@@ -123,7 +123,7 @@ public final class Tower {
         if (p.getY() < base.getY() - 0.5) { active = false; bot.log("기둥 밑으로 떨어짐 → 다시 판단"); return false; }
         if (Math.abs(feet.getX() - base.getX()) > 0 || Math.abs(feet.getZ() - base.getZ()) > 0) {
             // 밀려 떨어짐
-            if (p.onGround()) { active = false; bot.log("기둥에서 밀려남 → 다시 판단"); return false; }
+            if (p.onGround()) { active = false; cooldownUntil = bot.ticks + 20 * 15; bot.log("기둥에서 밀려남 → 15초 동안 방패로 싸움"); return false; }
         }
         if (phase == 0) {
             info = "기둥 쌓는 중 (" + (feet.getY() - base.getY()) + "/" + height + ")";

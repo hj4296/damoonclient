@@ -80,6 +80,9 @@ public class ObsidianTask extends Task {
     }
 
     private static boolean safeObsidian(ClientLevel l, BlockPos b) {
+        // 포털 틀은 절대 캐지 않음 (불 붙은 포털 블록이 2칸 안에 있으면 틀임)
+        for (BlockPos q : BlockPos.betweenClosed(b.offset(-2, -2, -2), b.offset(2, 2, 2)))
+            if (l.getBlockState(q).is(Blocks.NETHER_PORTAL)) return false;
         BlockState below = l.getBlockState(b.below());
         return below.getFluidState().isEmpty() && !below.isAir() && !BlockUtil.fluidNear(l, b.getX(), b.getY(), b.getZ(), true);
     }
@@ -192,12 +195,12 @@ public class ObsidianTask extends Task {
         if (Act.reach(p, new net.minecraft.world.phys.AABB(lava)) > 3.8 || p.getEyePosition().distanceTo(aim) > 4.2) {
             // 같은 용암으로 45초 넘게 못 다가가면 (물살에 밀리고 끼이기를 반복) 다른 용암
             if (!lava.equals(approachLava)) { approachLava = lava; approachTicks = 0; }
-            if (++approachTicks > 20 * 45) {
-                bot.log("용암에 45초 동안 못 다가감 → 다른 용암 " + lava.toShortString());
+            if (++approachTicks > 20 * 30) {
+                bot.log("용암에 30초 동안 못 다가감 → 다른 용암 " + lava.toShortString());
                 bot.nav.stop(); badLava.add(lava.asLong()); lava = null; approachLava = null;
                 return S.RUNNING;
             }
-            Nav.R r = bot.nav.go(new Goal.Reach(lava, 2.4));
+            Nav.R r = bot.nav.go(new Goal.Reach(lava, 3.0)); // 눈에서 용암 칸까지 3칸이면 겨냥점(바닥 가운데)까지 4.2 안
             if (r == Nav.R.FAILED || (r == Nav.R.ARRIVED && p.getEyePosition().distanceTo(aim) > 4.2)) { bot.nav.stop(); badLava.add(lava.asLong()); lava = null; }
             return S.RUNNING;
         }
