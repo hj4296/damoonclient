@@ -163,6 +163,9 @@ public final class Turtle {
         ClientLevel l = bot.level();
         // 근접 몹이 바로 붙어 있으면 (그 칸엔 벽을 못 놓고, 짓는 동안 맞음) 먼저 방패로 밀어내고 나서 지음
         boolean engaged = near != null && near.distanceTo(p) < 3.8;
+        // 블레이즈가 바로 옆이면 벽 놓는 사이 칼 맞듯 근접 공격을 연달아 맞음 → 감싸지 않음 (방패 들고 물러남)
+        for (Entity e : l.entitiesForRendering())
+            if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && b.distanceTo(p) < 3.5) { engaged = true; break; }
         if (!active) {
             if (bot.ticks < cooldownUntil || !danger(bot, p) || !p.onGround() || p.isInLava()) return false;
             // 용암 옆에선 감싸지 않음 (벽 놓는 사이 불에 타 죽음) — 먼저 벗어남

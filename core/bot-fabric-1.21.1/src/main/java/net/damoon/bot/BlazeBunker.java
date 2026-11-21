@@ -30,7 +30,7 @@ public final class BlazeBunker {
     private int buildTicks;
     private boolean sally;
     /** 벙커 없이 스포너 위·옆에서 방패+칼로 싸움 (블레이즈가 스폰되자마자 칼이 닿음) */
-    private boolean open = true;
+    private boolean open = false;
     private int sallyStart, lastGain, lastRods = -1, sallyRods = -1;
     public String info = "";
 
@@ -81,11 +81,33 @@ public final class BlazeBunker {
             BlockPos o = c.relative(f);
             if (!l.getBlockState(o).isAir() || !l.getBlockState(o.above()).isAir()) continue;
             if (lavaNear(l, c, 2)) continue;
+            // 창문(앞쪽 머리 높이 한 칸)으로 스포너가 실제로 보여야 함 — 안 보이면 벽에 갇혀 아무것도 못 잡음
+            if (!windowSees(l, p, c, f, sp)) continue;
             // 스포너 가까이(블레이즈가 생기는 곳 바로 옆) 우선: 생기자마자 칼이 닿음
             double score = Math.sqrt(c.distSqr(me)) * 0.25 + ds * 2.0 + Math.abs(c.getY() - sp.getY()) * 1.5;
             if (score < bs) { bs = score; best = c; outFront[0] = f; }
         }
         return best;
+    }
+
+    /** 칸 c에 섰을 때 눈에서 스포너(블레이즈가 뜨는 높이)까지의 선이 앞쪽 창문 칸으로 나가고, 그 뒤로 막힌 블록이 없는지 */
+    static boolean windowSees(ClientLevel l, LocalPlayer p, BlockPos c, Direction f, BlockPos sp) {
+        Vec3 eye = new Vec3(c.getX() + 0.5, c.getY() + 1.62, c.getZ() + 0.5);
+        for (double ty : new double[]{0.5, 1.5}) {
+            Vec3 to = new Vec3(sp.getX() + 0.5, sp.getY() + ty, sp.getZ() + 0.5);
+            Vec3 d = to.subtract(eye);
+            double along = f.getStepX() != 0 ? d.x * f.getStepX() : d.z * f.getStepZ();
+            if (along <= 0.3) return false;
+            double t = 0.5 / along; // 칸 가운데에서 앞면까지 0.5칸
+            Vec3 exit = eye.add(d.scale(t));
+            double side = f.getStepX() != 0 ? exit.z - c.getZ() : exit.x - c.getX();
+            if (side < 0.05 || side > 0.95) return false;
+            if (exit.y < c.getY() + 1.05 || exit.y > c.getY() + 1.95) return false;
+            var hr = l.clip(new net.minecraft.world.level.ClipContext(exit.add(d.normalize().scale(0.05)), to,
+                    net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p));
+            if (hr.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !hr.getBlockPos().equals(sp)) return false;
+        }
+        return true;
     }
 
     private static boolean lavaNear(ClientLevel l, BlockPos c, int r) {
@@ -168,7 +190,11 @@ public final class BlazeBunker {
             Direction[] f = new Direction[1];
             cell = pick(l, p, spawner, f);
             front = f[0];
-            if (cell == null) return R.FAILED;
+            if (cell == null) {
+                // 창문으로 스포너가 보이는 벙커 자리가 없음 → 스포너 위에서 방패+칼
+                open = true;
+                return R.RUNNING;
+            }
             bot.log("블레이즈 벙커 자리: " + cell.toShortString() + " (스포너 쪽 열어 둠)");
         }
         BlockPos feet = PathExec.feet(p);
