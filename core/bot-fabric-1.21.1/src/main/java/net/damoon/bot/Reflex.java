@@ -770,7 +770,15 @@ public final class Reflex {
             int v = Inv.foodValue(s);
             if (v > bestVal) { bestVal = v; best = i; }
         }
-        if (best < 0) return false;
+        if (best < 0) {
+            // 먹을 게 없는데 체력이 낮고 배고픔이 18 밑이라 자연 회복이 안 되면: 썩은 살점·거미 눈이라도 먹음
+            // (독·허기는 죽이지 못함. 배고픔이 18 넘으면 다시 회복이 시작됨)
+            if (p.getHealth() < 8 && p.getFoodData().getFoodLevel() < 18) {
+                if (Inv.select(p, s -> s.is(Items.ROTTEN_FLESH))) return true;
+                if (Inv.select(p, s -> s.is(Items.SPIDER_EYE))) return true;
+            }
+            return false;
+        }
         ItemStack want = p.getInventory().items.get(best);
         return Inv.select(p, s -> s == want);
     }
