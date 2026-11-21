@@ -226,7 +226,10 @@ public final class PathExec {
             if (p.isSprinting()) c.fwd = hd > 0.6;
         }
         if (to.move == Move.ASCEND && (p.onGround() || p.isInWater()) && (hd < 1.25 || p.horizontalCollision)) c.jump = true;
-        if (p.isInWater() && to.y >= Math.floor(p.getY())) c.jump = true;
+        if (p.isInWater() && to.y <= Math.floor(p.getY()) && p.getY() > to.y + 0.2 && (p.horizontalCollision || to.y < Math.floor(p.getY()))) {
+            // 물속에서 목표가 아래이거나, 머리가 옆 블록에 걸려 못 가면 가라앉음 (점프하면 계속 떠올라 끼임)
+            c.sneak = true;
+        } else if (p.isInWater() && to.y >= Math.floor(p.getY())) c.jump = true;
         if (p.horizontalCollision && p.onGround() && to.y > p.getY() - 0.5) c.jump = true;
         if (p.isInLava()) { c.jump = true; c.fwd = true; }
     }
