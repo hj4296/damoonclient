@@ -95,8 +95,9 @@ public final class PitEscape {
         for (BlockPos c : dig) {
             if (pass(l, c)) continue;
             var s = l.getBlockState(c);
-            if (!BlockUtil.breakable(l, c.getX(), c.getY(), c.getZ(), s) || BlockUtil.fluidNear(l, c.getX(), c.getY(), c.getZ(), true)) {
-                turn(bot, "못 캐는 블록/용암");
+            // 용암뿐 아니라 물도 피함 (물이 굴로 쏟아지면 익사)
+            if (!BlockUtil.breakable(l, c.getX(), c.getY(), c.getZ(), s) || BlockUtil.fluidNear(l, c.getX(), c.getY(), c.getZ(), false)) {
+                turn(bot, "못 캐는 블록/용암·물");
                 return turns <= 8;
             }
             info = "계단 파는 중 (y " + f.getY() + " → " + surf + ")";
