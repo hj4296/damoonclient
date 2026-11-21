@@ -108,6 +108,11 @@ public class CraftTask extends Task {
             return S.DONE;
         }
         if (wait > 0) { wait--; return S.RUNNING; }
+        // 가방이 꽉 차면 만든 것을 꺼낼 자리가 없음 → 창을 닫고 잡동사니를 버림
+        if (Inv.emptySlots(p) == 0) {
+            if (p.containerMenu != p.inventoryMenu) { p.closeContainer(); wait = 2; return S.RUNNING; }
+            if (Inv.dropJunk(p)) { wait = 3; return S.RUNNING; }
+        }
         RecipeHolder<CraftingRecipe> h = recipe(l, p, item);
         if (h == null) { bot.log("조합법 없음: " + item); return S.FAILED; }
         CraftingRecipe r = h.value();

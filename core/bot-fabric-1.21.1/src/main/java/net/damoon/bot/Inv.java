@@ -176,7 +176,28 @@ public final class Inv {
             Items.WHEAT_SEEDS, Items.ROTTEN_FLESH, Items.POISONOUS_POTATO, Items.BONE, Items.MOSS_BLOCK, Items.CLAY_BALL,
             Items.OAK_SAPLING, Items.DARK_OAK_SAPLING, Items.SPRUCE_SAPLING, Items.BIRCH_SAPLING, Items.DRIPSTONE_BLOCK, Items.POINTED_DRIPSTONE,
             Items.SAND, Items.RED_SAND, Items.SANDSTONE, Items.AZALEA, Items.FLOWERING_AZALEA, Items.MOSS_CARPET, Items.GLOW_BERRIES,
-            Items.SMOOTH_BASALT, Items.AMETHYST_SHARD);
+            Items.SMOOTH_BASALT, Items.AMETHYST_SHARD, Items.RAW_COPPER, Items.COPPER_INGOT, Items.RAIL, Items.OAK_FENCE, Items.COBWEB,
+            Items.ACACIA_SAPLING, Items.JUNGLE_SAPLING, Items.CHERRY_SAPLING, Items.MANGROVE_PROPAGULE, Items.KELP, Items.DANDELION, Items.POPPY,
+            Items.GLOW_LICHEN, Items.VINE, Items.HANGING_ROOTS, Items.ROOTED_DIRT, Items.MUD, Items.SPIDER_EYE, Items.CHEST_MINECART, Items.LAPIS_LAZULI,
+            Items.REDSTONE, Items.EMERALD, Items.FLOWER_POT);
+
+    /** 더 좋은 것이 있어 필요 없어진 도구 (나무·돌 곡괭이, 나무·돌 칼) */
+    public static boolean obsolete(LocalPlayer p, ItemStack s) {
+        boolean goodPick = has(p, Items.IRON_PICKAXE) || has(p, Items.DIAMOND_PICKAXE);
+        if (s.is(Items.WOODEN_PICKAXE)) return goodPick || has(p, Items.STONE_PICKAXE);
+        if (s.is(Items.STONE_PICKAXE)) return has(p, Items.DIAMOND_PICKAXE) || count(p, Items.IRON_PICKAXE) >= 1 && has(p, Items.DIAMOND);
+        if (s.is(Items.WOODEN_SWORD)) return has(p, Items.STONE_SWORD) || has(p, Items.IRON_SWORD);
+        if (s.is(Items.STONE_SWORD)) return has(p, Items.IRON_SWORD) || has(p, Items.DIAMOND_SWORD);
+        if (s.is(Items.WOODEN_AXE)) return has(p, Items.STONE_AXE);
+        if (s.is(Items.WOODEN_SHOVEL) || s.is(Items.STONE_SHOVEL)) return true;
+        return false;
+    }
+
+    public static int emptySlots(LocalPlayer p) {
+        int n = 0;
+        for (int i = 0; i < 36; i++) if (p.getInventory().items.get(i).isEmpty()) n++;
+        return n;
+    }
 
     /** 빈 칸이 적으면 잡동사니를 버림 (블록용 조약돌은 2묶음까지만). 버렸으면 true */
     public static boolean dropJunk(LocalPlayer p) {
@@ -189,7 +210,7 @@ public final class Inv {
         for (int i = 0; i < 36; i++) {
             ItemStack s = inv.items.get(i);
             if (s.isEmpty() || i == inv.selected) continue;
-            boolean junk = JUNK.contains(s.getItem());
+            boolean junk = JUNK.contains(s.getItem()) || obsolete(p, s);
             if (!junk && THROWAWAY.contains(s.getItem())) {
                 if (keepBlocks > 0) { keepBlocks -= s.getCount(); continue; }
                 junk = true;
