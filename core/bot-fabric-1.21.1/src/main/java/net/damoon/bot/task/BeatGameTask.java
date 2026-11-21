@@ -463,6 +463,13 @@ public class BeatGameTask extends Task {
                     int want = Inv.count(p, out) + Inv.count(p, rawMeat());
                     return run(bot, "cook", () -> new SmeltTask(rawMeat(), out, want));
                 }
+                // 동물은 땅 위에 있음 → 땅속이면 먼저 올라감
+                BlockPos ff = PathExec.feet(p);
+                int ftop = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, ff.getX(), ff.getZ());
+                if (surfaceTrip(bot, ff, ftop, ff.getY() < ftop - 4 && l.getBrightness(net.minecraft.world.level.LightLayer.SKY, ff) < 8)) {
+                    detail = "땅 위로 올라가는 중";
+                    return S.RUNNING;
+                }
                 if (hunterFood == null) hunterFood = new Hunter(Hunter.foodAnimals(), st -> st.has(net.minecraft.core.component.DataComponents.FOOD) || st.is(Items.LEATHER) || st.is(Items.FEATHER));
                 Hunter.R hr = hunterFood.tick(bot);
                 detail = hunterFood.info;
