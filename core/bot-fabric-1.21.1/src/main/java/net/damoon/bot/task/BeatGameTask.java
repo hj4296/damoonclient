@@ -227,7 +227,7 @@ public class BeatGameTask extends Task {
         // ---- 밤: 침대가 있으면 자서 밤을 건너뜀 ----
         // 진주를 모을 때(막대는 다 모았고 진주가 모자람)는 밤에 자지 않음 — 엔더맨은 밤에 나옴
         boolean pearlTime = NetherTask.rods(p) >= NetherTask.RODS && NetherTask.pearls(p) < NetherTask.PEARLS;
-        if ((BedTask.night(l) && BedTask.hasBed(p) && !pearlTime && !cool(bot, "bed")) || sub instanceof BedTask) {
+        if ((BedTask.night(l) && BedTask.hasBed(p) && !pearlTime && !cool(bot, "bed") && bot.ticks > BedTask.nextTry) || sub instanceof BedTask) {
             stage = "밤 — 침대에서 자기";
             return run(bot, "bed", BedTask::new);
         }

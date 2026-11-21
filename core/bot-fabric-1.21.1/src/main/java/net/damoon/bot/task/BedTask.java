@@ -31,6 +31,10 @@ public class BedTask extends Task {
         return Inv.count(p, s -> s.is(ItemTags.BEDS)) > 0;
     }
 
+    private int useTries, placements, pickTicks;
+    /** 잘 수 없었으면 이때까지 다시 시도하지 않음 */
+    public static int nextTry;
+
     @Override
     public S tick(Bot bot) {
         LocalPlayer p = bot.p();
@@ -61,9 +65,24 @@ public class BedTask extends Task {
             if (++tries % 20 == 0) bot.ctl.look(p.getYRot() + 90, 30f);
             return tries > 200 ? S.FAILED : S.RUNNING;
         }
+        // 여러 번 눌러도 못 누우면 (침대가 막힘·몹이 근처) 침대를 다시 챙겨 다른 곳에 놓거나 포기
+        if (useTries > 6) {
+            detail = "못 누움 → 침대 다시 챙기는 중";
+            if (l.getBlockState(bed).getBlock() instanceof BedBlock && !Placer.pickUp(bot, bed, l.getBlockState(bed).getBlock(), bedItem)) {
+                return ++pickTicks > 20 * 20 ? S.FAILED : S.RUNNING;
+            }
+            bed = null;
+            useTries = 0;
+            pickTicks = 0;
+            if (++placements >= 3) { nextTry = bot.ticks + 20 * 60 * 3; return S.FAILED; }
+            bot.ctl.look(p.getYRot() + 120, 30f);
+            wait = 5;
+            return S.RUNNING;
+        }
         detail = "침대에 눕는 중";
         Placer.open(bot, bed);
         wait = 10;
+        useTries++;
         if (++tries > 300) return S.FAILED;
         return S.RUNNING;
     }
