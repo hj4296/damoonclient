@@ -70,7 +70,8 @@ public final class Tower {
             if (d < cd) { cd = d; closest = (LivingEntity) e; }
         }
         boolean ranged = false;
-        if (!active) {
+        // 원거리 몹(스켈레톤) 때문에 기둥을 쌓는 건 활이 있어 위에서 쏠 수 있을 때만 (없으면 기둥 위는 과녁일 뿐)
+        if (!active && Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW)) {
             for (Entity e : l.entitiesForRendering())
                 if (Reflex.hostile(e) && Reflex.ranged(e) && e.distanceTo(p) < 20 && p.hasLineOfSight(e)) { ranged = true; break; }
         }
@@ -167,6 +168,16 @@ public final class Tower {
             if (feet.getY() < top - 1 && p.onGround()) { phase = 0; ticks = 0; return true; }
             bot.ctl.sneak = true;
             if (closest == null || cd > 10) calm++; else calm = 0;
+            // 방패도 활도 없이 기둥 위에서 화살을 맞고 있으면 버티지 말고 바로 내려감 (내려가서 칼로 잡거나 피함)
+            boolean bowReady = Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW);
+            if (!bowReady && !p.getOffhandItem().is(Items.SHIELD) && bot.lastAttacker != null && Reflex.ranged(bot.lastAttacker)
+                    && bot.ticks - bot.lastAttackTick < 20 * 2 && ticks > 20) {
+                forcedDown = true;
+                phase = 2;
+                ticks = 0;
+                bot.log("기둥 위에서 화살을 맞음 (방패·활 없음) → 내려감");
+                return true;
+            }
             // 몹이 밑에서 서성이기만 하고 안 다가오면 끝이 없음 → 1분 넘게 위에 있었으면 내려가 방패·칼로 상대
             if (calm > 60 || ticks > 20 * 60) {
                 forcedDown = calm <= 60;

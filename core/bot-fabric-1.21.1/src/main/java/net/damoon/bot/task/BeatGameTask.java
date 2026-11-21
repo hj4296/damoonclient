@@ -329,6 +329,11 @@ public class BeatGameTask extends Task {
             if (r == Hunter.R.NONE) { fail(bot, "bed-make", 20 * 60 * 3); bot.nav.stop(); }
             return S.RUNNING;
         }
+        // 방패가 부서졌는데 철이 있으면 무엇보다 먼저 새로 만듦 (방패 없이 스켈레톤·좀비를 만나면 위험)
+        if (!p.getOffhandItem().is(Items.SHIELD) && !Inv.has(p, Items.SHIELD) && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shieldnow")) {
+            if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "방패가 부서짐 → 새 방패"; return run(bot, "shieldnow", () -> new CraftTask(Items.SHIELD, 1)); }
+            if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "새 방패용 판자"; return run(bot, "shieldnowplanks", () -> new CraftTask(pl, want)); }
+        }
         // ---- 3. 음식 ----
         int food = foodCount(p);
         int raw = Inv.count(p, rawMeat());
@@ -382,6 +387,12 @@ public class BeatGameTask extends Task {
                 stage = "5. 철 장비: " + g.getDescription().getString();
                 return run(bot, "g" + g, () -> new CraftTask(g, 1));
             }
+        }
+        // 예비 방패 하나 (화살을 막다 보면 닳아 부서짐 — 부서지는 순간 바로 바꿔 듦)
+        if (p.getOffhandItem().is(Items.SHIELD) && !Inv.has(p, Items.SHIELD) && Inv.count(p, Items.IRON_INGOT) >= 1
+                && Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6 && !cool(bot, "spareshield")) {
+            stage = "5. 예비 방패";
+            return run(bot, "spareshield", () -> new CraftTask(Items.SHIELD, 1));
         }
         // 줍기: 근처에 떨어진 쓸 만한 것 (실, 깃털, 화살, 활, 진주 등)
         S loot = loot(bot, p, l);
