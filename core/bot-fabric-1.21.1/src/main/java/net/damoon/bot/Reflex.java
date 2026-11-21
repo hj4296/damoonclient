@@ -85,7 +85,10 @@ public final class Reflex {
         }
         if (proj != null && p.getOffhandItem().is(Items.SHIELD)) {
             if (eating) eating = false;
+            // 활을 당기던 중이면 쏘지 않고 취소 (칼로 바꾸면 당기기가 풀림) — 놓으면 약한 화살이 나가 화살만 버림. 사용 키는 계속 눌러 방패를 듦
+            boolean wasDrawing = p.isUsingItem() && p.getUseItem().is(Items.BOW);
             Inv.selectWeapon(p);
+            if (wasDrawing) { archer.reset(); bot.ctl.use = true; doing = "투사체! 활 취소하고 방패"; return true; }
             if (p.isUsingItem() && !p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; doing = "투사체! 손에 든 것 내림"; return true; }
             float multi = bestShieldYaw(p, proj);
             if (!Float.isNaN(faceYaw)) bot.ctl.look(faceYaw, 10f);
@@ -494,7 +497,7 @@ public final class Reflex {
                 doing = "블레이즈 활로 저격";
                 return true;
             }
-            if (danger && drawing) { bot.ctl.use = false; archer.reset(); return true; }
+            if (danger && drawing) { Inv.selectWeapon(p); bot.ctl.use = true; archer.reset(); return true; }
             Inv.selectWeapon(p);
             bot.ctl.lookAt(p, bz.getBoundingBox().getCenter());
             bot.ctl.use = true;
