@@ -27,7 +27,7 @@ public final class Miner {
     private final Predicate<ItemStack> item;
     private final int want;
     private final boolean needTool;
-    private BlockPos target;
+    private BlockPos target, digTarget;
     private int scanTick, noFind, targetTicks;
     private final Set<Long> bad = new HashSet<>();
     public int radius = 24;
@@ -102,7 +102,9 @@ public final class Miner {
         double reach = Act.reach(p, new net.minecraft.world.phys.AABB(target));
         info = "캐는 중 (" + have + "/" + want + ") 거리 " + String.format("%.1f", reach);
         bot.trace = "miner-reach " + target.toShortString();
-        if (reach <= 4.8) {
+        // 손이 닿을락 말락 하면 캐기·다가가기가 번갈아 바뀌며 캐던 것이 계속 처음부터 → 한 번 캐기 시작하면 조금 더 멀어도 계속 캠
+        if (reach <= (target.equals(digTarget) ? 5.2 : 4.8)) {
+            digTarget = target;
             bot.trace = "miner-dig";
             bot.nav.stop();
             // 시야를 가리는 블록(잎 등)이 있으면 그것부터 부숨
@@ -117,6 +119,7 @@ public final class Miner {
             if (!Act.dig(bot, dig)) bad.add(target.asLong());
             return R.RUNNING;
         }
+        digTarget = null;
         Act.stopDig(bot);
         Nav.R r = bot.nav.go(new Goal.Reach(target, 3.6));
         if (r == Nav.R.FAILED) {
