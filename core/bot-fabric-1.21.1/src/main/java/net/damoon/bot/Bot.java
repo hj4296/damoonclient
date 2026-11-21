@@ -89,6 +89,10 @@ public final class Bot {
     private float lastHp = -1;
 
     /** 맞을 때마다 원인·방향·방패 상태를 기록 (전투 디버깅용) */
+    /** 마지막으로 나를 때린(쏜) 몹과 그 때 */
+    public net.minecraft.world.entity.Entity lastAttacker;
+    public int lastAttackTick = -10000;
+
     private void trackDamage() {
         var p = mc().player;
         float hp = p.getHealth();
@@ -97,6 +101,8 @@ public final class Bot {
             String who = "-", ang = "-";
             if (src != null && src.getEntity() != null) {
                 var e = src.getEntity();
+                lastAttacker = e;
+                lastAttackTick = ticks;
                 who = e.getName().getString() + String.format("@%.1f", e.distanceTo(p));
                 double a = Math.toDegrees(Math.atan2(e.getZ() - p.getZ(), e.getX() - p.getX())) - 90 - p.getYRot();
                 a = ((a % 360) + 540) % 360 - 180;

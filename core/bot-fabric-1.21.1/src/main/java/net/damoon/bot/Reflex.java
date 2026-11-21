@@ -90,6 +90,22 @@ public final class Reflex {
             if (Math.abs(diff) <= 140) faceYaw = a1 + diff / 2;
             else proj = null;
         }
+        // 방금 화살을 쏴서 맞힌 몹(스켈레톤 등)이 있으면 그쪽을 계속 보며 방패를 듦 — 화살은 3틱 만에 날아와서 보고 나서 돌면 늦음
+        if (proj == null && p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed() && bot.lastAttacker instanceof LivingEntity sh
+                && sh.isAlive() && ranged(sh) && bot.ticks - bot.lastAttackTick < 20 * 5 && sh.distanceTo(p) < 20
+                && p.hasLineOfSight(sh) && nearMelee(p, 3.0) == null && !(sh instanceof net.minecraft.world.entity.monster.Blaze)) {
+            if (eating) { eating = false; bot.ctl.use = false; }
+            boolean wasDrawing = p.isUsingItem() && p.getUseItem().is(Items.BOW);
+            Inv.selectWeapon(p);
+            if (wasDrawing) archer.reset();
+            bot.ctl.lookAt(p, sh.getEyePosition());
+            bot.ctl.speed = 45f;
+            bot.ctl.use = true;
+            // 막으면서 다가가 벰 (낭떠러지가 아니면)
+            if (sh.distanceTo(p) > 2.5 && Bot.safeAheadToward(p, sh.getX(), sh.getZ())) bot.ctl.moveToward(p, sh.position());
+            doing = "쏜 " + sh.getName().getString() + " 쪽으로 방패 들고 다가가는 중";
+            return true;
+        }
         if (proj != null && p.getOffhandItem().is(Items.SHIELD)) {
             if (eating) eating = false;
             // 활을 당기던 중이면 쏘지 않고 취소 (칼로 바꾸면 당기기가 풀림) — 놓으면 약한 화살이 나가 화살만 버림. 사용 키는 계속 눌러 방패를 듦
