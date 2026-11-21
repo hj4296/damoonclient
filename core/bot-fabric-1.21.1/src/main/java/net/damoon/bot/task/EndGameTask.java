@@ -173,8 +173,7 @@ public class EndGameTask extends Task {
             return crystals(bot, p, l, crystals);
         }
         // 크리스탈을 다 부순 뒤: 엔드 돌 대피소(드래곤이 못 부숨)에서 창문으로 머리를 쏘고, 화살이 없으면 앉았을 때만 나가서 벰
-        S sh = hole(bot, p, l, dragon);
-        if (sh != null) return sh;
+        // (구멍·대피소는 브레스 구름이 들어오면 빠져나갈 곳이 없어서 쓰지 않음: 열린 곳에서 방패·회피·활·칼)
         return fight(bot, p, l, dragon);
     }
 
@@ -815,12 +814,27 @@ public class EndGameTask extends Task {
             Vec3 fwdDir = new Vec3(hc.x - bc.x, 0, hc.z - bc.z);
             fwdDir = fwdDir.lengthSqr() < 1e-3 ? new Vec3(1, 0, 0) : fwdDir.normalize();
             Vec3 toMe = new Vec3(p.getX() - hc.x, 0, p.getZ() - hc.z);
-            boolean inFront = toMe.lengthSqr() > 1e-3 && toMe.normalize().dot(fwdDir) > 0.6;
-            if (r > 2.9 || inFront) {
+            boolean inFront = toMe.lengthSqr() > 1e-3 && toMe.normalize().dot(fwdDir) > 0.85;
+            // 목 둘레 1칸 안은 맞음 → 목 상자에서 1.4칸 이상
+            double neckGap = Act.reach(p, d.getSubEntities()[1].getBoundingBox()) - 1.32;
+            boolean neckDanger = neckGap < 1.2;
+            // 체력이 낮으면 다가가지 않고 떨어져서 방패
+            if (p.getHealth() < 14) {
+                detail = hp + " — 체력이 낮아 떨어져서 방패 들고 회복";
+                bot.ctl.lookAt(p, hc);
+                Inv.selectWeapon(p);
+                bot.ctl.use = r < 9;
+                if (r < 8) bot.ctl.back = net.damoon.bot.Reflex.safeBehindPublic(p);
+                bot.reflex.holdEating = r < 9;
+                return S.RUNNING;
+            }
+            if (r > 2.9 || inFront || neckDanger) {
                 detail = hp + " — 내려앉음! 머리 옆으로 감" + (inFront ? " (정면은 브레스)" : "");
                 archer.reset();
+                // 머리 정면에서 45° 비낀 대각선 (목에서 멀고 브레스 정면도 피함)
                 Vec3 side = new Vec3(-fwdDir.z, 0, fwdDir.x);
-                Vec3 a = hc.add(side.scale(2.7)), b2 = hc.subtract(side.scale(2.7));
+                Vec3 diagA = fwdDir.add(side).normalize(), diagB = fwdDir.subtract(side).normalize();
+                Vec3 a = hc.add(diagA.scale(3.0)), b2 = hc.add(diagB.scale(3.0));
                 Vec3 tgt = p.position().distanceToSqr(a) < p.position().distanceToSqr(b2) ? a : b2;
                 BlockPos tp = BlockPos.containing(tgt.x, p.getY(), tgt.z);
                 Nav.R nr = bot.nav.go(new Goal.Near(tp, 1.2));

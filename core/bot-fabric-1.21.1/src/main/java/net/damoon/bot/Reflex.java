@@ -255,14 +255,12 @@ public final class Reflex {
                     double dd = part.getBoundingBox().distanceToSqr(p.getEyePosition());
                     if (dd < best) { best = dd; at = part.getBoundingBox().getCenter(); }
                 }
-                Vec3 v = dr.position().subtract(dr.xo, dr.yo, dr.zo);
-                Vec3 to = p.position().subtract(dr.position());
-                boolean closing = v.lengthSqr() > 0.01 && v.dot(to) > 0;
-                if (at != null && best < 20 * 20 && closing) {
+                // 앉아 있지 않은 드래곤이 25칸 안이면 항상 몸통 쪽으로 방패 (다가올 때 들면 준비가 늦음)
+                if (at != null && best < 25 * 25 && dr.distanceTo(p) < 30) {
                     if (eating) { eating = false; }
                     Inv.selectWeapon(p);
                     if (p.isUsingItem() && !p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; return true; }
-                    bot.ctl.lookAt(p, at);
+                    bot.ctl.lookAt(p, dr.position().add(0, 1, 0));
                     bot.ctl.speed = 45f;
                     bot.ctl.use = true;
                     doing = "돌진하는 드래곤을 방패로 막는 중";
