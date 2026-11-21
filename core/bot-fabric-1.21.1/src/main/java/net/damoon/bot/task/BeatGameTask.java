@@ -180,7 +180,7 @@ public class BeatGameTask extends Task {
         BlockPos d = bot.deathPos;
         // 용암에서 죽었으면 물건은 이미 탔고, 가면 또 빠짐 → 안 감
         for (BlockPos q : BlockPos.betweenClosed(d.offset(-2, -2, -2), d.offset(2, 1, 2))) {
-            if (BlockUtil.isLava(l.getBlockState(q))) { bot.log("죽은 자리가 용암 → 물건은 포기"); bot.deathPos = null; return null; }
+            if (net.damoon.bot.BlockUtil.isLava(l.getBlockState(q))) { bot.log("죽은 자리가 용암 → 물건은 포기"); bot.deathPos = null; return null; }
         }
         double dist = Math.sqrt(p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(d)));
         if (dist > 600) { bot.deathPos = null; return null; }
