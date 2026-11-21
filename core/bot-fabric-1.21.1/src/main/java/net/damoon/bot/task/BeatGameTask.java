@@ -68,6 +68,23 @@ public class BeatGameTask extends Task {
 
     /** 하위 작업 실행 (같은 key면 이어서) */
     private S run(Bot bot, String key, java.util.function.Supplier<Task> make) {
+        // 방금 실패한 작업(재료 부족 등)을 틱마다 다시 시도하지 않음:
+        // 그 사이 가장 흔한 부족 재료인 나무를 구해 둠 (오버월드), 아니면 잠깐 둘러봄
+        if (cool(bot, key) && (sub == null || !subKey.equals(key))) {
+            LocalPlayer p = bot.p();
+            if (bot.ticks % 200 == 0) bot.log(key + " 대기 중 (재료 부족) → 그동안 " + (bot.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && planksEq(p) < 24 ? "나무 모으기" : "둘러보기"));
+            if (bot.level().dimension() == net.minecraft.world.level.Level.OVERWORLD && planksEq(p) < 24) {
+                detail = "재료 부족 → 나무 모으는 중";
+                BlockPos f = PathExec.feet(p);
+                int top = bot.level().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, f.getX(), f.getZ());
+                if (surfaceTrip(bot, f, top, f.getY() < top - 4 && (miner == null || !minerKey.equals("logs") || !miner.busy()))) return S.RUNNING;
+                Predicate<ItemStack> lg = s -> s.is(ItemTags.LOGS);
+                return mine(bot, "logs", s -> s.is(BlockTags.LOGS), lg, Inv.count(p, lg) + 6, false, 6, 20);
+            }
+            // 네더·엔드에선 아무 데나 돌아다니면 위험 → 그 자리에서 잠깐 기다림 (반사 행동은 계속)
+            if (bot.level().dimension() != net.minecraft.world.level.Level.OVERWORLD) { bot.nav.stop(); detail = "잠깐 기다리는 중 (" + key + ")"; return S.RUNNING; }
+            return explore(bot, "재료");
+        }
         if (sub == null || !subKey.equals(key)) {
             sub = make.get();
             subKey = key;
