@@ -91,8 +91,10 @@ public final class Melee {
             }
             counter = false;
             bot.ctl.use = true;
-            if (Math.max(Math.abs(hx), Math.abs(hz)) < arm + 0.1 && Reflex.safeBehind(p)) bot.ctl.back = true;
-            else if (r > 3.2 && approach) {
+            // 서로 안 닿는 거리(3.0~3.2)에서 상대가 안 휘두르면 영원히 대치 → 오래 조용하면 칼이 닿게 한 발 다가감
+            double wantR = idle ? 2.7 : 3.2;
+            if (Math.max(Math.abs(hx), Math.abs(hz)) < arm + 0.1 && Reflex.safeBehind(p) && !idle) bot.ctl.back = true;
+            else if (r > wantR && approach) {
                 Integer last = lastDist.get(t.getId());
                 // 앞이 낭떠러지라 못 걷거나 오래 안 가까워지면 길찾기로 돌아서 감
                 if (!Bot.safeAhead(p) || (last != null && bot.ticks - last > 60)) {
