@@ -55,7 +55,8 @@ public final class PitEscape {
         BlockPos f = p.onGround() ? Placer.standCell(p) : PathExec.feet(p);
         ticks++;
         if (ticks > 20 * 60 * 15) { info = "포기"; return false; }
-        if (!f.equals(lastFeet)) { lastFeet = f; stepTicks = 0; } else stepTicks++;
+        // 뛰면서 위아래로 출렁여도 진전으로 치지 않음: 옆으로 옮겼거나 더 높이 올라갔을 때만
+        if (lastFeet == null || f.getX() != lastFeet.getX() || f.getZ() != lastFeet.getZ() || f.getY() > lastFeet.getY()) { lastFeet = f; stepTicks = 0; } else stepTicks++;
         // nav.stop()은 캐던 블록도 멈추게 하므로 (진행이 초기화됨) 길찾기가 돌고 있을 때만
         if (bot.nav.goal() != null) bot.nav.stop();
         int blocks = Inv.count(p, Inv.throwaway());
@@ -139,9 +140,10 @@ public final class PitEscape {
         bot.ctl.speed = 60f;
         if (p.getXRot() < 70f) return true;
         if (p.onGround()) bot.ctl.jump = true;
-        BlockPos stand = BlockPos.containing(p.getX(), Math.floor(p.getY() - 0.01), p.getZ());
-        if (!p.onGround() && pass(l, stand) && !pass(l, stand.below()) && p.getY() > stand.getY() + 1.05)
-            Act.place(bot, stand.below(), Direction.UP);
+        // 뛰어오른 뒤 원래 서 있던 칸이 비면 그 아래 블록 윗면에 놓음 (기둥 쌓기와 같은 방식)
+        BlockPos under = BlockPos.containing(p.getX(), p.getY() - 0.2, p.getZ());
+        if (!p.onGround() && pass(l, under) && !pass(l, under.below()) && p.getY() > under.getY() + 1.05)
+            Act.place(bot, under.below(), Direction.UP);
         return true;
     }
 
