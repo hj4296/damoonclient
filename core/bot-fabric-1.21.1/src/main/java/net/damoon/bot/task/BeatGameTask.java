@@ -178,6 +178,10 @@ public class BeatGameTask extends Task {
         if (bot.deathPos == null || bot.deathDim != l.dimension()) return null;
         if (bot.ticks - bot.deathTick > 20 * 60 * 4) { bot.deathPos = null; return null; }
         BlockPos d = bot.deathPos;
+        // 용암에서 죽었으면 물건은 이미 탔고, 가면 또 빠짐 → 안 감
+        for (BlockPos q : BlockPos.betweenClosed(d.offset(-2, -2, -2), d.offset(2, 1, 2))) {
+            if (BlockUtil.isLava(l.getBlockState(q))) { bot.log("죽은 자리가 용암 → 물건은 포기"); bot.deathPos = null; return null; }
+        }
         double dist = Math.sqrt(p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(d)));
         if (dist > 600) { bot.deathPos = null; return null; }
         stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";

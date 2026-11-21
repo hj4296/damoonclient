@@ -27,6 +27,7 @@ public final class Reflex {
     final Archer archer = new Archer();
     /** 자리 지키기 (스포너 옆): 쫓아가지 않고 다가오는 적만 벰 */
     public boolean camp;
+    private int lavaTicks;
     /** 벙커 짓는 중: 체력이 넉넉하면 방패보다 짓기를 먼저 */
     public boolean building;
     public final Turtle turtle = new Turtle();
@@ -156,6 +157,43 @@ public final class Reflex {
 
         // 위험하면 블록으로 몸을 감싸고 회복 (터틀링)
         // 물속에서 숨이 차면 가장 가까운 공기 쪽으로 헤엄쳐 올라감 (익사 방지) — 무엇보다 먼저
+        // 용암에 빠짐: 무엇보다 먼저 — 물 양동이가 있으면 발밑에 붓고, 없으면 가장 가까운 단단한 땅으로 뛰어 나감
+        if (p.isInLava() || (lavaTicks > 0 && p.isOnFire() && BlockUtil.isLava(bot.level().getBlockState(p.blockPosition())))) {
+            lavaTicks++;
+            if (turtle.active()) turtle.abort();
+            if (eating) { eating = false; bot.ctl.use = false; }
+            Act.stopDig(bot);
+            bot.nav.stop();
+            var l = bot.level();
+            net.minecraft.core.BlockPos f = p.blockPosition();
+            if (Inv.has(p, Items.WATER_BUCKET) && lavaTicks < 30) {
+                Inv.select(p, Inv.is(Items.WATER_BUCKET));
+                bot.ctl.look(p.getYRot(), 90f);
+                bot.ctl.speed = 90f;
+                if (p.getXRot() > 80f) net.minecraft.client.Minecraft.getInstance().gameMode.useItem(p, net.minecraft.world.InteractionHand.MAIN_HAND);
+                bot.ctl.jump = true;
+                doing = "용암! 물 붓기";
+                return true;
+            }
+            net.minecraft.core.BlockPos out = null;
+            double od = 1e9;
+            for (net.minecraft.core.BlockPos q : net.minecraft.core.BlockPos.betweenClosed(f.offset(-4, -1, -4), f.offset(4, 2, 4))) {
+                var fl = l.getBlockState(q.below());
+                if (fl.getCollisionShape(l, q.below()).isEmpty() || BlockUtil.isLava(fl) || BlockUtil.hurts(fl)) continue;
+                if (BlockUtil.isLava(l.getBlockState(q)) || BlockUtil.isLava(l.getBlockState(q.above()))) continue;
+                if (!l.getBlockState(q).getCollisionShape(l, q).isEmpty() || !l.getBlockState(q.above()).getCollisionShape(l, q.above()).isEmpty()) continue;
+                double d = q.distToCenterSqr(p.position()) + Math.max(0, q.getY() - f.getY()) * 2;
+                if (d < od) { od = d; out = q.immutable(); }
+            }
+            if (out != null) bot.ctl.lookYaw(p, Vec3.atBottomCenterOf(out), -10f);
+            else bot.ctl.look(p.getYRot(), -30f);
+            bot.ctl.fwd = true;
+            bot.ctl.sprint = true;
+            bot.ctl.jump = true;
+            doing = "용암! 빠져나가는 중";
+            return true;
+        }
+        lavaTicks = 0;
         if (p.isUnderWater() && p.getAirSupply() < 200) {
             net.minecraft.core.BlockPos f = p.blockPosition();
             net.minecraft.core.BlockPos air = null;

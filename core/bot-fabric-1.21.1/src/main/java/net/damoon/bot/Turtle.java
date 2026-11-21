@@ -164,7 +164,10 @@ public final class Turtle {
         // 근접 몹이 바로 붙어 있으면 (그 칸엔 벽을 못 놓고, 짓는 동안 맞음) 먼저 방패로 밀어내고 나서 지음
         boolean engaged = near != null && near.distanceTo(p) < 3.8;
         if (!active) {
-            if (bot.ticks < cooldownUntil || !danger(bot, p) || !p.onGround()) return false;
+            if (bot.ticks < cooldownUntil || !danger(bot, p) || !p.onGround() || p.isInLava()) return false;
+            // 용암 옆에선 감싸지 않음 (벽 놓는 사이 불에 타 죽음) — 먼저 벗어남
+            if (BlockUtil.fluidNear(l, Placer.standCell(p).getX(), Placer.standCell(p).getY(), Placer.standCell(p).getZ(), true)
+                    || BlockUtil.isLava(l.getBlockState(Placer.standCell(p).below()))) return false;
             // 엔드에서 드래곤이 근처에 있으면 감싸지 않음 (브레스는 벽을 뚫고 들어옴)
             if (l.dimension() == net.minecraft.world.level.Level.END) {
                 for (Entity e : l.entitiesForRendering())
