@@ -17,6 +17,8 @@ public final class PitEscape {
     private int ticks, stepTicks, turns;
     private BlockPos lastFeet, stepTo;
     public String info = "";
+    /** 구덩이가 아니어도 바로 계단을 파서 땅 위까지 올라감 (땅속 깊은 곳에서 길찾기가 너무 오래 걸릴 때) */
+    public boolean force;
 
     private static boolean pass(ClientLevel l, BlockPos b) {
         return BlockUtil.passable(l, b.getX(), b.getY(), b.getZ(), l.getBlockState(b));
@@ -58,9 +60,9 @@ public final class PitEscape {
         if (bot.nav.goal() != null) bot.nav.stop();
         int blocks = Inv.count(p, Inv.throwaway());
         if (dir == null) {
-            int d0 = depth(l, f);
+            int d0 = force ? 99 : depth(l, f);
             if (d0 <= 1) { info = "빠져나옴"; return false; }
-            if (d0 - 1 <= blocks && headroom(l, f, d0 + 1)) {
+            if (!force && d0 - 1 <= blocks && headroom(l, f, d0 + 1)) {
                 return pillar(bot, p, l, f, d0);
             }
             dir = pickDir(l, f);
