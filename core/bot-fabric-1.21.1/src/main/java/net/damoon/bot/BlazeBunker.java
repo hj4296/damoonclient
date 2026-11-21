@@ -92,22 +92,32 @@ public final class BlazeBunker {
 
     /** 칸 c에 섰을 때 눈에서 스포너(블레이즈가 뜨는 높이)까지의 선이 앞쪽 창문 칸으로 나가고, 그 뒤로 막힌 블록이 없는지 */
     static boolean windowSees(ClientLevel l, LocalPlayer p, BlockPos c, Direction f, BlockPos sp) {
+        // 지을 벽(앞쪽 머리 높이 창문만 열림 + 천장)을 미리 셈해서, 눈에서 스포너 위(블레이즈가 뜨는 곳)까지 선이 벽·땅에 안 걸리는지
+        java.util.Set<BlockPos> wall = new java.util.HashSet<>();
+        for (int y = 0; y <= 2; y++)
+            for (Direction h : Direction.Plane.HORIZONTAL) {
+                if (h == f && y == 1) continue;
+                wall.add(c.relative(h).above(y));
+            }
+        wall.add(c.above(2));
         Vec3 eye = new Vec3(c.getX() + 0.5, c.getY() + 1.62, c.getZ() + 0.5);
-        for (double ty : new double[]{0.5, 1.5}) {
+        int ok = 0;
+        for (double ty : new double[]{1.0, 1.8}) {
             Vec3 to = new Vec3(sp.getX() + 0.5, sp.getY() + ty, sp.getZ() + 0.5);
             Vec3 d = to.subtract(eye);
-            double along = f.getStepX() != 0 ? d.x * f.getStepX() : d.z * f.getStepZ();
-            if (along <= 0.3) return false;
-            double t = 0.5 / along; // 칸 가운데에서 앞면까지 0.5칸
-            Vec3 exit = eye.add(d.scale(t));
-            double side = f.getStepX() != 0 ? exit.z - c.getZ() : exit.x - c.getX();
-            if (side < 0.05 || side > 0.95) return false;
-            if (exit.y < c.getY() + 1.05 || exit.y > c.getY() + 1.95) return false;
-            var hr = l.clip(new net.minecraft.world.level.ClipContext(exit.add(d.normalize().scale(0.05)), to,
-                    net.minecraft.world.level.ClipContext.Block.COLLIDER, net.minecraft.world.level.ClipContext.Fluid.NONE, p));
-            if (hr.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK && !hr.getBlockPos().equals(sp)) return false;
+            double len = d.length();
+            boolean clear = true;
+            for (double s = 0.1; s < len - 0.3; s += 0.1) {
+                Vec3 q = eye.add(d.scale(s / len));
+                BlockPos b = BlockPos.containing(q);
+                if (b.equals(c) || b.equals(c.above())) continue;
+                if (wall.contains(b)) { clear = false; break; }
+                var st = l.getBlockState(b);
+                if (!b.equals(sp) && !st.getCollisionShape(l, b).isEmpty()) { clear = false; break; }
+            }
+            if (clear) ok++;
         }
-        return true;
+        return ok == 2;
     }
 
     private static boolean lavaNear(ClientLevel l, BlockPos c, int r) {
