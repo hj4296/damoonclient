@@ -41,6 +41,8 @@ public class ObsidianTask extends Task {
     private BlockPos viewLava, waterSrc;
     private int waterSrcTicks;
     private int viewDigTicks;
+    private BlockPos approachLava;
+    private int approachTicks;
     private final Set<Long> badCover = new HashSet<>();
     private final java.util.Map<Long, Integer> coverTries = new java.util.HashMap<>();
     /** 물을 부었는데 그대로 용암인 횟수 (손이 안 닿는 등) */
@@ -101,6 +103,9 @@ public class ObsidianTask extends Task {
             detail = "물 다시 퍼 담는 중";
             Vec3 aimP = Vec3.atCenterOf(water).add(0, 0.3, 0);
             if (Act.reach(p, new net.minecraft.world.phys.AABB(water)) > 4.0 || p.getEyePosition().distanceTo(aimP) > 4.2) {
+                // 부은 물로 45초 넘게 못 다가가면 버림 (빈 양동이로 다른 물을 뜸)
+                if (!water.equals(approachLava)) { approachLava = water; approachTicks = 0; }
+                if (++approachTicks > 20 * 45) { bot.nav.stop(); water = null; approachLava = null; return S.RUNNING; }
                 bot.nav.go(new Goal.Reach(water, 2.5));
                 return S.RUNNING;
             }
@@ -185,6 +190,13 @@ public class ObsidianTask extends Task {
         Vec3 aim = Vec3.atCenterOf(lava.below()).add(0, 0.5, 0);
         // 양동이는 눈에서 4.5칸까지만 닿음: 겨냥점(용암 칸 바닥 가운데)이 멀면 더 다가감
         if (Act.reach(p, new net.minecraft.world.phys.AABB(lava)) > 3.8 || p.getEyePosition().distanceTo(aim) > 4.2) {
+            // 같은 용암으로 45초 넘게 못 다가가면 (물살에 밀리고 끼이기를 반복) 다른 용암
+            if (!lava.equals(approachLava)) { approachLava = lava; approachTicks = 0; }
+            if (++approachTicks > 20 * 45) {
+                bot.log("용암에 45초 동안 못 다가감 → 다른 용암 " + lava.toShortString());
+                bot.nav.stop(); badLava.add(lava.asLong()); lava = null; approachLava = null;
+                return S.RUNNING;
+            }
             Nav.R r = bot.nav.go(new Goal.Reach(lava, 2.4));
             if (r == Nav.R.FAILED || (r == Nav.R.ARRIVED && p.getEyePosition().distanceTo(aim) > 4.2)) { bot.nav.stop(); badLava.add(lava.asLong()); lava = null; }
             return S.RUNNING;
