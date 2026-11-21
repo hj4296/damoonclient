@@ -68,6 +68,8 @@ public class PortalTask extends Task {
         return (i == 0 || i == 3) && (j == 0 || j == 4);
     }
 
+    private int upY = Integer.MIN_VALUE;
+
     @Override
     public S tick(Bot bot) {
         LocalPlayer p = bot.p();
@@ -88,6 +90,13 @@ public class PortalTask extends Task {
                 // 물·용암이 없는 곳으로 조금 옮겨 감
                 if (digger == null) digger = new net.damoon.bot.Digger(d0);
                 detail = "물·용암 없는 포털 자리 찾는 중";
+                if (digger.recentTurns >= 4) {
+                    // 사방이 용암·물 → 위로 올라가서 다시 찾음
+                    if (upY == Integer.MIN_VALUE) upY = f.getY() + 8;
+                    net.damoon.bot.Nav.R r = bot.nav.go(new net.damoon.bot.path.Goal.Above(upY));
+                    if (r != net.damoon.bot.Nav.R.RUNNING) { bot.nav.stop(); upY = Integer.MIN_VALUE; digger = new net.damoon.bot.Digger(d0.getClockWise()); }
+                    return S.RUNNING;
+                }
                 digger.tick(bot, net.damoon.bot.Digger.Mode.TUNNEL);
                 return S.RUNNING;
             }
