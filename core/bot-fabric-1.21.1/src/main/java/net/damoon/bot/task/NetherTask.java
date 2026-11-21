@@ -83,7 +83,8 @@ public class NetherTask extends Task {
             }
         }
         // 먹을 게 하나도 없고 체력이 저절로 안 차면 (배고픔 17 이하) 오버월드로 돌아가 사냥해 옴
-        if (BeatGameTask.foodCount(p) == 0 && (p.getFoodData().getFoodLevel() < 18 || p.getHealth() < 10)) {
+        // 음식이 3개 이하로 줄면 다 떨어지기 전에 (싸우는 동안 금방 줄어듦) 돌아가서 채워 옴
+        if (BeatGameTask.foodCount(p) <= 3 || foodTrip && BeatGameTask.foodCount(p) < 8) {
             if (!foodTrip) { foodTrip = true; bot.log("먹을 게 없음 → 포털로 돌아가 오버월드에서 음식을 구해 옴"); }
             bot.reflex.camp = false;
             bot.reflex.building = false;

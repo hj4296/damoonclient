@@ -346,10 +346,10 @@ public class BeatGameTask extends Task {
         }
         // ---- 5. 철 ----
         int ironHave = Inv.count(p, Items.IRON_INGOT) + Inv.count(p, Items.RAW_IRON) + ironInGear(p);
-        if (ironHave < 33) {
-            stage = "5. 철 캐기 (" + ironHave + "/33)";
+        if (ironHave < 35) {
+            stage = "5. 철 캐기 (" + ironHave + "/35)";
             return mineDeep(bot, "iron", st -> st.is(Blocks.IRON_ORE) || st.is(Blocks.DEEPSLATE_IRON_ORE), is(Items.RAW_IRON),
-                    Inv.count(p, Items.RAW_IRON) + (33 - ironHave), 16);
+                    Inv.count(p, Items.RAW_IRON) + (35 - ironHave), 16);
         }
         if (Inv.count(p, Items.RAW_IRON) > 0 && !cool(bot, "smeltiron")) {
             stage = "5. 철 굽기";
@@ -435,7 +435,7 @@ public class BeatGameTask extends Task {
             }
             // 예비 방패 (화염구를 막다 보면 방패가 닳아 부서짐)
             int shields = Inv.count(p, Items.SHIELD) + (p.getOffhandItem().is(Items.SHIELD) ? 1 : 0);
-            if (shields < 3 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
+            if (shields < 4 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
                 if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "7. 예비 방패"; return run(bot, "shield2", () -> new CraftTask(Items.SHIELD, Inv.count(p, Items.SHIELD) + 1)); }
                 if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "7. 예비 방패용 판자"; return run(bot, "shield2planks", () -> new CraftTask(pl, want)); }
             }
@@ -456,8 +456,8 @@ public class BeatGameTask extends Task {
             BlockPos lit = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 2, PathExec.feet(p).getY() - 20, PathExec.feet(p).getY() + 20,
                     st -> st.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
             // 네더에 들어가기 전 음식을 넉넉히 (네더엔 먹을 게 거의 없음) — 포털을 짓기 전에 (짓자마자 들어가 버리므로)
-            if (foodCount(p) < 12 && !cool(bot, "netherfood") && !(sub instanceof PortalTask)) {
-                stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/12)";
+            if (foodCount(p) < 20 && !cool(bot, "netherfood") && !(sub instanceof PortalTask)) {
+                stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/20)";
                 if (Inv.count(p, rawMeat()) >= 3 && hasFuel(p) && !cool(bot, "cook")) {
                     Item out = cookedFor(p);
                     int want = Inv.count(p, out) + Inv.count(p, rawMeat());
