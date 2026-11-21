@@ -43,6 +43,7 @@ public class BeatGameTask extends Task {
     private String exploreFor = "";
     private int exploreUntil;
     private net.damoon.bot.PitEscape pit;
+    private int netherFoodSince;
     private final Map<String, Integer> cooldown = new HashMap<>();
     private final EndGameTask end = new EndGameTask();
     private NetherTask nether;
@@ -450,6 +451,25 @@ public class BeatGameTask extends Task {
             // 맨 아래 칸(아래가 포털이 아닌 칸)만 — 그래야 그 안에 설 수 있음
             BlockPos lit = net.damoon.bot.Scan.nearest(l, PathExec.feet(p), 2, PathExec.feet(p).getY() - 20, PathExec.feet(p).getY() + 20,
                     st -> st.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
+            // 네더에 들어가기 전 음식을 넉넉히 (네더엔 먹을 게 거의 없음)
+            if (lit != null && foodCount(p) < 10 && !cool(bot, "netherfood")) {
+                stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/10)";
+                if (Inv.count(p, rawMeat()) >= 3 && hasFuel(p) && !cool(bot, "cook")) {
+                    Item out = cookedFor(p);
+                    int want = Inv.count(p, out) + Inv.count(p, rawMeat());
+                    return run(bot, "cook", () -> new SmeltTask(rawMeat(), out, want));
+                }
+                if (hunterFood == null) hunterFood = new Hunter(Hunter.foodAnimals(), st -> st.has(net.minecraft.core.component.DataComponents.FOOD) || st.is(Items.LEATHER) || st.is(Items.FEATHER));
+                Hunter.R hr = hunterFood.tick(bot);
+                detail = hunterFood.info;
+                if (hr == Hunter.R.NONE) {
+                    if (netherFoodSince == 0) netherFoodSince = bot.ticks;
+                    // 5분 넘게 찾아도 없으면 있는 것만 들고 감
+                    if (bot.ticks - netherFoodSince > 20 * 60 * 5) { fail(bot, "netherfood", 20 * 60 * 10); netherFoodSince = 0; }
+                    return explore(bot, "동물");
+                }
+                return S.RUNNING;
+            }
             if (lit != null) {
                 stage = "7. 네더 포털로 들어가는 중";
                 BlockPos fp = PathExec.feet(p);

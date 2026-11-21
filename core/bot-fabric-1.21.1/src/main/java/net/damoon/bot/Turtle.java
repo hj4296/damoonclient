@@ -85,7 +85,7 @@ public final class Turtle {
         }
         // 먹을 게 없고 배고프면 갇혀 있어도 체력이 안 참 → 적이 정말 가까울 때만 (아니면 사냥하러 가야 함)
         // 밤엔 밖이 더 위험하니 먹을 게 없어도 감싸고 아침까지 버팀
-        boolean night = net.damoon.bot.task.BedTask.night(bot.level());
+        boolean night = net.damoon.bot.task.BedTask.night(bot.level()) && bot.level().dimension() == net.minecraft.world.level.Level.OVERWORLD;
         double r = canHeal(p) || night ? 14 : 6;
         for (Entity e : bot.level().entitiesForRendering()) if (Reflex.hostile(e) && e.distanceTo(p) < r) return true;
         return false;
@@ -243,10 +243,18 @@ public final class Turtle {
             for (Entity e : l.entitiesForRendering())
                 if (e instanceof net.minecraft.world.entity.monster.EnderMan em && em.isCreepy() && em.distanceTo(p) < 20) angry = true;
             // 화난 엔더맨이 밖에 있으면 화가 풀릴 때까지 안에서 기다림
-            if (((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) && !(angry && ticks < 20 * 60)) || ticks > 20 * 90) {
+            boolean night = net.damoon.bot.task.BedTask.night(l) && l.dimension() == net.minecraft.world.level.Level.OVERWORLD;
+            boolean foeNear = false;
+            for (Entity e : l.entitiesForRendering()) if (Reflex.hostile(e) && e.distanceTo(p) < 10) { foeNear = true; break; }
+            // 먹을 게 없으면 갇혀 있어도 체력이 안 참: 오버월드 밤이 아니면 나가서 먹을 것을 구함 (밤엔 아침까지 버팀)
+            boolean hopeless = !canHeal(p) && ticks > 20 * 8 && !night && !(angry && ticks < 20 * 60);
+            boolean timeout = ticks > 20 * 90 && (canHeal(p) || !night || ticks > 20 * 60 * 8);
+            if (((p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) && !(angry && ticks < 20 * 60)) || timeout || hopeless) {
                 phase = 2;
                 reflex.forceEat = false;
-                bot.log("회복 완료 (체력 " + (int) p.getHealth() + ") → 벽을 부수고 나감");
+                // 나오자마자 다시 갇히지 않게 잠시 쉼 (그 사이 먹을 것을 구하거나 할 일을 함)
+                cooldownUntil = bot.ticks + 20 * (canHeal(p) ? 20 : 90);
+                bot.log("회복 " + (hopeless ? "불가 (먹을 게 없음)" : "완료") + " (체력 " + (int) p.getHealth() + ") → 벽을 부수고 나감");
             } else {
                 reflex.doing = "갇힌 채 회복 중 (체력 " + (int) p.getHealth() + ")";
                 return reflex.startEatIfNeeded() || true;

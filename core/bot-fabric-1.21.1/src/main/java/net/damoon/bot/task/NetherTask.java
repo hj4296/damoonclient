@@ -34,6 +34,7 @@ public class NetherTask extends Task {
     private net.damoon.bot.EnderTrap trap;
     private CraftTask boatCraft;
     private CraftTask shieldCraft;
+    private boolean foodTrip;
     private int shieldRetry;
     private boolean boatTried;
     private BlockPos safeSpot;
@@ -70,8 +71,15 @@ public class NetherTask extends Task {
         if (portal == null) {
             BlockPos f = PathExec.feet(p);
             portal = Scan.nearest(l, f, 1, f.getY() - 4, f.getY() + 4, s -> s.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
-            if (portal == null) portal = f;
-            bot.log("네더 도착! 돌아갈 포털: " + portal.toShortString());
+            if (portal != null) {
+                net.damoon.bot.Memory.putPos("netherPortal", portal);
+                bot.log("네더 도착! 돌아갈 포털: " + portal.toShortString());
+            } else {
+                // 포털 옆이 아님 (게임을 다시 켬) → 적어 둔 포털 자리
+                portal = net.damoon.bot.Memory.getPos("netherPortal");
+                if (portal == null) portal = f;
+                bot.log("돌아갈 포털 (기억): " + portal.toShortString());
+            }
         }
         // 방패가 부서졌으면 (화염구·화살을 막다 닳음) 판자와 철로 바로 새로 만듦 — 방패 없이 블레이즈와 싸우면 불에 탐
         boolean hasShield = p.getOffhandItem().is(Items.SHIELD) || Inv.has(p, Items.SHIELD);
@@ -86,6 +94,17 @@ public class NetherTask extends Task {
             }
             return S.RUNNING;
         }
+        // 먹을 게 하나도 없고 체력이 저절로 안 차면 (배고픔 17 이하) 오버월드로 돌아가 사냥해 옴
+        if (BeatGameTask.foodCount(p) == 0 && (p.getFoodData().getFoodLevel() < 18 || p.getHealth() < 10)) {
+            if (!foodTrip) { foodTrip = true; bot.log("먹을 게 없음 → 포털로 돌아가 오버월드에서 음식을 구해 옴"); }
+            bot.reflex.camp = false;
+            bot.reflex.building = false;
+            detail = "먹을 게 없음 → 포털로 돌아가는 중";
+            Nav.R nr = bot.nav.go(new Goal.Block(portal.getX(), portal.getY(), portal.getZ(), true));
+            if (nr == Nav.R.FAILED) bot.nav.stop();
+            return S.RUNNING;
+        }
+        foodTrip = false;
         // 다리 놓을 블록이 모자라면 네더랙 캐기
         if ((Inv.count(p, Inv.throwaway()) < 24 && bot.ticks > rackGiveUp) || rack != null) {
             if (rack == null) {
