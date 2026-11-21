@@ -69,6 +69,28 @@ public final class Reflex {
         trackBlazes(p);
         // 갑옷·방패는 생기면 바로 착용 (어떤 작업 중이든)
         if (bot.ticks % 20 == 7 && !p.isUsingItem()) { Inv.equipArmor(p); Inv.equipShield(p); }
+        // 터지려는 크리퍼: 방패가 있으면 그쪽으로 방패를 듦 — 방패는 폭발을 통째로 막음 (도망은 굴·벽에 막히면 못 피함)
+        if (p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed()) {
+            Creeper boom = null;
+            double bd = 6.5;
+            for (Entity e : bot.level().entitiesForRendering())
+                if (e instanceof Creeper c && c.isAlive() && c.getSwelling(1f) > 0.05f && c.distanceTo(p) < bd) { bd = c.distanceTo(p); boom = c; }
+            if (boom != null) {
+                if (eating) { eating = false; bot.ctl.use = false; }
+                boolean wasDrawing = p.isUsingItem() && p.getUseItem().is(Items.BOW);
+                Inv.selectWeapon(p);
+                if (wasDrawing) archer.reset();
+                if (p.isUsingItem() && !p.getUseItem().is(Items.SHIELD) && !wasDrawing) { bot.ctl.use = false; doing = "크리퍼! 손에 든 것 내림"; return true; }
+                bot.ctl.lookAt(p, boom.getBoundingBox().getCenter());
+                bot.ctl.speed = 90f;
+                bot.ctl.use = true;
+                // 막으면서 뒤로 물러남 (가까울수록 폭발이 셈) — 뒤가 안전할 때만
+                if (bd < 4.5 && safeBehind(p)) bot.ctl.back = true;
+                if (bot.ticks % 10 == 0) bot.dbg(String.format("터지려는 크리퍼 %.1f칸 → 방패 (막는중=%s)", bd, p.isBlocking()));
+                doing = "터지려는 크리퍼 쪽으로 방패";
+                return true;
+            }
+        }
         // 바로 앞의 근접 몹 (위더 스켈레톤 등): 이게 있으면 먹기·우유·불 끄기·화염구 방어보다 방패 싸움이 먼저
         // 날아오는 화염구·화살: 궤적을 계산해서 나를 맞힐 것만 방패로 막음 (방패는 들고 5틱 뒤부터 막힘)
         Entity proj = turtle.sealed() || (tower.active() && !tower.onTop(p)) ? null : incoming(p, 15);
