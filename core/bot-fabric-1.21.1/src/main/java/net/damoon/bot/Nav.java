@@ -28,6 +28,7 @@ public final class Nav {
     Nav(Bot bot) { this.bot = bot; }
 
     public Goal goal() { return goal; }
+    public int fails() { return fails; }
     public PathExec exec() { return exec; }
 
     public void stop() {

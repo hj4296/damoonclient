@@ -39,6 +39,10 @@ public class BeatGameTask extends Task {
     private Digger digger;
     private BlockPos exploreTo;
     private int exploreTicks;
+    /** 캘 블록을 못 찾아 탐험하는 동안엔 Miner를 새로 만들지 않음 (만들 때마다 길찾기가 끊기던 문제) */
+    private String exploreFor = "";
+    private int exploreUntil;
+    private net.damoon.bot.PitEscape pit;
     private final Map<String, Integer> cooldown = new HashMap<>();
     private final EndGameTask end = new EndGameTask();
     private NetherTask nether;
@@ -80,9 +84,11 @@ public class BeatGameTask extends Task {
     /** 블록 캐서 모으기 (없으면 탐험) */
     private S mine(Bot bot, String key, Predicate<BlockState> block, Predicate<ItemStack> item, int want, boolean tool, int below, int above) {
         if (miner == null || !minerKey.equals(key)) {
+            if (key.equals(exploreFor) && bot.ticks < exploreUntil) return explore(bot, key);
             miner = new Miner(block, item, want, tool);
             miner.below = below;
             miner.above = above;
+            if (key.equals(exploreFor)) miner.failAfter = 1;
             minerKey = key;
             bot.nav.stop();
         }
@@ -91,9 +97,12 @@ public class BeatGameTask extends Task {
         if (r == Miner.R.FAILED) {
             miner = null;
             minerKey = "";
+            exploreFor = key;
+            exploreUntil = bot.ticks + 20 * 15;
             return explore(bot, key);
         }
-        if (r == Miner.R.DONE) { miner = null; minerKey = ""; }
+        if (r == Miner.R.DONE) { miner = null; minerKey = ""; exploreFor = ""; }
+        else if (miner.busy()) exploreFor = "";
         return S.RUNNING;
     }
 
@@ -178,6 +187,17 @@ public class BeatGameTask extends Task {
         if (rec != null) return rec;
         bot.trace = "overworld";
         int tier = tier(p);
+        // 좁은 굴 바닥에 갇힘 (되살아난 자리가 예전에 판 굴이거나, 길찾기가 계속 실패) → 쌓거나 계단을 파서 올라감
+        if (pit != null || (bot.ticks % 20 == 7 && (tier == 0 || bot.nav.fails() >= 3) && net.damoon.bot.PitEscape.trapped(bot))) {
+            if (pit == null) { pit = new net.damoon.bot.PitEscape(); bot.log("좁은 굴에 갇힘 → 빠져나가기"); }
+            stage = "굴에서 빠져나가기";
+            if (pit.tick(bot)) { detail = pit.info; return S.RUNNING; }
+            bot.log("굴 빠져나가기 끝: " + pit.info);
+            pit = null;
+            miner = null;
+            minerKey = "";
+            exploreTo = null;
+        }
         Predicate<ItemStack> logs = s -> s.is(ItemTags.LOGS);
         Predicate<ItemStack> planks = s -> s.is(ItemTags.PLANKS);
         int cobble = Inv.count(p, s -> s.is(Items.COBBLESTONE) || s.is(Items.COBBLED_DEEPSLATE) || s.is(Items.BLACKSTONE));

@@ -94,7 +94,7 @@ public final class Miner {
             target = find(p, l);
             if (target == null) {
                 info = "캘 블록을 못 찾음";
-                return ++noFind > 6 ? R.FAILED : R.RUNNING;
+                return ++noFind > failAfter ? R.FAILED : R.RUNNING;
             }
             noFind = 0;
         }
@@ -139,6 +139,8 @@ public final class Miner {
     /** 위아래로 몇 칸까지 찾을지 */
     public int below = 8, above = 10;
     public int chunks = 2;
+    /** 몇 번 연속 못 찾으면 실패로 볼지 (탐험 중 다시 볼 땐 빨리) */
+    public int failAfter = 6;
 
     private BlockPos find(LocalPlayer p, ClientLevel l) {
         BlockPos c = PathExec.feet(p);
