@@ -83,6 +83,8 @@ public final class Turtle {
                 if (e instanceof net.minecraft.world.entity.monster.WitherSkeleton && e.distanceTo(p) < 6) return true;
             return false;
         }
+        // 체력이 아주 낮은데 배고픔이 18 이상이라 저절로 차는 중이면: 적이 안 보여도 감싸고 다 찰 때까지 쉼 (사람처럼)
+        if (hp < 8 && p.getFoodData().getFoodLevel() >= 18 && bot.level().dimension() == net.minecraft.world.level.Level.OVERWORLD) return true;
         // 먹을 게 없고 배고프면 갇혀 있어도 체력이 안 참 → 적이 정말 가까울 때만 (아니면 사냥하러 가야 함)
         // 밤엔 밖이 더 위험하니 먹을 게 없어도 감싸고 아침까지 버팀
         boolean night = net.damoon.bot.task.BedTask.night(bot.level()) && bot.level().dimension() == net.minecraft.world.level.Level.OVERWORLD;
