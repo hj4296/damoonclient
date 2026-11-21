@@ -46,7 +46,10 @@ public final class Nav {
     public R go(Goal g) {
         LocalPlayer p = bot.p();
         // '땅 위로' 목표 높이는 서 있는 기둥에 따라 조금씩 달라짐 → 비슷하면 같은 목표로 봄 (매 틱 길을 새로 찾다 제자리에 멈추던 문제)
-        if (goal instanceof Goal.Above a && g instanceof Goal.Above b && Math.abs(a.y() - b.y()) <= 4) g = goal;
+        // (단, 예전 목표엔 이미 닿았는데 새 목표엔 아직이면 새 목표 — 아니면 '도착'만 반복하며 제자리)
+        BlockPos f0 = PathExec.feet(p);
+        if (goal instanceof Goal.Above a && g instanceof Goal.Above b && Math.abs(a.y() - b.y()) <= 4
+                && !(a.isIn(f0.getX(), f0.getY(), f0.getZ()) && !b.isIn(f0.getX(), f0.getY(), f0.getZ()))) g = goal;
         if (goal == null || !goal.equals(g)) {
             stop();
             goal = g;
