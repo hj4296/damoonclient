@@ -170,6 +170,44 @@ public final class Reflex {
             return true;
         }
 
+        // 드래곤 브레스 구름 안이면 (벽을 뚫고 들어옴) 무엇보다 먼저 빠져나옴 — 발밑이 있는 쪽으로만
+        if (bot.level().dimension() == net.minecraft.world.level.Level.END) {
+            var cloud = net.damoon.bot.task.EndGameTask.breathAt(bot.level(), p);
+            if (cloud != null) {
+                if (turtle.active()) turtle.abort();
+                if (eating) { eating = false; bot.ctl.use = false; }
+                Vec3 away = new Vec3(p.getX() - cloud.getX(), 0, p.getZ() - cloud.getZ());
+                if (away.lengthSqr() < 0.01) away = new Vec3(-p.getX(), 0, -p.getZ());
+                away = away.normalize();
+                Vec3 pick = null;
+                double bestDot = -2;
+                for (int k = 0; k < 16; k++) {
+                    double a = k * Math.PI / 8;
+                    Vec3 d = new Vec3(Math.cos(a), 0, Math.sin(a));
+                    boolean ok = true;
+                    for (double t = 1.0; t <= 3.0 && ok; t += 1.0)
+                        if (!Bot.safeAheadToward(p, p.getX() + d.x * t, p.getZ() + d.z * t)) ok = false;
+                    if (ok && d.dot(away) > bestDot) { bestDot = d.dot(away); pick = d; }
+                }
+                bot.nav.stop();
+                Act.stopDig(bot);
+                if (pick != null) {
+                    bot.ctl.lookYaw(p, p.position().add(pick.scale(5)), 5f);
+                    bot.ctl.fwd = true;
+                    bot.ctl.sprint = bestDot > 0;
+                    // 벽에 막혔으면 부수거나 뛰어넘음
+                    if (p.horizontalCollision) {
+                        bot.ctl.jump = true;
+                        net.minecraft.core.BlockPos w = p.blockPosition().offset((int) Math.round(pick.x), 0, (int) Math.round(pick.z));
+                        for (net.minecraft.core.BlockPos b : new net.minecraft.core.BlockPos[]{w, w.above()})
+                            if (!bot.level().getBlockState(b).getCollisionShape(bot.level(), b).isEmpty()) { Act.dig(bot, b); break; }
+                    }
+                } else bot.ctl.sneak = true;
+                doing = "드래곤 브레스 구름에서 빠져나오는 중";
+                return true;
+            }
+        }
+
         // 엔더 진주로 위기 탈출 (공허·죽을 낙하·용암·포위) — 무엇보다 먼저
         if (Pearl.tick(bot)) return true;
 
@@ -563,6 +601,8 @@ public final class Reflex {
         for (int a = age; a <= age + ahead; a++) if (a >= 52 && a <= 88) return true;
         return age > 88 && b.isOnFire();
     }
+
+    public static boolean safeBehindPublic(LocalPlayer p) { return safeBehind(p); }
 
     /** 바라보는 반대쪽(뒤)으로 한 걸음이 안전한지 */
     static boolean safeBehind(LocalPlayer p) {

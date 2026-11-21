@@ -22,6 +22,7 @@ public final class Turtle {
     private int phase, ticks;
 
     public boolean active() { return active; }
+    public void abort() { active = false; }
     /** 구멍 모드: 발밑 3칸을 파고 들어가 위를 덮음 (적이 이미 붙었을 때) */
     private boolean hole;
 
@@ -147,6 +148,11 @@ public final class Turtle {
         boolean engaged = near != null && near.distanceTo(p) < 3.8;
         if (!active) {
             if (bot.ticks < cooldownUntil || !danger(bot, p) || !p.onGround()) return false;
+            // 엔드에서 드래곤이 근처에 있으면 감싸지 않음 (브레스는 벽을 뚫고 들어옴)
+            if (l.dimension() == net.minecraft.world.level.Level.END) {
+                for (Entity e : l.entitiesForRendering())
+                    if (e instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon dr && dr.isAlive() && dr.distanceTo(p) < 40) return false;
+            }
             BlockPos f0 = Placer.standCell(p);
             // 적이 이미 붙어 있으면 벽은 못 지으니 발밑을 파고 들어감 (2칸만 내려가도 몹 팔이 안 닿음)
             boolean useHole = false; // 구멍 숨기는 몹이 같이 떨어져 들어와서 끔 (holeOk 참고)

@@ -57,7 +57,10 @@ public class EndGameTask extends Task {
     private final Map<Integer, Integer> shotsAt = new HashMap<>();
 
     // 철창 크리스탈: 블록 기둥
-    private enum TowerSt { BASE, CLIMB, OPEN, SHOOT, DOWN }
+    private enum TowerSt { BASE, CLIMB, OPEN, RETREAT, SHOOT, BACK, DOWN }
+    private boolean towerCaged;
+    private BlockPos retreatTo;
+    private int retreatTicks;
     private TowerSt tst;
     private int towerCrystal = -1;
     private BlockPos towerBase;
@@ -110,7 +113,7 @@ public class EndGameTask extends Task {
         for (Entity e : l.entitiesForRendering()) {
             if (e instanceof EnderDragon d && d.isAlive()) dragon = d;
             // 철창 안 크리스탈 2개는 그냥 둠: 옆에서 부수면 폭발에 죽고, 드래곤이 가운데 앉아 있을 땐 멀어서 회복도 못 함
-            if (e instanceof EndCrystal c && c.isAlive() && c.getY() > 60 && Math.hypot(c.getX(), c.getZ()) > 20 && !caged(l, c)) crystals.add(c);
+            if (e instanceof EndCrystal c && c.isAlive() && c.getY() > 60 && Math.hypot(c.getX(), c.getZ()) > 20) crystals.add(c);
         }
 
         // 브레스 피하기
@@ -169,6 +172,9 @@ public class EndGameTask extends Task {
         if (!crystals.isEmpty()) {
             return crystals(bot, p, l, crystals);
         }
+        // 크리스탈을 다 부순 뒤: 엔드 돌 대피소(드래곤이 못 부숨)에서 창문으로 머리를 쏘고, 화살이 없으면 앉았을 때만 나가서 벰
+        S sh = shelter(bot, p, l, dragon);
+        if (sh != null) return sh;
         return fight(bot, p, l, dragon);
     }
 
@@ -195,7 +201,15 @@ public class EndGameTask extends Task {
         if (towerCrystal != -1) {
             Entity e = l.getEntity(towerCrystal);
             if (e instanceof EndCrystal c && c.isAlive()) return tower(bot, p, l, c);
-            // 크리스탈이 없어졌으면 내려옴
+            // 크리스탈이 없어졌으면: 다리 위에 있으면 기둥으로 돌아간 뒤 내려옴
+            if (towerCaged && (tst == TowerSt.SHOOT || tst == TowerSt.RETREAT || tst == TowerSt.BACK)) {
+                detail = "크리스탈 파괴! 기둥으로 돌아가는 중";
+                BlockPos top = new BlockPos(towerBase.getX(), towerH + 1, towerBase.getZ());
+                Nav.R nr = bot.nav.go(new Goal.Block(top.getX(), top.getY(), top.getZ(), false));
+                tst = TowerSt.BACK;
+                if (nr != Nav.R.RUNNING || ++retreatTicks > 20 * 40) { bot.nav.stop(); tst = TowerSt.DOWN; }
+                return S.RUNNING;
+            }
             if (tst != null && tst != TowerSt.BASE && PathExec.feet(p).getY() > towerBase.getY() + 1) {
                 tst = TowerSt.DOWN;
                 return towerDown(bot, p, l);
@@ -373,7 +387,10 @@ public class EndGameTask extends Task {
         BlockPos best = null;
         double bd = 1e9;
         // 크리스탈 폭발(9칸 안은 철 갑옷으로도 위험)을 피해 10칸쯤 떨어진 곳에 기둥
-        for (int dist : new int[]{10, 9, 11, 8}) {
+        boolean cage = caged(l, c);
+        towerCaged = cage;
+        // 철창: 바로 옆(5~6칸)에 쌓아 철창을 뜯은 뒤 다리로 8칸 물러나서 쏨 / 철창 없음: 10칸 떨어져 쌓고 바로 쏨
+        for (int dist : cage ? new int[]{6, 5} : new int[]{10, 9, 11, 8}) {
             for (int[] d : dirs) {
                 int x = cx + d[0] * dist, z = cz + d[1] * dist;
                 int y = groundY(l, x, z);
@@ -449,8 +466,26 @@ public class EndGameTask extends Task {
                     }
                 }
                 Act.stopDig(bot);
-                tst = TowerSt.SHOOT;
                 towerWait = 0;
+                if (towerCaged) {
+                    // 크리스탈 폭발(9칸 안 위험)을 피해 같은 높이로 다리를 놓아 물러남
+                    retreatTo = new BlockPos(towerBase.getX() + towerDx * 8, towerH + 1, towerBase.getZ() + towerDz * 8);
+                    retreatTicks = 0;
+                    tst = TowerSt.RETREAT;
+                    bot.log("철창을 뜯음 → 다리를 놓아 8칸 물러나서 쏨");
+                } else tst = TowerSt.SHOOT;
+            }
+            case RETREAT -> {
+                detail = "다리 놓으며 물러나는 중 (크리스탈 폭발 피하기)";
+                Nav.R nr = bot.nav.go(new Goal.Block(retreatTo.getX(), retreatTo.getY(), retreatTo.getZ(), false));
+                if (nr == Nav.R.ARRIVED || ++retreatTicks > 20 * 40) { bot.nav.stop(); tst = TowerSt.SHOOT; towerWait = 0; }
+                if (nr == Nav.R.FAILED) { bot.nav.stop(); tst = TowerSt.SHOOT; }
+            }
+            case BACK -> {
+                detail = "기둥으로 돌아가는 중";
+                BlockPos top = new BlockPos(towerBase.getX(), towerH + 1, towerBase.getZ());
+                Nav.R nr = bot.nav.go(new Goal.Block(top.getX(), top.getY(), top.getZ(), false));
+                if (nr != Nav.R.RUNNING || ++retreatTicks > 20 * 40) { bot.nav.stop(); tst = TowerSt.DOWN; }
             }
             case SHOOT -> {
                 detail = "철창 안 크리스탈 쏘는 중";
@@ -462,8 +497,8 @@ public class EndGameTask extends Task {
                     towerWait = 25;
                     bot.log("철창 안 크리스탈에 발사 (" + towerShots + ")");
                     if (towerShots > 6) {
-                        // 화살이 안 되면 칼로 (폭발 감수)
-                        tst = TowerSt.DOWN;
+                        retreatTicks = 0;
+                        tst = towerCaged ? TowerSt.BACK : TowerSt.DOWN;
                     }
                 }
             }
@@ -493,6 +528,129 @@ public class EndGameTask extends Task {
     // ---------------- 드래곤과 싸우기 ----------------
     private Vec3 lastDragonPos;
 
+    private BlockPos shCell;
+    private Direction shFront;
+    private int shPhase, shFails, shBuild;
+    private Miner shGather;
+
+    private List<BlockPos> shWalls() {
+        List<BlockPos> out = new ArrayList<>();
+        for (int y = 0; y <= 2; y++)
+            for (Direction h : Direction.Plane.HORIZONTAL) {
+                if (h == shFront && y == 1) continue; // 머리 높이 창문
+                out.add(shCell.relative(h).above(y));
+            }
+        out.add(shCell.above(2));
+        return out;
+    }
+
+    private static boolean dragonProof(net.minecraft.world.level.block.state.BlockState st) {
+        return st.is(Blocks.END_STONE) || st.is(Blocks.OBSIDIAN) || st.is(Blocks.BEDROCK) || st.is(Blocks.END_STONE_BRICKS);
+    }
+
+    /** null이면 대피소 전술을 안 씀 (그냥 fight) */
+    private S shelter(Bot bot, LocalPlayer p, ClientLevel l, EnderDragon d) {
+        if (d == null || shFails > 3) { if (bot.ticks % 100 == 0) bot.dbg("대피소 안 씀: d=" + (d != null) + " fails=" + shFails); return null; }
+        boolean arrows = Inv.has(p, Items.ARROW) && Inv.has(p, Items.BOW);
+        DragonPhaseInstance ph = d.getPhaseManager().getCurrentPhase();
+        boolean perched = ph.isSitting() || ph.getPhase() == EnderDragonPhase.LANDING;
+        // 앉은 드래곤은 화살이 안 통함 → 체력이 넉넉하면 나가서 머리 옆에서 칼로 (fight), 아니면 대피소에서 기다림
+        if (perched && p.getHealth() >= 12) return null;
+        // 섬에서 멀면 (시작 발판 등) 먼저 섬 가운데 쪽으로
+        double cdist = Math.hypot(p.getX(), p.getZ());
+        if (cdist > 28) {
+            detail = "섬 가운데로 이동 (대피소 지으러)";
+            Nav.R r = bot.nav.go(new Goal.NearXZ(0, 0, 18));
+            if (r == Nav.R.FAILED) bot.nav.stop();
+            return S.RUNNING;
+        }
+        if (shCell == null) {
+            BlockPos best = null;
+            double bd = 1e9;
+            for (int r : new int[]{10, 11, 9, 12}) {
+                for (int a = 0; a < 24; a++) {
+                    double ang = a * Math.PI * 2 / 24;
+                    int x = (int) Math.floor(Math.cos(ang) * r), z = (int) Math.floor(Math.sin(ang) * r);
+                    int y = groundY(l, x, z);
+                    BlockPos c = new BlockPos(x, y, z);
+                    if (!l.getBlockState(c.below()).is(Blocks.END_STONE)) continue;
+                    if (!l.getBlockState(c).isAir() || !l.getBlockState(c.above()).isAir() || !l.getBlockState(c.above(2)).isAir()) continue;
+                    Direction f = Direction.getNearest(-x, 0, -z);
+                    if (!l.getBlockState(c.relative(f).above()).isAir()) continue;
+                    double dd = p.distanceToSqr(Vec3.atCenterOf(c));
+                    if (dd < bd) { bd = dd; best = c; shFront = f; }
+                }
+                if (best != null) break;
+            }
+            if (best == null) { shFails = 9; bot.log("대피소 자리를 못 찾음"); return null; }
+            shCell = best;
+            shPhase = 0;
+            bot.log("크리스탈 끝 → 포털 옆에 엔드 돌 대피소 (드래곤 돌진·화염을 피하고 창문으로 머리 저격)");
+        }
+        // 엔드 돌이 모자라면 캠
+        int need = 0;
+        for (BlockPos w : shWalls()) if (!dragonProof(l.getBlockState(w))) need++;
+        if (shPhase == 0 && (shGather != null || Inv.count(p, Items.END_STONE) + Inv.count(p, Items.OBSIDIAN) < need)) {
+            if (shGather == null) {
+                shGather = new Miner(st -> st.is(Blocks.END_STONE), Inv.is(Items.END_STONE), Inv.count(p, Items.END_STONE) + need + 4, false);
+                shGather.minY = shCell.getY() - 1;
+            }
+            Miner.R mr = shGather.tick(bot);
+            detail = "대피소용 엔드 돌 모으는 중: " + shGather.info;
+            if (mr != Miner.R.RUNNING) { shGather = null; if (mr == Miner.R.FAILED) shFails++; }
+            return S.RUNNING;
+        }
+        BlockPos f = PathExec.feet(p);
+        if (!f.equals(shCell)) {
+            shPhase = 0; // 나갔다 오면 부서진 벽을 다시 막음
+            shBuild = 0;
+            detail = "대피소 자리로 이동";
+            Nav.R r = bot.nav.go(new Goal.Block(shCell.getX(), shCell.getY(), shCell.getZ(), false));
+            if (r == Nav.R.FAILED) { bot.nav.stop(); shFails++; shCell = null; }
+            return S.RUNNING;
+        }
+        bot.nav.stop();
+        bot.reflex.holdEating = false;
+        if (shPhase == 0) {
+            double dx = shCell.getX() + 0.5 - p.getX(), dz = shCell.getZ() + 0.5 - p.getZ();
+            if (dx * dx + dz * dz > 0.03 && ++shBuild < 60) {
+                bot.ctl.lookYaw(p, Vec3.atBottomCenterOf(shCell), 60f);
+                bot.ctl.fwd = true;
+                bot.ctl.sneak = true;
+                return S.RUNNING;
+            }
+            java.util.function.Predicate<net.minecraft.world.item.ItemStack> proof = st -> st.is(Items.END_STONE) || st.is(Items.OBSIDIAN);
+            for (BlockPos w : shWalls()) {
+                if (dragonProof(l.getBlockState(w))) continue;
+                if (!l.getBlockState(w).canBeReplaced()) { Act.dig(bot, w); return S.RUNNING; }
+                int r = net.damoon.bot.Placer.placeAt(bot, w, proof);
+                if (r == -1) continue;
+                detail = "엔드 돌 대피소 짓는 중";
+                if (++shBuild > 20 * 40) { shFails++; shCell = null; }
+                return S.RUNNING;
+            }
+            shPhase = 1;
+            bot.log("대피소 완성 → 창문으로 드래곤 머리 저격");
+        }
+        // 안에서: 앉은 드래곤 머리 (거의 가만히 있음) 또는 날아다니는 머리를 창문으로 쏨
+        bot.ctl.sneak = true;
+        Vec3 headC = d.head.getBoundingBox().getCenter();
+        Vec3 eye = p.getEyePosition().subtract(0, 0.1, 0);
+        String hp = String.format("드래곤 %.0f/200", d.getHealth());
+        boolean see = !perched && eye.distanceTo(headC) < 50 && Ballistics.clearShot(l, p, eye, headC, Ballistics.FULL);
+        if (arrows && see) {
+            archer.high = false;
+            Vec3 vel = d.position().subtract(d.xo, d.yo, d.zo);
+            if (archer.tick(bot, headC, vel)) bot.log("대피소에서 드래곤 머리에 화살 (" + hp + ")");
+            detail = hp + " — 대피소 창문으로 " + (perched ? "앉은" : "날아다니는") + " 드래곤 머리 저격";
+            return S.RUNNING;
+        }
+        archer.reset();
+        bot.ctl.look(shFront.toYRot(), -10f);
+        detail = hp + " — 대피소 안에서 기다리는 중";
+        return S.RUNNING;
+    }
+
     private S fight(Bot bot, LocalPlayer p, ClientLevel l, EnderDragon d) {
         if (d == null) return S.RUNNING;
         DragonPhaseInstance ph = d.getPhaseManager().getCurrentPhase();
@@ -506,24 +664,46 @@ public class EndGameTask extends Task {
             AABB head = d.head.getBoundingBox();
             double r = Act.reach(p, head);
             bot.reflex.holdEating = p.getHealth() > 8;
-            if (r > 2.9) {
-                detail = hp + " — 내려앉음! 머리로 달려감";
+            // 브레스는 머리 앞쪽으로 나옴 → 머리 옆(정면에서 비켜선 곳)에서 침
+            Vec3 hc = head.getCenter(), bc = d.position();
+            Vec3 fwdDir = new Vec3(hc.x - bc.x, 0, hc.z - bc.z);
+            fwdDir = fwdDir.lengthSqr() < 1e-3 ? new Vec3(1, 0, 0) : fwdDir.normalize();
+            Vec3 toMe = new Vec3(p.getX() - hc.x, 0, p.getZ() - hc.z);
+            boolean inFront = toMe.lengthSqr() > 1e-3 && toMe.normalize().dot(fwdDir) > 0.6;
+            if (r > 2.9 || inFront) {
+                detail = hp + " — 내려앉음! 머리 옆으로 감" + (inFront ? " (정면은 브레스)" : "");
                 archer.reset();
-                // 머리는 계속 조금씩 움직이므로 블록 단위로 고정한 목표를 씀 (매 틱 길찾기 다시 하지 않게)
-                AABB q = new AABB(BlockPos.containing(head.getCenter())).inflate(0.5);
-                Nav.R nr = bot.nav.go(new Goal.Reach(q, 2.6));
-                if (nr == Nav.R.FAILED) bot.nav.stop();
+                Vec3 side = new Vec3(-fwdDir.z, 0, fwdDir.x);
+                Vec3 a = hc.add(side.scale(2.7)), b2 = hc.subtract(side.scale(2.7));
+                Vec3 tgt = p.position().distanceToSqr(a) < p.position().distanceToSqr(b2) ? a : b2;
+                BlockPos tp = BlockPos.containing(tgt.x, p.getY(), tgt.z);
+                Nav.R nr = bot.nav.go(new Goal.Near(tp, 1.2));
+                if (nr == Nav.R.FAILED) {
+                    bot.nav.stop();
+                    AABB q = new AABB(BlockPos.containing(head.getCenter())).inflate(0.5);
+                    bot.nav.go(new Goal.Reach(q, 2.6));
+                }
                 return S.RUNNING;
             }
             bot.nav.stop();
-            detail = hp + " — 머리 공격!";
             Inv.selectWeapon(p);
             bot.ctl.lookAt(p, head.getCenter());
+            // 머리·목 둘레 1칸 안에 들어가면 드래곤이 10씩 때림 → 칼끝 거리(2.6~3.0)만 유지
+            if (p.getHealth() < 10) {
+                // 체력이 낮으면 머리에서 물러나 먹음
+                detail = hp + " — 체력이 낮아 물러나서 먹는 중";
+                bot.reflex.holdEating = false;
+                if (r < 5.5 && Bot.safeAheadToward(p, p.getX() - (head.getCenter().x - p.getX()), p.getZ() - (head.getCenter().z - p.getZ()))) bot.ctl.back = true;
+                return S.RUNNING;
+            }
+            detail = hp + " — 머리 공격!";
             float charge = p.getAttackStrengthScale(0.5f);
-            if (r > 2.4) bot.ctl.fwd = true;
-            if (p.onGround() && charge > 0.85f) bot.ctl.jump = true;
+            if (r < 2.5 && net.damoon.bot.Reflex.safeBehindPublic(p)) bot.ctl.back = true;
+            else if (r > 2.95 && p.onGround()) bot.ctl.fwd = true;
+            // 점프 치명타 (앞으로 가며 뛰지 않게: 제자리 점프)
+            if (p.onGround() && charge > 0.85f && r >= 2.5 && r <= 2.95) { bot.ctl.jump = true; bot.ctl.fwd = false; }
             boolean falling = !p.onGround() && p.getDeltaMovement().y < -0.05;
-            if ((falling || charge >= 1f && p.onGround() && r > 2.7) && bot.ctl.aimed(p, 25)) {
+            if ((falling || charge >= 1f && p.onGround() && r > 2.6) && bot.ctl.aimed(p, 25) && r <= 3.0) {
                 if (Act.attack(bot, d.head, 0.95f) && falling) bot.log("치명타!");
             }
             return S.RUNNING;
@@ -571,7 +751,7 @@ public class EndGameTask extends Task {
         return best;
     }
 
-    private static AreaEffectCloud breathAt(ClientLevel l, LocalPlayer p) {
+    public static AreaEffectCloud breathAt(ClientLevel l, LocalPlayer p) {
         for (Entity e : l.entitiesForRendering()) {
             if (e instanceof AreaEffectCloud c && c.getParticle().getType() == ParticleTypes.DRAGON_BREATH) {
                 double dx = p.getX() - c.getX(), dz = p.getZ() - c.getZ();
