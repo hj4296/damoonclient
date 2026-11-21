@@ -38,7 +38,8 @@ public class ObsidianTask extends Task {
     private final Set<Long> badLava = new HashSet<>();
     private final Set<Long> badWater = new HashSet<>();
     private int waterTries;
-    private BlockPos viewLava;
+    private BlockPos viewLava, waterSrc;
+    private int waterSrcTicks;
     private int viewDigTicks;
     private final Set<Long> badCover = new HashSet<>();
     private final java.util.Map<Long, Integer> coverTries = new java.util.HashMap<>();
@@ -153,9 +154,12 @@ public class ObsidianTask extends Task {
             BlockPos src = Scan.nearest(l, PathExec.feet(p), 3, p.getBlockY() - 24, p.getBlockY() + 40,
                     s -> s.getFluidState().is(FluidTags.WATER) && s.getFluidState().isSource(), b -> l.getBlockState(b.above()).isAir() && !badWater.contains(b.asLong()));
             if (src == null) return S.FAILED;
+            // 같은 물 원천으로 30초 넘게 못 가면 (흐르는 물살에 밀림 등) 다른 원천
+            if (!src.equals(waterSrc)) { waterSrc = src; waterSrcTicks = 0; }
+            if (++waterSrcTicks > 20 * 30) { badWater.add(src.asLong()); bot.nav.stop(); waterSrc = null; return S.RUNNING; }
             if (Act.reach(p, new net.minecraft.world.phys.AABB(src)) > 4.0) {
                 Nav.R r = bot.nav.go(new Goal.Reach(src, 3.0));
-                if (r == Nav.R.FAILED) { bot.nav.stop(); return S.FAILED; }
+                if (r == Nav.R.FAILED) { bot.nav.stop(); badWater.add(src.asLong()); return S.RUNNING; }
                 return S.RUNNING;
             }
             bot.nav.stop();
