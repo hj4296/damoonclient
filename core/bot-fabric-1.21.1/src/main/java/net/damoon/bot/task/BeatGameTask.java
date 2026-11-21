@@ -269,7 +269,11 @@ public class BeatGameTask extends Task {
         // 처음(땅 위에 있을 때) 넉넉히 모아 두고, 나중엔 막대기가 정말 없을 때만 나무를 구하러 감
         int needPlanks = tier < 2 ? 40
                 : (sticks < 3 ? 2 : 0) + (Inv.has(p, Items.CRAFTING_TABLE) || Inv.count(p, planks) >= 4 ? 0 : 4);
-        if (tier < 3 && planksEq(p) < needPlanks) {
+        // (다이아 곡괭이가 있어도 작업대를 잃어버렸고 판자도 없으면 오버월드에선 나무를 구함 — 양동이·방패 등을 못 만듦)
+        boolean noTable = !Inv.has(p, Items.CRAFTING_TABLE) && l.dimension() == net.minecraft.world.level.Level.OVERWORLD;
+        // 이왕 나무하러 가면 작업대 + 예비 방패 3개 + 여유만큼 (한 번에)
+        if (noTable && tier >= 3 && planksEq(p) < needPlanks) needPlanks = 32;
+        if ((tier < 3 || noTable) && planksEq(p) < needPlanks) {
             stage = "1. 나무 모으기";
             int wantLogs = Inv.count(p, logs) + (int) Math.ceil((needPlanks - planksEq(p)) / 4.0) + 1;
             // 땅속이면 먼저 땅 위로
@@ -446,7 +450,7 @@ public class BeatGameTask extends Task {
             // 우유 (위더 스켈레톤의 위더 효과를 풀기 위해) — 빈 양동이가 없으면 하나 더 만듦
             if (!Inv.has(p, Items.MILK_BUCKET) && !cool(bot, "milk")) {
                 if (!Inv.has(p, Items.BUCKET)) {
-                    if (Inv.count(p, Items.IRON_INGOT) >= 3) { stage = "7. 우유용 양동이"; return run(bot, "bucket2", () -> new CraftTask(Items.BUCKET, 1)); }
+                    if (Inv.count(p, Items.IRON_INGOT) >= 3 && !cool(bot, "bucket2")) { stage = "7. 우유용 양동이"; return run(bot, "bucket2", () -> new CraftTask(Items.BUCKET, 1)); }
                 } else {
                     stage = "7. 소에게서 우유 받기";
                     S r = milk(bot, p, l);
