@@ -165,7 +165,8 @@ public final class Tower {
             if (feet.getY() < top - 1 && p.onGround()) { phase = 0; ticks = 0; return true; }
             bot.ctl.sneak = true;
             if (closest == null || cd > 10) calm++; else calm = 0;
-            if (calm > 60) {
+            // 몹이 밑에서 서성이기만 하고 안 다가오면 끝이 없음 → 1분 넘게 위에 있었으면 내려가 방패·칼로 상대
+            if (calm > 60 || ticks > 20 * 60) {
                 phase = 2;
                 ticks = 0;
                 if (bot.ticks - lastDescLog > 400) { bot.log("잠잠해짐 → 기둥 캐며 내려감"); lastDescLog = bot.ticks; }
