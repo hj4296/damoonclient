@@ -208,6 +208,70 @@ public final class Reflex {
             }
         }
 
+        // 엔드: 드래곤 화염구가 내 근처에 떨어질 것 같으면 (구름이 생김) 날아오는 방향의 옆으로 피함
+        if (bot.level().dimension() == net.minecraft.world.level.Level.END) {
+            for (Entity e : bot.level().entitiesForRendering()) {
+                if (!(e instanceof net.minecraft.world.entity.projectile.DragonFireball fb)) continue;
+                Vec3 pos = fb.position(), v = fb.getDeltaMovement();
+                if (v.lengthSqr() < 1e-4) v = fb.position().subtract(fb.xo, fb.yo, fb.zo);
+                if (v.lengthSqr() < 1e-4) continue;
+                Vec3 land = null;
+                for (int t = 0; t < 60; t++) {
+                    Vec3 np = pos.add(v);
+                    var hit = bot.level().clip(new net.minecraft.world.level.ClipContext(pos, np, net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                            net.minecraft.world.level.ClipContext.Fluid.NONE, fb));
+                    if (hit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK) { land = hit.getLocation(); break; }
+                    if (p.getBoundingBox().inflate(0.5).clip(pos, np).isPresent()) { land = p.position(); break; }
+                    pos = np;
+                    v = v.add(v.normalize().scale(0.1)).scale(0.95);
+                }
+                if (land == null || land.distanceTo(p.position()) > 5.5) continue;
+                Vec3 side = new Vec3(-v.z, 0, v.x).normalize();
+                Vec3 away = p.position().subtract(land).multiply(1, 0, 1);
+                if (away.lengthSqr() > 0.01 && side.dot(away) < 0) side = side.scale(-1);
+                Vec3 target = p.position().add(side.scale(6));
+                if (!Bot.safeAheadToward(p, target.x, target.z)) { side = side.scale(-1); target = p.position().add(side.scale(6)); }
+                if (eating) { eating = false; bot.ctl.use = false; }
+                bot.nav.stop();
+                bot.ctl.lookYaw(p, target, 0f);
+                bot.ctl.fwd = true;
+                bot.ctl.sprint = true;
+                if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+                doing = "드래곤 화염구 피하는 중";
+                return true;
+            }
+        }
+
+        // 엔드: 날아오는 드래곤(돌진)은 방패로 막음 (몸통 공격은 방패에 막힘)
+        if (bot.level().dimension() == net.minecraft.world.level.Level.END && p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed()) {
+            for (Entity e : bot.level().entitiesForRendering()) {
+                if (!(e instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon dr) || !dr.isAlive()) continue;
+                var ph = dr.getPhaseManager().getCurrentPhase();
+                if (ph.isSitting()) break;
+                // 몸 부위 중 가장 가까운 것
+                double best = 1e9;
+                Vec3 at = null;
+                for (var part : dr.getSubEntities()) {
+                    double dd = part.getBoundingBox().distanceToSqr(p.getEyePosition());
+                    if (dd < best) { best = dd; at = part.getBoundingBox().getCenter(); }
+                }
+                Vec3 v = dr.position().subtract(dr.xo, dr.yo, dr.zo);
+                Vec3 to = p.position().subtract(dr.position());
+                boolean closing = v.lengthSqr() > 0.01 && v.dot(to) > 0;
+                if (at != null && best < 20 * 20 && closing) {
+                    if (eating) { eating = false; }
+                    Inv.selectWeapon(p);
+                    if (p.isUsingItem() && !p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; return true; }
+                    bot.ctl.lookAt(p, at);
+                    bot.ctl.speed = 45f;
+                    bot.ctl.use = true;
+                    doing = "돌진하는 드래곤을 방패로 막는 중";
+                    return true;
+                }
+                break;
+            }
+        }
+
         // 엔더 진주로 위기 탈출 (공허·죽을 낙하·용암·포위) — 무엇보다 먼저
         if (Pearl.tick(bot)) return true;
 

@@ -173,7 +173,7 @@ public class EndGameTask extends Task {
             return crystals(bot, p, l, crystals);
         }
         // 크리스탈을 다 부순 뒤: 엔드 돌 대피소(드래곤이 못 부숨)에서 창문으로 머리를 쏘고, 화살이 없으면 앉았을 때만 나가서 벰
-        S sh = shelter(bot, p, l, dragon);
+        S sh = hole(bot, p, l, dragon);
         if (sh != null) return sh;
         return fight(bot, p, l, dragon);
     }
@@ -527,6 +527,152 @@ public class EndGameTask extends Task {
 
     // ---------------- 드래곤과 싸우기 ----------------
     private Vec3 lastDragonPos;
+
+    // ---------------- 드래곤 구멍: 3칸 파고 들어가 덮음 (브레스·돌진·화염구 모두 안 닿음), 앉았을 때만 나가서 벰 ----------------
+    private BlockPos hTop;      // 구멍 입구 칸 (땅 높이의 발 위치)
+    private int hFails, hTicks;
+    private boolean hOut;       // 지금 밖에 나가 싸우는 중
+
+    private boolean healing;
+
+    private S hole(Bot bot, LocalPlayer p, ClientLevel l, EnderDragon d) {
+        if (d == null || hFails > 4) return null;
+        // 평소엔 열린 곳에서 싸우고(fight), 체력이 10 아래면 덮은 구멍에 숨어 먹고 18까지 회복
+        if (!healing && p.getHealth() < 10) { healing = true; bot.log("체력 " + (int) p.getHealth() + " → 구멍을 파고 숨어서 회복"); }
+        if (healing && p.getHealth() >= 18 && p.getFoodData().getFoodLevel() >= 17) { healing = false; hOut = false; bot.log("회복 완료 → 다시 싸우러"); }
+        if (!healing) {
+            if (hOut || hTop == null) return null;
+            // 구멍 안에 있으면 나옴
+            BlockPos f0 = PathExec.feet(p);
+            if (f0.getY() < hTop.getY() && Math.abs(f0.getX() - hTop.getX()) + Math.abs(f0.getZ() - hTop.getZ()) == 0) {
+                detail = "구멍에서 나가는 중";
+                BlockPos cover = hTop.below();
+                if (!l.getBlockState(cover).isAir() && !l.getBlockState(cover).canBeReplaced() && hTop.getY() - f0.getY() >= 2) { Act.dig(bot, cover); return S.RUNNING; }
+                Act.stopDig(bot);
+                bot.ctl.look(p.getYRot(), 90f);
+                bot.ctl.sneak = true;
+                if (p.getXRot() > 70f) {
+                    if (p.onGround()) bot.ctl.jump = true;
+                    BlockPos at = BlockPos.containing(p.getX(), Math.floor(p.getY() - 0.01), p.getZ());
+                    if (!p.onGround() && l.getBlockState(at).isAir() && !l.getBlockState(at.below()).isAir() && p.getY() > at.getY() + 1.05)
+                        Act.place(bot, at.below(), Direction.UP);
+                }
+                return S.RUNNING;
+            }
+            hOut = true;
+            return null;
+        }
+        hOut = false;
+        DragonPhaseInstance ph = d.getPhaseManager().getCurrentPhase();
+        boolean perched = ph.isSitting() || ph.getPhase() == EnderDragonPhase.LANDING;
+        if (bot.ticks % 100 == 0) bot.dbg(String.format("드래곤 상태 %s 체력 %.0f 거리 %.0f 위치 %.0f,%.0f,%.0f", ph.getPhase(), d.getHealth(), d.distanceTo(p), d.getX(), d.getY(), d.getZ()));
+        double cdist = Math.hypot(p.getX(), p.getZ());
+        if (cdist > 28 && !hOut) {
+            detail = "섬 가운데로 이동 (구멍 파러)";
+            Nav.R r = bot.nav.go(new Goal.NearXZ(0, 0, 18));
+            if (r == Nav.R.FAILED) bot.nav.stop();
+            return S.RUNNING;
+        }
+        if (hTop == null) {
+            BlockPos best = null;
+            double bd = 1e9;
+            for (int r : new int[]{9, 10, 8, 11}) {
+                for (int a = 0; a < 24; a++) {
+                    double ang = a * Math.PI * 2 / 24;
+                    int x = (int) Math.floor(Math.cos(ang) * r), z = (int) Math.floor(Math.sin(ang) * r);
+                    int y = groundY(l, x, z);
+                    BlockPos c = new BlockPos(x, y, z);
+                    boolean ok = l.getBlockState(c).isAir() && l.getBlockState(c.above()).isAir();
+                    for (int k = 1; k <= 4 && ok; k++) if (!l.getBlockState(c.below(k)).is(Blocks.END_STONE)) ok = false;
+                    for (Direction h : Direction.Plane.HORIZONTAL)
+                        for (int k = 1; k <= 3 && ok; k++) if (!l.getBlockState(c.below(k).relative(h)).is(Blocks.END_STONE)) ok = false;
+                    if (!ok) continue;
+                    double dd = p.distanceToSqr(Vec3.atCenterOf(c));
+                    if (dd < bd) { bd = dd; best = c; }
+                }
+                if (best != null) break;
+            }
+            if (best == null) { hFails = 9; bot.log("구멍 팔 자리를 못 찾음"); return null; }
+            hTop = best;
+            bot.log("숨을 구멍 자리: " + hTop.toShortString());
+        }
+        // 앉았고 체력이 넉넉하면 나가서 싸움 (fight가 머리 옆으로 감)
+        if (false) {
+            if (!hOut) {
+                BlockPos f = PathExec.feet(p);
+                int depth = hTop.getY() - f.getY();
+                if (depth > 0 && Math.abs(f.getX() - hTop.getX()) + Math.abs(f.getZ() - hTop.getZ()) == 0) {
+                    // 덮개 부수고 블록을 쌓아 올라감
+                    detail = "드래곤이 앉음! 구멍에서 나가는 중";
+                    Act.stopDig(bot);
+                    bot.ctl.look(p.getYRot(), 90f);
+                    bot.ctl.sneak = true;
+                    if (p.getXRot() > 70f) {
+                        if (p.onGround()) bot.ctl.jump = true;
+                        BlockPos at = BlockPos.containing(p.getX(), Math.floor(p.getY() - 0.01), p.getZ());
+                        if (!p.onGround() && l.getBlockState(at).isAir() && !l.getBlockState(at.below()).isAir() && p.getY() > at.getY() + 1.05)
+                            Act.place(bot, at.below(), Direction.UP);
+                    }
+                    return S.RUNNING;
+                }
+                hOut = true;
+            }
+            bot.reflex.forceEat = false;
+            return null; // fight()가 앉은 드래곤 머리 옆에서 공격
+        }
+        // 날고 있음 (또는 체력이 낮음): 구멍으로
+        BlockPos f = PathExec.feet(p);
+        boolean onTop = Math.abs(f.getX() - hTop.getX()) + Math.abs(f.getZ() - hTop.getZ()) == 0;
+        if (!onTop && f.getY() >= hTop.getY() - 1) {
+            hOut = false;
+            detail = "구멍으로 돌아가는 중";
+            Nav.R r = bot.nav.go(new Goal.Block(hTop.getX(), hTop.getY(), hTop.getZ(), false));
+            if (r == Nav.R.FAILED) { bot.nav.stop(); if (++hFails > 4) return null; hTop = null; }
+            return S.RUNNING;
+        }
+        bot.nav.stop();
+        hOut = false;
+        int depth = hTop.getY() - f.getY();
+        if (depth < 3) {
+            detail = "숨을 구멍 파는 중 (" + Math.max(0, depth) + "/3)";
+            if (!p.onGround()) return S.RUNNING;
+            double dx = hTop.getX() + 0.5 - p.getX(), dz = hTop.getZ() + 0.5 - p.getZ();
+            if (dx * dx + dz * dz > 0.03 && depth == 0) {
+                bot.ctl.lookYaw(p, Vec3.atBottomCenterOf(hTop), 60f);
+                bot.ctl.fwd = true;
+                bot.ctl.sneak = true;
+                return S.RUNNING;
+            }
+            bot.ctl.look(p.getYRot(), 90f);
+            bot.ctl.speed = 60f;
+            Act.dig(bot, f.below());
+            if (++hTicks > 20 * 30) { hTicks = 0; hFails++; hTop = null; }
+            return S.RUNNING;
+        }
+        BlockPos cover = hTop.below();
+        if (l.getBlockState(cover).canBeReplaced()) {
+            detail = "구멍 위를 덮는 중";
+            net.damoon.bot.Placer.placeAt(bot, cover, st -> st.is(Items.END_STONE) || Inv.throwaway().test(st));
+            return S.RUNNING;
+        }
+        hTicks = 0;
+        String hp = String.format("드래곤 %.0f/200", d.getHealth());
+        bot.reflex.holdEating = false;
+        bot.reflex.forceEat = p.getHealth() < 20;
+        boolean arrows = Inv.has(p, Items.ARROW) && Inv.has(p, Items.BOW);
+        Vec3 headC = d.head.getBoundingBox().getCenter();
+        Vec3 eye = p.getEyePosition().subtract(0, 0.1, 0);
+        if (false && arrows && !perched && eye.distanceTo(headC) < 45 && Ballistics.clearShot(l, p, eye, headC, Ballistics.FULL)) {
+            archer.high = false;
+            Vec3 vel = d.position().subtract(d.xo, d.yo, d.zo);
+            if (archer.tick(bot, headC, vel)) bot.log("참호에서 드래곤 머리에 화살 (" + hp + ")");
+            detail = hp + " — 참호에서 날아다니는 드래곤 머리 저격";
+            return S.RUNNING;
+        }
+        archer.reset();
+        detail = hp + " — 구멍 속에서 먹으며 회복 중 (체력 " + (int) p.getHealth() + ")";
+        return S.RUNNING;
+    }
 
     private BlockPos shCell;
     private Direction shFront;
