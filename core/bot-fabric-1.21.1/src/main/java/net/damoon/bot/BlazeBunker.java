@@ -29,6 +29,8 @@ public final class BlazeBunker {
     private int phase;              // 0 자리로, 1 짓기, 2 싸우기
     private int buildTicks;
     private boolean sally;
+    /** 벙커 없이 스포너 위·옆에서 방패+칼로 싸움 (블레이즈가 스폰되자마자 칼이 닿음) */
+    private boolean open = true;
     private int sallyStart, lastGain, lastRods = -1, sallyRods = -1;
     public String info = "";
 
@@ -105,9 +107,63 @@ public final class BlazeBunker {
         return out;
     }
 
+    private int openFails;
+    private boolean announced;
+
+    /** 스포너 위에 서서 싸움: 스폰되는 블레이즈는 바로 칼이 닿고, 멀리 뜬 건 반사 행동이 활·접근으로 처리 */
+    private R openFight(Bot bot, LocalPlayer p, ClientLevel l, List<Entity> blazes, int rods, int want) {
+        bot.reflex.camp = false;
+        bot.reflex.building = false;
+        bot.reflex.forceEat = p.getHealth() < 16;
+        // 떨어진 막대 줍기 (가까운 블레이즈가 없을 때)
+        boolean close = false;
+        for (Entity e : blazes) if (e.distanceTo(p) < 5) { close = true; break; }
+        if (!close) {
+            for (Entity e : l.entitiesForRendering()) {
+                if (e instanceof ItemEntity ie && ie.getItem().is(Items.BLAZE_ROD) && ie.distanceTo(p) < 12) {
+                    info = "막대 줍는 중 (" + rods + "/" + want + ")";
+                    if (ie.distanceTo(p) < 2.5) { bot.nav.stop(); bot.ctl.lookYaw(p, ie.position(), 20f); bot.ctl.fwd = true; }
+                    else { Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0)); if (r == Nav.R.FAILED) bot.nav.stop(); }
+                    return R.RUNNING;
+                }
+                if (e instanceof net.minecraft.world.entity.projectile.AbstractArrow a && a.getOwner() == p && a.getDeltaMovement().lengthSqr() < 0.001
+                        && a.distanceTo(p) < 8 && a.pickup == net.minecraft.world.entity.projectile.AbstractArrow.Pickup.ALLOWED) {
+                    info = "땅에 꽂힌 화살 줍는 중";
+                    Nav.R r = bot.nav.go(new Goal.Near(a.blockPosition(), 0.8));
+                    if (r == Nav.R.FAILED) bot.nav.stop();
+                    return R.RUNNING;
+                }
+            }
+        }
+        info = "스포너 위에서 방패+칼로 블레이즈 잡는 중 (" + rods + "/" + want + ")";
+        BlockPos top = spawner.above();
+        boolean onTop = PathExec.feet(p).equals(top);
+        if (!onTop && openFails < 3) {
+            Nav.R r = bot.nav.go(new Goal.Block(top));
+            if (r == Nav.R.FAILED) { bot.nav.stop(); openFails++; }
+            return R.RUNNING;
+        }
+        if (!onTop && p.distanceToSqr(Vec3.atCenterOf(spawner)) > 3.0 * 3.0) {
+            Nav.R r = bot.nav.go(new Goal.Near(spawner, 2.5));
+            if (r == Nav.R.FAILED) bot.nav.stop();
+            return R.RUNNING;
+        }
+        bot.nav.stop();
+        // 블레이즈가 없으면 스포너 쪽을 보고 방패를 든 채 기다림
+        bot.ctl.use = p.getOffhandItem().is(Items.SHIELD);
+        if (onTop) bot.ctl.sneak = true; // 스포너 위에서 떨어지지 않게
+        return R.RUNNING;
+    }
+
     public R tick(Bot bot, int rods, int want) {
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
+        if (open && !quick) {
+            List<Entity> bl = new ArrayList<>();
+            for (Entity e : l.entitiesForRendering()) if (e instanceof Blaze b && b.isAlive() && b.distanceTo(p) < 16) bl.add(e);
+            if (!announced) { announced = true; bot.log("블레이즈 스포너 " + spawner.toShortString() + " → 스포너 위에서 방패+칼로 싸움"); }
+            return openFight(bot, p, l, bl, rods, want);
+        }
         if (cell == null) {
             Direction[] f = new Direction[1];
             cell = pick(l, p, spawner, f);
@@ -159,6 +215,20 @@ public final class BlazeBunker {
                         if (r == Nav.R.FAILED) bot.nav.stop();
                         return R.RUNNING;
                     }
+                }
+                // 블레이즈는 나를 볼 수 있으면 다가오지 않고 떠서 쏘기만 함 → 칼이 닿게 내가 그 아래로 감
+                Blaze tgt = null;
+                double best = 1e9;
+                for (Entity e : blazes) {
+                    if (!(e instanceof Blaze b) || e.getY() > p.getY() + 3.2 || e.getY() < p.getY() - 2.5 || !p.hasLineOfSight(e)) continue;
+                    double s = e.distanceTo(p) + b.getHealth() * 0.3;
+                    if (s < best) { best = s; tgt = b; }
+                }
+                if (tgt != null && tgt.distanceTo(p) > 2.6) {
+                    info = "블레이즈 밑으로 다가가 칼로 벰 (" + rods + "/" + want + ")";
+                    Nav.R r = bot.nav.go(new Goal.NearXZ(tgt.getBlockX(), tgt.getBlockZ(), 2));
+                    if (r != Nav.R.RUNNING) { bot.nav.stop(); bot.ctl.lookAt(p, tgt.getEyePosition()); bot.ctl.use = p.getOffhandItem().is(Items.SHIELD); }
+                    return R.RUNNING;
                 }
                 info = "스포너 옆에서 방패 들고 블레이즈와 싸우는 중 (" + rods + "/" + want + ")";
                 Nav.R r = bot.nav.go(new Goal.Near(spawner, 2.5));

@@ -460,7 +460,7 @@ public final class Reflex {
             Inv.selectWeapon(p);
             bot.ctl.lookAt(p, bz.getBoundingBox().getCenter());
             bot.ctl.use = true;
-            if (!danger && r > 3.0 && !camp) bot.ctl.fwd = true;
+            if (!danger && r > 3.0 && !camp && Bot.safeAhead(p)) bot.ctl.fwd = true;
             doing = danger ? "블레이즈가 코앞에서 쏘는 중 → 방패" : camp ? "방패 들고 블레이즈 기다리는 중" : "방패 들고 블레이즈에게 다가가는 중";
             return true;
         }
