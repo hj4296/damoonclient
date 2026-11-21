@@ -24,6 +24,8 @@ public final class Nav {
     public boolean allowPlace = true;
     public String info = "";
     private final Set<Long> avoid = new HashSet<>();
+    /** 끼었던 이동 → 만료 틱 (길찾기를 새로 해도 3분 동안 기억) */
+    private final java.util.Map<Long, Integer> badEdges = new java.util.HashMap<>();
 
     Nav(Bot bot) { this.bot = bot; }
 
@@ -66,6 +68,13 @@ public final class Nav {
                 fails++;
                 bot.log("경로 실패: " + exec.why + " (" + fails + "회)");
                 if (exec.why.contains("못 캐는") || exec.why.contains("끼임")) avoid.add(exec.target().pos().asLong());
+                if (exec.why.contains("끼임") || exec.why.contains("너무 오래")) {
+                    PathFinder.Node a = exec.path.get(Math.min(exec.index(), exec.path.size() - 1)), b = exec.target();
+                    badEdges.put(PathFinder.edge(a.x, a.y, a.z, b.x, b.y, b.z), bot.ticks + 20 * 180);
+                    // 출발 칸이 살짝 다르게 잡혀도 피하도록 실제 발 위치에서의 이동도 막음
+                    BlockPos ff = PathExec.feet(p);
+                    badEdges.put(PathFinder.edge(ff.getX(), ff.getY(), ff.getZ(), b.x, b.y, b.z), bot.ticks + 20 * 180);
+                }
                 waitTicks = 5;
             }
             exec = null;
@@ -78,6 +87,8 @@ public final class Nav {
             finder = new PathFinder(p.level(), p, f, g, blocks);
             finder.canBreak = allowBreak;
             finder.avoid.addAll(avoid);
+            badEdges.values().removeIf(t -> t < bot.ticks);
+            finder.badEdges.addAll(badEdges.keySet());
         }
         PathFinder.Status s = finder.step(18_000_000L);
         info = "길찾는 중… " + finder.expanded();

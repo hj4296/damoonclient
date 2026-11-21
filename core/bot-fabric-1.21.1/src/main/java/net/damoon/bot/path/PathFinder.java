@@ -59,6 +59,12 @@ public final class PathFinder {
     public boolean canBreak = true;
     public int placeBlocks;
     public final java.util.Set<Long> avoid = new java.util.HashSet<>();
+    /** 실제로 해 보니 못 가는 이동 (끼임) — 같은 길을 다시 고르지 않게 */
+    public final java.util.Set<Long> badEdges = new java.util.HashSet<>();
+
+    public static long edge(int fx, int fy, int fz, int tx, int ty, int tz) {
+        return BlockPos.asLong(fx, fy, fz) * 1000003L ^ BlockPos.asLong(tx, ty, tz);
+    }
     private Status status = Status.RUNNING;
 
     public PathFinder(Level level, Player player, BlockPos from, Goal goal, int throwaway) {
@@ -162,6 +168,7 @@ public final class PathFinder {
 
     private void add(Node from, int x, int y, int z, double cost, Move m, long[] br, long place) {
         if (cost >= BlockUtil.INF || y < level.getMinBuildHeight() || y > level.getMaxBuildHeight()) return;
+        if (!badEdges.isEmpty() && badEdges.contains(edge(from.x, from.y, from.z, x, y, z))) return;
         double g = from.g + cost + danger(x, y, z);
         long k = BlockPos.asLong(x, y, z);
         Node n = nodes.get(k);
