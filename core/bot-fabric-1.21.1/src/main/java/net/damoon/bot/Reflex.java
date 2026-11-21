@@ -439,6 +439,20 @@ public final class Reflex {
         if (threat != null) {
             // 활 쏘는 몹에게 다가갈 때는 방패를 들고 감
             double r = Act.reach(p, threat.getBoundingBox());
+            // 방패가 없으면 멀리서 쏘는 몹에게 다가가지 않음 (가다가 여러 대 맞음) → 반대쪽으로 달려 시야에서 벗어남
+            if (ranged(threat) && !shieldOn && r > 5.0 && !(threat instanceof net.minecraft.world.entity.monster.Blaze)) {
+                Vec3 away = p.position().subtract(threat.position()).multiply(1, 0, 1);
+                if (away.lengthSqr() < 0.01) away = new Vec3(1, 0, 0);
+                Vec3 to = p.position().add(away.normalize().scale(6));
+                if (Bot.safeAheadToward(p, to.x, to.z)) {
+                    bot.ctl.lookYaw(p, to, 0f);
+                    bot.ctl.fwd = true;
+                    bot.ctl.sprint = p.getFoodData().getFoodLevel() > 6;
+                    if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+                    doing = "방패가 없어 " + threat.getName().getString() + "에게서 도망";
+                    return true;
+                }
+            }
             if (ranged(threat) && r > 3.0 && shieldOn) {
                 Inv.selectWeapon(p);
                 bot.ctl.lookAt(p, threat.getBoundingBox().getCenter());
@@ -691,9 +705,12 @@ public final class Reflex {
                 && bot.level().getGameTime() - lastHurtStamp(p) < 60 && atk.distanceTo(p) < 6 && p.hasLineOfSight(atk)) {
             return atk;
         }
+        boolean inEnd = bot.level().dimension() == net.minecraft.world.level.Level.END;
         for (Entity e : bot.level().entitiesForRendering()) {
             if (!hostile(e)) continue;
             if (e instanceof EnderMan && bot.ticks < ignoreEndermenUntil) continue;
+            // 엔드에선 드래곤이 우선: 엔더맨은 바로 옆(3칸)에서 덤빌 때만
+            if (inEnd && e instanceof EnderMan && e.distanceTo(p) > 3) continue;
             if (bot.ticks < ignoreUntil.getOrDefault(e.getId(), 0)) continue;
             double d = e.distanceTo(p);
             // 활 쏘는 몹은 멀리서도 보이면 달려가서 벰
