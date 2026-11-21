@@ -648,8 +648,9 @@ public class BeatGameTask extends Task {
                     || st.is(Items.BLAZE_ROD) || st.is(Items.DIAMOND) || st.is(Items.OBSIDIAN) || st.is(Items.FLINT))) continue;
             double d = ie.distanceTo(p);
             if (d > 10 || d < 0.8 || Math.abs(ie.getY() - p.getY()) > 3 || !ie.onGround() || lootIgnore.contains(ie.getId())) continue;
-            int t = lootTime.merge(ie.getId(), 1, Integer::sum);
-            if (t > 20 * 10) { lootIgnore.add(ie.getId()); bot.nav.stop(); continue; }
+            // 처음 본 때부터 10초 (거미줄에 걸려 떠 있는 실처럼 가끔만 조건에 맞아도 끝이 나도록 실제 시간으로 셈)
+            int first = lootTime.computeIfAbsent(ie.getId(), k -> bot.ticks);
+            if (bot.ticks - first > 20 * 10) { lootIgnore.add(ie.getId()); continue; }
             stage = "줍기: " + st.getHoverName().getString();
             Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0));
             if (r == Nav.R.ARRIVED) { bot.ctl.lookYaw(p, ie.position(), 20f); bot.ctl.fwd = true; }
