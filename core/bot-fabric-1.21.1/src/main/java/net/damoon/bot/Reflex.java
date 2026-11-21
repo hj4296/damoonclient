@@ -92,6 +92,15 @@ public final class Reflex {
             else bot.ctl.lookAt(p, proj.position());
             bot.ctl.speed = 45f;
             bot.ctl.use = true;
+            // 쏜 몹(스켈레톤 등)이 16칸 안이면 방패를 든 채 그쪽으로 걸어가서 잡음 (가만히 막기만 하면 끝이 안 남)
+            Entity shooterE = proj instanceof net.minecraft.world.entity.projectile.Projectile pj ? pj.getOwner() : null;
+            if (shooterE instanceof LivingEntity sh && sh.isAlive() && hostile(sh) && sh.distanceTo(p) < 16 && Float.isNaN(faceYaw)
+                    && Bot.safeAheadToward(p, sh.getX(), sh.getZ()) && !(sh instanceof net.minecraft.world.entity.monster.Blaze) && !(sh instanceof net.minecraft.world.entity.monster.Ghast)) {
+                bot.ctl.moveToward(p, sh.position());
+                if (p.horizontalCollision && p.onGround()) bot.ctl.jump = true;
+                doing = "화살을 막으며 " + sh.getName().getString() + "에게 다가가는 중";
+                return true;
+            }
             // 막으면서도 가던 길은 계속 감 (걷는 길일 때만, 방패 쪽을 본 채 옆·뒷걸음)
             var ex = bot.nav.exec();
             if (ex != null) {
