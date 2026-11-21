@@ -521,6 +521,15 @@ public class BeatGameTask extends Task {
                 return r;
             }
             stage = "7. 네더 포털 짓기";
+            // 포털은 땅 위 평지에 지음 (땅속 좁은 동굴에선 틀 블록을 놓을 받침이 없어 자주 실패)
+            if (!(sub instanceof PortalTask) && (portalTask == null || portalTask.placedObsidian(l) == 0)) {
+                BlockPos pf = PathExec.feet(p);
+                int ptop = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pf.getX(), pf.getZ());
+                if (surfaceTrip(bot, pf, ptop, pf.getY() < ptop - 6 && l.getBrightness(net.minecraft.world.level.LightLayer.SKY, pf) < 8)) {
+                    detail = "포털 지을 땅 위로 올라가는 중";
+                    return S.RUNNING;
+                }
+            }
             if (portalTask == null || portalFails > 3) { portalTask = new PortalTask(); portalFails = 0; }
             final PortalTask pt = portalTask;
             S r = run(bot, "portal", () -> pt);
