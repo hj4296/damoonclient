@@ -156,22 +156,33 @@ public final class Reflex {
 
         // 위험하면 블록으로 몸을 감싸고 회복 (터틀링)
         // 물속에서 숨이 차면 가장 가까운 공기 쪽으로 헤엄쳐 올라감 (익사 방지) — 무엇보다 먼저
-        if (p.isUnderWater() && p.getAirSupply() < 150) {
+        if (p.isUnderWater() && p.getAirSupply() < 200) {
             net.minecraft.core.BlockPos f = p.blockPosition();
             net.minecraft.core.BlockPos air = null;
             double ad = 1e9;
-            for (net.minecraft.core.BlockPos q : net.minecraft.core.BlockPos.betweenClosed(f.offset(-6, -2, -6), f.offset(6, 8, 6))) {
+            // 가까운 공기 칸 (위쪽 우선, 물에 닿아 있어야 헤엄쳐 갈 수 있음)
+            for (net.minecraft.core.BlockPos q : net.minecraft.core.BlockPos.betweenClosed(f.offset(-10, -3, -10), f.offset(10, 16, 10))) {
                 var st = bot.level().getBlockState(q);
                 if (!st.isAir() || !bot.level().getBlockState(q.above()).isAir()) continue;
-                double d = q.distSqr(f) + (q.getY() < f.getY() ? 20 : 0);
+                boolean touchesWater = false;
+                for (net.minecraft.core.Direction dd : net.minecraft.core.Direction.values())
+                    if (bot.level().getFluidState(q.relative(dd)).is(net.minecraft.tags.FluidTags.WATER)) { touchesWater = true; break; }
+                if (!touchesWater) continue;
+                double d = q.distSqr(f) + (q.getY() < f.getY() ? 30 : 0);
                 if (d < ad) { ad = d; air = q.immutable(); }
             }
             if (eating) { eating = false; bot.ctl.use = false; }
-            Act.stopDig(bot);
             bot.nav.stop();
-            if (air != null) {
+            net.minecraft.core.BlockPos head = net.minecraft.core.BlockPos.containing(p.getEyePosition()).above();
+            var hs = bot.level().getBlockState(head);
+            boolean ceiling = !hs.getCollisionShape(bot.level(), head).isEmpty();
+            if (air != null && ad < 12 * 12) {
+                Act.stopDig(bot);
                 bot.ctl.lookAt(p, Vec3.atCenterOf(air));
                 bot.ctl.fwd = Math.abs(air.getX() + 0.5 - p.getX()) + Math.abs(air.getZ() + 0.5 - p.getZ()) > 0.6;
+            } else if (ceiling && BlockUtil.breakable(bot.level(), head.getX(), head.getY(), head.getZ(), hs)) {
+                // 위가 막혀 있고 공기가 안 보이면 위로 파 올라감
+                Act.dig(bot, head);
             } else bot.ctl.look(p.getYRot(), -70f);
             bot.ctl.jump = true;
             bot.ctl.sprint = true;
