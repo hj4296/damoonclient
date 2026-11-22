@@ -258,6 +258,12 @@ public class BeatGameTask extends Task {
             bot.log("이미 지은 포털이 있음 " + owPortal.toShortString() + " → " + subKey + " 그만두고 그리로");
             sub = null; subKey = ""; bot.nav.stop();
         }
+        // 떨어뜨린 물건의 시계가 가는 중이면 하던 하위 작업(숨기·캐기 등)을 그만두고 물건부터
+        if (sub != null && bot.deathPos != null && bot.deathDim == l.dimension() && pileTicking(p, bot.deathPos)) {
+            bot.log("떨어뜨린 물건이 사라지기 시작함 → " + subKey + " 그만두고 물건부터");
+            bot.reflex.building = false; bot.reflex.camp = false;
+            sub = null; subKey = ""; bot.nav.stop();
+        }
         if (sub != null) { bot.trace = "sub " + subKey; return run(bot, subKey, () -> sub); }
         if (l.dimension() == Level.NETHER) {
             // 네더에서 죽었으면 다시 왔을 때 먼저 떨어뜨린 물건을 찾음 (멀리 있던 동안은 물건 시계가 멈춰 있음)
@@ -275,6 +281,12 @@ public class BeatGameTask extends Task {
     /** 죽은 자리로 돌아가 떨어뜨린 물건 줍기 (아이템은 5분 뒤 사라지므로 4분 안에) */
     private int recoverNear, recoverDeathTick = -1, recoverFails;
     private boolean recoverLoaded, recoverFromMemory;
+
+    /** 떨어뜨린 물건 자리의 청크가 움직이는(5분 시계가 가는) 범위 안인지 — 시뮬레이션 거리 8청크 + 여유 1 */
+    private static boolean pileTicking(LocalPlayer p, BlockPos d) {
+        int cx = Math.abs((d.getX() >> 4) - (p.getBlockX() >> 4)), cz = Math.abs((d.getZ() >> 4) - (p.getBlockZ() >> 4));
+        return Math.max(cx, cz) <= 9;
+    }
 
     private void forgetDeath(Bot bot) {
         bot.deathPos = null;
@@ -303,8 +315,10 @@ public class BeatGameTask extends Task {
         if (recoverDeathTick != bot.deathTick) { recoverDeathTick = bot.deathTick; if (!recoverFromMemory) recoverNear = 0; recoverFromMemory = false; recoverFails = 0; }
         BlockPos d = bot.deathPos;
         double dist = Math.sqrt(p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(d)));
-        // 떨어진 물건은 그 자리가 플레이어 근처(약 8청크 안)라 움직일 때만 5분 시계가 감 → 멀리서 다시 태어났으면 시간은 멈춰 있음
-        if (dist < 130) recoverNear++;
+        // 떨어진 물건은 그 청크가 플레이어 둘레 '움직이는 범위'(시뮬레이션 거리 8청크, 네모 범위 → 대각선이면 180칸까지) 안일 때만
+        // 5분 시계가 감 → 멀리서 다시 태어났으면 시간은 멈춰 있음 (직선 130칸으로 재다가 145칸 근처에서 사냥하는 동안 물건이 사라짐)
+        boolean ticking = pileTicking(p, d);
+        if (ticking) recoverNear++;
         if (recoverNear > 20 * 60 * 4 + 20 * 30) { bot.log("물건이 사라졌을 시간 → 포기"); forgetDeath(bot); return null; }
         // 용암에 빠져 죽었으면 (죽은 칸·발밑이 용암) 물건은 이미 탔고, 가면 또 빠짐 → 안 감
         if (l.isLoaded(d) && (net.damoon.bot.BlockUtil.isLava(l.getBlockState(d)) || net.damoon.bot.BlockUtil.isLava(l.getBlockState(d.below())))) {
@@ -314,13 +328,16 @@ public class BeatGameTask extends Task {
         // 멀리서 다시 태어났고 맨손이면: 물건은 안 사라지니 먼저 돌 곡괭이·칼만 만들고 감 (맨손으로 땅속 먼 길은 위험)
         // 먼 길이면 돌 곡괭이·칼과 음식 3개는 챙긴 뒤에 감 (빈손·굶주린 채 가다 죽음). 체력이 낮고 먹을 게 없으면 먼저 사냥
         boolean sword = Inv.has(p, Items.STONE_SWORD) || Inv.has(p, Items.IRON_SWORD) || Inv.has(p, Items.DIAMOND_SWORD);
-        // (배가 불러도 먹을 게 3개 안 되면 먼저 사냥 — 안 그러면 배고파질 때까지 딴 일만 하며 물건을 미룸)
-        if (dist > 140 && foodCount(p) < 3 && tier(p) >= 1 && !cool(bot, "emhunt")) huntLatch = true;
-        if (dist > 140 && (tier(p) < 2 || !sword || foodCount(p) < 3)) return null;
-        if (foodCount(p) < 1 && (p.getHealth() < 12 || p.getFoodData().getFoodLevel() < 10)) return null;
-        // 멀리 가야 하는데 방패·갑옷이 없으면 밤엔 가지 않음 (가다가 스켈레톤·좀비에게 죽음) → 밤엔 숨고 낮에 감
-        boolean weakNow = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
-        if (dist > 40 && weakNow && l.dimension() == Level.OVERWORLD && BedTask.dark(l)) return null;
+        // 시계가 멈춰 있을 때(멀리 있음)만 준비를 함. 시계가 가기 시작했으면(가까이 옴) 사냥·숨기 없이 곧장 감
+        if (!ticking) {
+            // (배가 불러도 먹을 게 3개 안 되면 먼저 사냥 — 안 그러면 배고파질 때까지 딴 일만 하며 물건을 미룸)
+            if (foodCount(p) < 3 && tier(p) >= 1 && !cool(bot, "emhunt")) huntLatch = true;
+            if (tier(p) < 2 || !sword || foodCount(p) < 3) return null;
+            if (foodCount(p) < 1 && (p.getHealth() < 12 || p.getFoodData().getFoodLevel() < 10)) return null;
+            // 멀리 가야 하는데 방패·갑옷이 없으면 밤엔 가지 않음 (가다가 스켈레톤·좀비에게 죽음) → 밤엔 숨고 낮에 감
+            boolean weakNow = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
+            if (weakNow && l.dimension() == Level.OVERWORLD && BedTask.dark(l)) return null;
+        }
         stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";
         if (dist > 6) {
             Nav.R r = bot.nav.go(new Goal.Near(d, 3));
