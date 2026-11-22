@@ -314,6 +314,8 @@ public class BeatGameTask extends Task {
         // 멀리서 다시 태어났고 맨손이면: 물건은 안 사라지니 먼저 돌 곡괭이·칼만 만들고 감 (맨손으로 땅속 먼 길은 위험)
         // 먼 길이면 돌 곡괭이·칼과 음식 3개는 챙긴 뒤에 감 (빈손·굶주린 채 가다 죽음). 체력이 낮고 먹을 게 없으면 먼저 사냥
         boolean sword = Inv.has(p, Items.STONE_SWORD) || Inv.has(p, Items.IRON_SWORD) || Inv.has(p, Items.DIAMOND_SWORD);
+        // (배가 불러도 먹을 게 3개 안 되면 먼저 사냥 — 안 그러면 배고파질 때까지 딴 일만 하며 물건을 미룸)
+        if (dist > 140 && foodCount(p) < 3 && tier(p) >= 1 && !cool(bot, "emhunt")) huntLatch = true;
         if (dist > 140 && (tier(p) < 2 || !sword || foodCount(p) < 3)) return null;
         if (foodCount(p) < 1 && (p.getHealth() < 12 || p.getFoodData().getFoodLevel() < 10)) return null;
         // 멀리 가야 하는데 방패·갑옷이 없으면 밤엔 가지 않음 (가다가 스켈레톤·좀비에게 죽음) → 밤엔 숨고 낮에 감
