@@ -179,10 +179,19 @@ public final class Inv {
             Items.SMOOTH_BASALT, Items.AMETHYST_SHARD, Items.RAW_COPPER, Items.COPPER_INGOT, Items.RAIL, Items.OAK_FENCE, Items.COBWEB,
             Items.ACACIA_SAPLING, Items.JUNGLE_SAPLING, Items.CHERRY_SAPLING, Items.MANGROVE_PROPAGULE, Items.KELP, Items.DANDELION, Items.POPPY,
             Items.GLOW_LICHEN, Items.VINE, Items.HANGING_ROOTS, Items.ROOTED_DIRT, Items.MUD, Items.SPIDER_EYE, Items.CHEST_MINECART, Items.LAPIS_LAZULI,
-            Items.REDSTONE, Items.EMERALD, Items.FLOWER_POT);
+            Items.REDSTONE, Items.EMERALD, Items.FLOWER_POT,
+            // 네더·밤 사냥에서 주운 쓸모없는 것들 (가방이 꽉 차 조합이 막히던 문제)
+            Items.NETHER_BRICKS, Items.NETHER_BRICK_FENCE, Items.NETHER_BRICK_STAIRS, Items.SOUL_SAND, Items.SOUL_SOIL, Items.NETHER_WART_BLOCK,
+            Items.WARPED_WART_BLOCK, Items.NETHER_WART, Items.GRASS_BLOCK, Items.GUNPOWDER, Items.PHANTOM_MEMBRANE, Items.EGG, Items.LEATHER,
+            Items.GRAY_WOOL, Items.LIGHT_GRAY_WOOL, Items.BLACK_WOOL, Items.BROWN_WOOL, Items.WEEPING_VINES, Items.TWISTING_VINES,
+            Items.SHROOMLIGHT, Items.CRIMSON_FUNGUS, Items.WARPED_FUNGUS, Items.GOLD_NUGGET, Items.QUARTZ, Items.GLOWSTONE_DUST,
+            Items.ARMADILLO_SCUTE, Items.SLIME_BALL, Items.INK_SAC, Items.GLOW_INK_SAC, Items.SUGAR_CANE, Items.BAMBOO, Items.CACTUS,
+            Items.SWEET_BERRIES, Items.BROWN_MUSHROOM, Items.RED_MUSHROOM, Items.SHORT_GRASS, Items.FERN, Items.TALL_GRASS);
 
     /** 더 좋은 것이 있어 필요 없어진 도구 (나무·돌 곡괭이, 나무·돌 칼) */
     public static boolean obsolete(LocalPlayer p, ItemStack s) {
+        // 이미 같은 갑옷을 입고 있으면 가방의 같은 갑옷은 필요 없음
+        if (s.getItem() instanceof ArmorItem ai && p.getItemBySlot(ai.getEquipmentSlot()).is(s.getItem())) return true;
         boolean goodPick = has(p, Items.IRON_PICKAXE) || has(p, Items.DIAMOND_PICKAXE);
         if (s.is(Items.WOODEN_PICKAXE)) return goodPick || has(p, Items.STONE_PICKAXE);
         if (s.is(Items.STONE_PICKAXE)) return has(p, Items.DIAMOND_PICKAXE) || count(p, Items.IRON_PICKAXE) >= 1 && has(p, Items.DIAMOND);
