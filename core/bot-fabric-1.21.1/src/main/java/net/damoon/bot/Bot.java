@@ -50,6 +50,8 @@ public final class Bot {
     public net.minecraft.core.BlockPos deathPos;
     public net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> deathDim;
     public int deathTick;
+    /** 살아 있을 때 마지막으로 센 가방 칸 수 (죽은 자리의 물건이 얼마나 되는지) */
+    public int lastInvStacks;
     /** 작업이 다시 시작돼도(죽음 등) 기억할 것: 네더를 마쳤는지, 포털 틀에 끼운 눈 */
     public boolean pastNether;
     public int framesWithEyes;
@@ -164,8 +166,19 @@ public final class Bot {
             deathTick = ticks;
             deaths++;
             // 게임을 다시 켜도 물건을 찾으러 갈 수 있게 적어 둠
-            Memory.putPos("deathPos", deathPos);
-            Memory.put("deathDim", deathDim.location().toString());
+            // (빈손으로 또 죽었으면 전에 적어 둔 — 물건이 더 많은 — 자리를 덮어쓰지 않음)
+            int oldItems = 0;
+            try { String o = Memory.get("deathItems"); if (o != null && Memory.get("deathPos") != null) oldItems = Integer.parseInt(o); } catch (RuntimeException ignored) {}
+            if (lastInvStacks >= oldItems) {
+                Memory.putPos("deathPos", deathPos);
+                Memory.put("deathDim", deathDim.location().toString());
+                Memory.put("deathItems", String.valueOf(lastInvStacks));
+            } else {
+                log("빈손에 가까워 (" + lastInvStacks + "칸) 전에 죽은 자리 (" + oldItems + "칸)를 계속 기억");
+                deathPos = Memory.getPos("deathPos");
+                String dd = Memory.get("deathDim");
+                if (dd != null) deathDim = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.ResourceLocation.parse(dd));
+            }
             log("죽었다… 다시 시작 (" + deaths + "번째)");
             mc.player.respawn();
             mc.setScreen(null);
@@ -174,6 +187,13 @@ public final class Bot {
             return;
         }
         if (mc.player != null && mc.level != null) trackDamage();
+        if (ticks % 20 == 0 && mc.player != null && mc.player.isAlive()) {
+            int n = 0;
+            for (var st : mc.player.getInventory().items) if (!st.isEmpty()) n++;
+            for (var st : mc.player.getInventory().armor) if (!st.isEmpty()) n++;
+            if (!mc.player.getOffhandItem().isEmpty()) n++;
+            lastInvStacks = n;
+        }
         if (mc.screen instanceof WinScreen) {
             if (!victory) {
                 victory = true;
