@@ -414,7 +414,8 @@ public class BeatGameTask extends Task {
             }
             return mine(bot, "logs", s -> s.is(BlockTags.LOGS), logs, wantLogs, false, 6, 20);
         }
-        if (Inv.count(p, planks) < needPlanks + 2 && Inv.count(p, logs) > 0 && !cool(bot, "planks")) {
+        // 원목이 있으면 판자를 늘 6개 이상 (침대·방패·작업대를 만들 때 원목만 있고 판자가 없어 '재료 부족'으로 멈추던 문제)
+        if (Inv.count(p, planks) < Math.max(needPlanks + 2, 6) && Inv.count(p, logs) > 0 && !cool(bot, "planks")) {
             stage = "1. 판자 만들기";
             int want = Inv.count(p, planks) + Math.min(Inv.count(p, logs), 4) * 4;
             Item pl = plankFor(p);
