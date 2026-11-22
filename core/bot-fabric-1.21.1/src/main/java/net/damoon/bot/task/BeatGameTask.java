@@ -235,6 +235,13 @@ public class BeatGameTask extends Task {
         }
         if (bot.ticks % 20 == 0) { Inv.equipArmor(p); Inv.equipShield(p); }
         if (bot.ticks % 20 == 10) Inv.dropJunk(p);
+        // 포털 근처에 오면(지었거나 네더에서 돌아옴) 자리를 기억해 둠 — 멀리 나갔다가도 새로 짓지 않고 돌아오게
+        // (하위 작업 중에도: 포털을 짓자마자 그 안에 서서 넘어가 버리므로)
+        if (l.dimension() == Level.OVERWORLD && bot.ticks % 20 == 3) {
+            BlockPos ft = PathExec.feet(p);
+            BlockPos np = net.damoon.bot.Scan.nearest(l, ft, 1, ft.getY() - 8, ft.getY() + 8, st -> st.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
+            if (np != null) rememberOverworldPortal(np);
+        }
         // 흑요석·포털 짓기 중인데 이미 지은 포털이 있으면 그만둠 (멀리 있을 때 시작했던 경우)
         if ((sub instanceof ObsidianTask || sub instanceof PortalTask) && l.dimension() == Level.OVERWORLD && knownOverworldPortal(l) != null) {
             bot.log("이미 지은 포털이 있음 " + owPortal.toShortString() + " → " + subKey + " 그만두고 그리로");
@@ -313,12 +320,6 @@ public class BeatGameTask extends Task {
     }
 
     private S overworld(Bot bot, LocalPlayer p, ClientLevel l) {
-        // 포털 근처에 오면(네더에서 돌아옴 등) 자리를 기억해 둠 — 멀리 나갔다가도 새로 짓지 않고 돌아오게
-        if (bot.ticks % 40 == 3) {
-            BlockPos ft = PathExec.feet(p);
-            BlockPos np = net.damoon.bot.Scan.nearest(l, ft, 1, ft.getY() - 8, ft.getY() + 8, st -> st.is(Blocks.NETHER_PORTAL), b -> !l.getBlockState(b.below()).is(Blocks.NETHER_PORTAL));
-            if (np != null) rememberOverworldPortal(np);
-        }
         S rec = recover(bot, p, l);
         if (rec != null) return rec;
         bot.trace = "overworld";
