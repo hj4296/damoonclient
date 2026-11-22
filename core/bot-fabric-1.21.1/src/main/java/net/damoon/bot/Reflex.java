@@ -326,7 +326,10 @@ public final class Reflex {
                 Vec3 c = Vec3.atCenterOf(step);
                 bot.ctl.lookAt(p, c);
                 bot.ctl.fwd = Math.abs(c.x - p.getX()) + Math.abs(c.z - p.getZ()) > 0.4;
-                if (step.getY() < net.minecraft.core.BlockPos.containing(p.getEyePosition()).getY()) { bot.ctl.sneak = true; bot.ctl.jump = false; bot.ctl.sprint = true; doing = "숨이 참 → 물길 따라 공기 쪽으로 (아래)"; return true; }
+                if (step.getY() < net.minecraft.core.BlockPos.containing(p.getEyePosition()).getY()) {
+                    if (bot.ticks % 20 == 0) bot.dbg("숨이 참 → 물길 따라 아래 " + step.toShortString() + " (내 위치 " + String.format("%.2f %.2f %.2f", p.getX(), p.getY(), p.getZ()) + ")");
+                    bot.ctl.sneak = true; bot.ctl.jump = false; bot.ctl.sprint = true; doing = "숨이 참 → 물길 따라 공기 쪽으로 (아래)"; return true;
+                }
                 if (bot.ticks % 20 == 0) bot.dbg("숨이 참 → 물길 따라 " + step.toShortString());
                 // 천장이 막힌 1칸 높이 물길: 위로 뜨면(점프) 천장에 걸려 영영 못 들어감 → 높이를 그 칸에 맞추고 수평으로 헤엄침
                 net.minecraft.core.BlockPos sa = step.above();
@@ -756,9 +759,14 @@ public final class Reflex {
             }
         }
         if (goal == null) return null;
-        net.minecraft.core.BlockPos cur = goal;
-        while (!parent.get(cur).equals(start)) cur = parent.get(cur);
-        return cur;
+        // 길 전체에서 내 몸(발·머리)이 이미 차지한 칸은 건너뛰고 처음으로 몸 밖에 있는 칸을 다음 걸음으로
+        // (머리에서 시작한 길의 첫 칸이 내 발 칸이면 '아래로 가라앉기'만 하며 블록 위에 선 채 익사하던 문제)
+        java.util.ArrayList<net.minecraft.core.BlockPos> path = new java.util.ArrayList<>();
+        for (net.minecraft.core.BlockPos cur = goal; !cur.equals(start); cur = parent.get(cur)) path.add(cur);
+        java.util.Collections.reverse(path);
+        net.minecraft.world.phys.AABB box = bot.p().getBoundingBox().deflate(0.05);
+        for (net.minecraft.core.BlockPos c : path) if (!box.intersects(new net.minecraft.world.phys.AABB(c))) return c;
+        return path.get(path.size() - 1);
     }
 
     /** 가까이 있고 보이는 근접 몹 (활·화염구 쏘는 몹·크리퍼 제외) */
