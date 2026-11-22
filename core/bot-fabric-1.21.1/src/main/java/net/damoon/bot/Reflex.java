@@ -645,7 +645,9 @@ public final class Reflex {
             double r = Act.reach(p, threat.getBoundingBox());
             // 방패가 없으면 멀리서 쏘는 몹에게 다가가지 않음 (가다가 여러 대 맞음) → 반대쪽으로 달려 시야에서 벗어남
             // (10칸 안이면 도망치지 않고 달려들어 벰: 등을 보이고 뛰면 3초마다 한 대씩 맞아 죽음 — 도망가다 4대 맞고 죽던 문제)
-            if (ranged(threat) && !shieldOn && r > 10.0 && !(threat instanceof net.minecraft.world.entity.monster.Blaze)) {
+            // (칼·도끼가 없으면 맨주먹으로 달려들어 봤자 못 잡음 → 3칸 넘으면 도망)
+            boolean armed = Inv.count(p, s -> s.getItem() instanceof net.minecraft.world.item.SwordItem || s.getItem() instanceof net.minecraft.world.item.AxeItem) > 0;
+            if (ranged(threat) && !shieldOn && r > (armed ? 10.0 : 3.0) && !(threat instanceof net.minecraft.world.entity.monster.Blaze)) {
                 Vec3 away = p.position().subtract(threat.position()).multiply(1, 0, 1);
                 if (away.lengthSqr() < 0.01) away = new Vec3(1, 0, 0);
                 Vec3 to = p.position().add(away.normalize().scale(6));
