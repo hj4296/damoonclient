@@ -137,6 +137,7 @@ public class BeatGameTask extends Task {
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil;
     private int shieldWoodSince;
+    private boolean coalLatch;
     /** 오버월드 쪽 네더 포털 자리 (기억 파일에도 적어 둠) — 멀리 나갔다가 포털을 새로 짓지 않고 돌아오게 */
     private BlockPos owPortal;
     private boolean owPortalLoaded;
@@ -459,7 +460,11 @@ public class BeatGameTask extends Task {
             return run(bot, "cook", () -> new SmeltTask(rawMeat(), out, want));
         }
         // ---- 4. 석탄 ----
-        if (Inv.count(p, Items.COAL) + Inv.count(p, Items.CHARCOAL) < 5 && !cool(bot, "coal")) {
+        // 한 번 캐기 시작하면 10개까지 (5개 밑으로 떨어질 때마다 1개씩만 캐고 오가던 문제)
+        int coalNow = Inv.count(p, Items.COAL) + Inv.count(p, Items.CHARCOAL);
+        if (coalNow < 5) coalLatch = true;
+        if (coalNow >= 10) coalLatch = false;
+        if (coalLatch && !cool(bot, "coal")) {
             stage = "4. 석탄 캐기";
             S s = mine(bot, "coal", st -> st.is(Blocks.COAL_ORE) || st.is(Blocks.DEEPSLATE_COAL_ORE), is(Items.COAL), 10, true, 24, 24);
             if (miner == null && exploreTo != null) { fail(bot, "coal", 20 * 120); exploreTo = null; bot.nav.stop(); }
