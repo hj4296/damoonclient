@@ -312,7 +312,10 @@ public class BeatGameTask extends Task {
         }
         if (dist > 1500) { forgetDeath(bot); return null; }
         // 멀리서 다시 태어났고 맨손이면: 물건은 안 사라지니 먼저 돌 곡괭이·칼만 만들고 감 (맨손으로 땅속 먼 길은 위험)
-        if (dist > 140 && tier(p) < 2) return null;
+        // 먼 길이면 돌 곡괭이·칼과 음식 3개는 챙긴 뒤에 감 (빈손·굶주린 채 가다 죽음). 체력이 낮고 먹을 게 없으면 먼저 사냥
+        boolean sword = Inv.has(p, Items.STONE_SWORD) || Inv.has(p, Items.IRON_SWORD) || Inv.has(p, Items.DIAMOND_SWORD);
+        if (dist > 140 && (tier(p) < 2 || !sword || foodCount(p) < 3)) return null;
+        if (foodCount(p) < 1 && (p.getHealth() < 12 || p.getFoodData().getFoodLevel() < 10)) return null;
         // 멀리 가야 하는데 방패·갑옷이 없으면 밤엔 가지 않음 (가다가 스켈레톤·좀비에게 죽음) → 밤엔 숨고 낮에 감
         boolean weakNow = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
         if (dist > 40 && weakNow && l.dimension() == Level.OVERWORLD && BedTask.night(l)) return null;
