@@ -319,7 +319,16 @@ public final class Reflex {
             net.minecraft.core.BlockPos head = net.minecraft.core.BlockPos.containing(p.getEyePosition()).above();
             var hs = bot.level().getBlockState(head);
             boolean ceiling = !hs.getCollisionShape(bot.level(), head).isEmpty();
-            if (air != null && ad < 12 * 12) {
+            // 물을 따라 실제로 헤엄쳐 갈 수 있는 가장 가까운 공기 칸 (벽 너머 공기로 가다 익사하던 문제)
+            net.minecraft.core.BlockPos step = swimToAir(net.minecraft.core.BlockPos.containing(p.getEyePosition()));
+            if (step != null) {
+                Act.stopDig(bot);
+                Vec3 c = Vec3.atCenterOf(step);
+                bot.ctl.lookAt(p, c);
+                bot.ctl.fwd = Math.abs(c.x - p.getX()) + Math.abs(c.z - p.getZ()) > 0.4;
+                if (step.getY() < net.minecraft.core.BlockPos.containing(p.getEyePosition()).getY()) { bot.ctl.sneak = true; bot.ctl.jump = false; bot.ctl.sprint = true; doing = "숨이 참 → 물길 따라 공기 쪽으로 (아래)"; return true; }
+                if (bot.ticks % 20 == 0) bot.dbg("숨이 참 → 물길 따라 " + step.toShortString());
+            } else if (air != null && ad < 12 * 12) {
                 Act.stopDig(bot);
                 bot.ctl.lookAt(p, Vec3.atCenterOf(air));
                 bot.ctl.fwd = Math.abs(air.getX() + 0.5 - p.getX()) + Math.abs(air.getZ() + 0.5 - p.getZ()) > 0.6;
@@ -706,6 +715,35 @@ public final class Reflex {
             }
         }
         return false;
+    }
+
+    /** 머리 칸에서 물·빈 칸만 지나 닿는 가장 가까운 공기 칸까지 BFS → 첫 걸음 칸 (없으면 null) */
+    private net.minecraft.core.BlockPos swimToAir(net.minecraft.core.BlockPos start) {
+        var l = bot.level();
+        java.util.ArrayDeque<net.minecraft.core.BlockPos> q = new java.util.ArrayDeque<>();
+        java.util.Map<net.minecraft.core.BlockPos, net.minecraft.core.BlockPos> parent = new java.util.HashMap<>();
+        q.add(start);
+        parent.put(start, start);
+        net.minecraft.core.BlockPos goal = null;
+        while (!q.isEmpty() && parent.size() < 1500) {
+            net.minecraft.core.BlockPos c = q.poll();
+            var st = l.getBlockState(c);
+            if (!c.equals(start) && st.isAir()) { goal = c; break; }
+            for (net.minecraft.core.Direction d : new net.minecraft.core.Direction[]{net.minecraft.core.Direction.UP, net.minecraft.core.Direction.NORTH,
+                    net.minecraft.core.Direction.SOUTH, net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.WEST, net.minecraft.core.Direction.DOWN}) {
+                net.minecraft.core.BlockPos n = c.relative(d);
+                if (parent.containsKey(n) || Math.abs(n.getY() - start.getY()) > 20) continue;
+                var ns = l.getBlockState(n);
+                boolean open = ns.isAir() || (ns.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && ns.getCollisionShape(l, n).isEmpty());
+                if (!open || BlockUtil.isLava(ns)) continue;
+                parent.put(n, c);
+                q.add(n);
+            }
+        }
+        if (goal == null) return null;
+        net.minecraft.core.BlockPos cur = goal;
+        while (!parent.get(cur).equals(start)) cur = parent.get(cur);
+        return cur;
     }
 
     /** 가까이 있고 보이는 근접 몹 (활·화염구 쏘는 몹·크리퍼 제외) */
