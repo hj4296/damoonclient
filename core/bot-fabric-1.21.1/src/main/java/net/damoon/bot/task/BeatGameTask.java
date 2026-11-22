@@ -304,6 +304,9 @@ public class BeatGameTask extends Task {
         if (dist > 1500) { forgetDeath(bot); return null; }
         // 멀리서 다시 태어났고 맨손이면: 물건은 안 사라지니 먼저 돌 곡괭이·칼만 만들고 감 (맨손으로 땅속 먼 길은 위험)
         if (dist > 140 && tier(p) < 2) return null;
+        // 멀리 가야 하는데 방패·갑옷이 없으면 밤엔 가지 않음 (가다가 스켈레톤·좀비에게 죽음) → 밤엔 숨고 낮에 감
+        boolean weakNow = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
+        if (dist > 40 && weakNow && l.dimension() == Level.OVERWORLD && BedTask.night(l)) return null;
         stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";
         if (dist > 6) {
             Nav.R r = bot.nav.go(new Goal.Near(d, 3));
