@@ -312,9 +312,19 @@ public class BeatGameTask extends Task {
         }
         for (var e : l.entitiesForRendering()) {
             if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(d)) < 10
-                    && lootTime.merge(ie.getId(), 1, Integer::sum) < 20 * 8) {
+                    && lootTime.merge(ie.getId(), 1, Integer::sum) < 20 * 12) {
                 detail = "떨어뜨린 " + ie.getItem().getHoverName().getString() + " 줍는 중";
-                if (ie.distanceTo(p) < 2.5) { bot.nav.stop(); bot.ctl.lookYaw(p, ie.position(), 20f); bot.ctl.fwd = true; if (ie.getY() > p.getY() + 0.6 && p.onGround()) bot.ctl.jump = true; }
+                boolean wet = ie.isInWater() || p.isInWater();
+                if (ie.distanceTo(p) < 2.5 || (wet && ie.distanceTo(p) < 10)) {
+                    // 가깝거나 물속이면 길찾기 없이 바로 그쪽으로 헤엄침 (물속 길찾기가 자주 막힘)
+                    bot.nav.stop();
+                    bot.ctl.lookAt(p, ie.position());
+                    bot.ctl.fwd = true;
+                    if (p.isInWater()) {
+                        if (ie.getY() < p.getY() - 0.4 && p.getAirSupply() > 120) bot.ctl.sneak = true; // 가라앉기
+                        else bot.ctl.jump = true;
+                    } else if (ie.getY() > p.getY() + 0.6 && p.onGround() || p.horizontalCollision) bot.ctl.jump = true;
+                }
                 else { Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0)); if (r == Nav.R.FAILED) bot.nav.stop(); }
                 return S.RUNNING;
             }
