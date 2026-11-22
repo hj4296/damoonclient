@@ -162,6 +162,11 @@ public class BeatGameTask extends Task {
     private net.damoon.bot.Climb surfClimb;
 
     private boolean surfaceTrip(Bot bot, BlockPos f, int top, boolean need) {
+        // 하늘이 보이면(하늘빛 12 이상) 이미 땅 위 — 나뭇잎·나무 아래라 높이 지도가 위로 잡힌 것 (나무 꼭대기로 올라가려다 멈추던 문제)
+        if (bot.level().getBrightness(net.minecraft.world.level.LightLayer.SKY, f) >= 12 && bot.p().onGround()) {
+            if (surfaceY != Integer.MIN_VALUE) { surfaceY = Integer.MIN_VALUE; surfClimb = null; bot.nav.stop(); }
+            return false;
+        }
         if (surfaceY == Integer.MIN_VALUE || bot.ticks > surfaceUntil) {
             surfaceY = Integer.MIN_VALUE;
             if (!need) return false;
