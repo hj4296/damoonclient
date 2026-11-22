@@ -740,7 +740,8 @@ public class BeatGameTask extends Task {
             boolean seeEnder = false;
             for (var e : l.entitiesForRendering())
                 if (e instanceof net.minecraft.world.entity.monster.EnderMan && e.distanceTo(p) < 48) { seeEnder = true; break; }
-            if (sub instanceof EnderHutTask || (l.dimension() == net.minecraft.world.level.Level.OVERWORLD && seeEnder
+            // (낮엔 굴이 30초 만에 끝나므로(엔더맨이 동굴에만 있음) 굴 대신 바로 다가가 다리를 침)
+            if (sub instanceof EnderHutTask || (l.dimension() == net.minecraft.world.level.Level.OVERWORLD && seeEnder && BedTask.night(l)
                     && Inv.count(p, Inv.throwaway()) >= 16 && !cool(bot, "hut"))) {
                 detail = "엔더맨 굴";
                 return run(bot, "hut", () -> new EnderHutTask(NetherTask.PEARLS));
