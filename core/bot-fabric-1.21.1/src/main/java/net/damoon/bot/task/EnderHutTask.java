@@ -25,6 +25,7 @@ import java.util.List;
  * 멀리 있는 엔더맨의 눈을 쳐다봐서 화나게 하면 순간이동해 굴 앞으로 옴. 벽·지붕이 화살도 막음.
  */
 public class EnderHutTask extends Task {
+    private int noEnder;
     private BlockPos in, out;      // 안쪽 칸(내가 섬), 바깥 칸(입구)
     private Direction front;
     private int phase, ticks, lookTicks, buildTicks, peekTicks;
@@ -228,6 +229,8 @@ public class EnderHutTask extends Task {
             return S.RUNNING;
         }
         peeking = false;
+        // 엔더맨이 1분 넘게 하나도 안 보이면 이 자리는 그만 (다른 곳을 찾아감)
+        if (any == null) { if (++noEnder > 20 * 60) return S.FAILED; } else noEnder = 0;
         // 엔더맨이 아예 없으면: 아침이 됐거나 근처에 없음
         if (l.dimension() == net.minecraft.world.level.Level.OVERWORLD && !BedTask.night(l) && ticks > 20 * 30) return S.FAILED;
         bot.ctl.look(front.toYRot(), 0f);
