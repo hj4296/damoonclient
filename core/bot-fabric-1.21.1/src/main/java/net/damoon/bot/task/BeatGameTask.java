@@ -138,6 +138,8 @@ public class BeatGameTask extends Task {
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil;
     private int shieldWoodSince;
     private boolean coalLatch;
+    private int waterSeekStart;
+    private final java.util.Set<Long> badWaterZone = new java.util.HashSet<>();
     /** 오버월드 쪽 네더 포털 자리 (기억 파일에도 적어 둠) — 멀리 나갔다가 포털을 새로 짓지 않고 돌아오게 */
     private BlockPos owPortal;
     private boolean owPortalLoaded;
@@ -645,14 +647,22 @@ public class BeatGameTask extends Task {
                     int wtop = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, wf.getX(), wf.getZ());
                     if (surfaceTrip(bot, wf, wtop, underground(l, wf, wtop))) { detail = "물을 찾아 땅 위로 올라가는 중"; return S.RUNNING; }
                     BlockPos ws = net.damoon.bot.Scan.nearest(l, wf, 4, wf.getY() - 16, wf.getY() + 24,
-                            st -> st.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && st.getFluidState().isSource(), b -> l.getBlockState(b.above()).isAir());
+                            st -> st.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && st.getFluidState().isSource(),
+                            b -> l.getBlockState(b.above()).isAir() && !badWaterZone.contains(new BlockPos(b.getX() >> 4, 0, b.getZ() >> 4).asLong()));
                     if (ws != null) {
                         detail = "물을 찾음 → 양동이로 뜨러 가는 중";
                         if (net.damoon.bot.Act.reach(p, new net.minecraft.world.phys.AABB(ws)) > 4.0) {
+                            // 30초 넘게 못 가면 그 청크의 물은 포기
+                            if (bot.ticks - waterSeekStart > 20 * 30 && waterSeekStart > 0) {
+                                badWaterZone.add(new BlockPos(ws.getX() >> 4, 0, ws.getZ() >> 4).asLong());
+                                waterSeekStart = 0; bot.nav.stop(); return S.RUNNING;
+                            }
+                            if (waterSeekStart == 0) waterSeekStart = bot.ticks;
                             Nav.R wr = bot.nav.go(new Goal.Reach(ws, 3.0));
-                            if (wr == Nav.R.FAILED) bot.nav.stop();
+                            if (wr == Nav.R.FAILED) { bot.nav.stop(); badWaterZone.add(new BlockPos(ws.getX() >> 4, 0, ws.getZ() >> 4).asLong()); waterSeekStart = 0; }
                             return S.RUNNING;
                         }
+                        waterSeekStart = 0;
                         bot.nav.stop();
                         ObsidianTask.useBucket(bot, Items.BUCKET, net.minecraft.world.phys.Vec3.atCenterOf(ws).add(0, 0.4, 0));
                         return S.RUNNING;

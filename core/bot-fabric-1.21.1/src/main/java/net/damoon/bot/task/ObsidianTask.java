@@ -164,10 +164,11 @@ public class ObsidianTask extends Task {
             if (src == null) return S.FAILED;
             // 같은 물 원천으로 30초 넘게 못 가면 (흐르는 물살에 밀림 등) 다른 원천
             if (!src.equals(waterSrc)) { waterSrc = src; waterSrcTicks = 0; }
-            if (++waterSrcTicks > 20 * 30) { badWater.add(src.asLong()); bot.nav.stop(); waterSrc = null; return S.RUNNING; }
+            // 못 가면 그 물 원천 하나만이 아니라 주변 물 전체를 포기 (큰 호수면 칸마다 30초씩 끝이 없음)
+            if (++waterSrcTicks > 20 * 30) { badWaterAround(l, src); bot.nav.stop(); waterSrc = null; bot.log("물에 30초 동안 못 감 → 그 주변 물은 포기"); return S.RUNNING; }
             if (Act.reach(p, new net.minecraft.world.phys.AABB(src)) > 4.0) {
                 Nav.R r = bot.nav.go(new Goal.Reach(src, 3.0));
-                if (r == Nav.R.FAILED) { bot.nav.stop(); badWater.add(src.asLong()); return S.RUNNING; }
+                if (r == Nav.R.FAILED) { bot.nav.stop(); badWaterAround(l, src); return S.RUNNING; }
                 return S.RUNNING;
             }
             bot.nav.stop();
@@ -224,6 +225,11 @@ public class ObsidianTask extends Task {
             lava = null;
         }
         return S.RUNNING;
+    }
+
+    private void badWaterAround(ClientLevel l, BlockPos c) {
+        for (BlockPos q : BlockPos.betweenClosed(c.offset(-8, -4, -8), c.offset(8, 4, 8)))
+            if (l.getFluidState(q).is(FluidTags.WATER)) badWater.add(q.asLong());
     }
 
     private static boolean isLavaSource(ClientLevel l, BlockPos b) {
