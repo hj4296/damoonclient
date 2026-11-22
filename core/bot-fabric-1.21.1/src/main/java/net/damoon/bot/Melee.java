@@ -39,6 +39,8 @@ public final class Melee {
     private static boolean othersThreat(Bot bot, LocalPlayer p, LivingEntity t) {
         for (Entity e : bot.level().entitiesForRendering()) {
             if (e == t || !Tower.groundMelee(e) || ((LivingEntity) e).getMaxHealth() <= 10) continue;
+            // 보트에 탄 몹·화나지 않은 엔더맨은 막을 필요 없음 (서로 때문에 둘 다 영원히 방패만 들던 문제)
+            if (e.isPassenger() || (e instanceof net.minecraft.world.entity.monster.EnderMan em && !em.isCreepy())) continue;
             double ox = e.getX() - p.getX(), oz = e.getZ() - p.getZ();
             double arm = e.getBbWidth() / 2 + 0.83 + p.getBbWidth() / 2;
             if (Math.max(Math.abs(ox), Math.abs(oz)) > arm + 1.2 || Math.abs(e.getY() - p.getY()) > 2.5) continue;
@@ -83,7 +85,9 @@ public final class Melee {
             boolean idle = since > 60 && engagedTicks(bot, t) > 60;
             double hx = t.getX() - p.getX(), hz = t.getZ() - p.getZ();
             double arm = t.getBbWidth() / 2 + 0.83 + p.getBbWidth() / 2;
-            if (r <= 3.0 && charge >= 0.9f && (window || idle) && !othersThreat(bot, p, t)) {
+            // 10초 넘게 막기만 했으면 (다른 몹 때문에 계속 기다림) 그냥 벰
+            boolean stuck = engagedTicks(bot, t) > 20 * 10 && since > 20 * 3;
+            if (r <= 3.0 && charge >= 0.9f && (window || idle || stuck) && (stuck || !othersThreat(bot, p, t))) {
                 if (p.isUsingItem()) { bot.ctl.use = false; counter = true; return "방패 내리고 반격"; }
                 counter = false;
                 if (bot.ctl.aimed(p, 25) && Act.attack(bot, t, 0.9f)) { engaged.remove(t.getId()); return window ? "막고 반격!" : "공격"; }
