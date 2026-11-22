@@ -34,8 +34,9 @@ public final class Miner {
     /** 이 높이보다 아래는 안 캠 (예: 발밑 엔드 돌만 캐서 섬에 구멍 뚫지 않게) */
     public int minY = Integer.MIN_VALUE;
     public String info = "";
-    private final Set<Integer> ignoreDrops = new HashSet<>();
-    private final java.util.Map<Integer, Integer> dropTime = new java.util.HashMap<>();
+    // 줍지 못하는 아이템은 Miner를 새로 만들어도 계속 무시 (처음 본 시각 기준 8초) — 매 틱 새로 만들어져 영원히 쫓던 문제
+    private static final Set<Integer> ignoreDrops = new HashSet<>();
+    private static final java.util.Map<Integer, Integer> dropTime = new java.util.HashMap<>();
 
     public Miner(Predicate<BlockState> block, Predicate<ItemStack> item, int want, boolean needTool) {
         this.block = block;
@@ -64,7 +65,10 @@ public final class Miner {
         }
         if (drop != null) {
             bot.trace = "miner-drop";
-            if (dropTime.merge(drop.getId(), 1, Integer::sum) > 20 * 8) {
+            if (dropTime.size() > 500) dropTime.clear();
+            if (ignoreDrops.size() > 500) ignoreDrops.clear();
+            int first = dropTime.computeIfAbsent(drop.getId(), k -> bot.ticks);
+            if (bot.ticks - first > 20 * 8 || bot.ticks < first) {
                 ignoreDrops.add(drop.getId());
             } else {
                 info = "아이템 줍는 중 (" + have + "/" + want + ")";
