@@ -647,7 +647,8 @@ public class BeatGameTask extends Task {
             if (lit != null) rememberOverworldPortal(lit);
             else lit = knownOverworldPortal(l);
             // 네더에 들어가기 전 음식을 넉넉히 (네더엔 먹을 게 거의 없음) — 포털을 짓기 전에 (짓자마자 들어가 버리므로)
-            if (foodCount(p) < 20 && !cool(bot, "netherfood") && !(sub instanceof PortalTask)) {
+            // (못 채워 쉬는 중이어도 8개 밑이면 무조건 더 구함 — 3개로 들어가면 네더에서 바로 '먹을 게 없음'으로 돌아나와 포털을 오가던 문제)
+            if ((foodCount(p) < 20 && !cool(bot, "netherfood") || foodCount(p) < 8) && !(sub instanceof PortalTask)) {
                 stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/20)";
                 if (Inv.count(p, rawMeat()) >= 3 && hasFuel(p) && !cool(bot, "cook")) {
                     Item out = cookedFor(p);
