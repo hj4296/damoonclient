@@ -9,7 +9,7 @@ import net.minecraft.core.BlockPos;
  * 길찾기가 계속 실패하면 계단을 파서 올라감.
  */
 public final class Climb {
-    private int legY = Integer.MIN_VALUE, fails;
+    private int legY = Integer.MIN_VALUE, fails, bestY = Integer.MIN_VALUE, bestTick;
     private PitEscape stairs;
     public String info = "";
 
@@ -23,6 +23,18 @@ public final class Climb {
             stairs = null;
             fails = 0;
             legY = Integer.MIN_VALUE;
+            bestTick = bot.ticks;
+        }
+        // 30초 넘게 높이가 안 늘면 (길찾기가 실패만 반복) 바로 계단을 파서 올라감
+        if (f.getY() > bestY) { bestY = f.getY(); bestTick = bot.ticks; }
+        if (bestTick == 0) bestTick = bot.ticks;
+        if (bot.ticks - bestTick > 20 * 30) {
+            bot.nav.stop();
+            stairs = new PitEscape();
+            stairs.force = true;
+            bestTick = bot.ticks;
+            bot.log("30초 동안 못 올라감 → 계단을 파서 올라감");
+            return true;
         }
         if (legY == Integer.MIN_VALUE || f.getY() >= legY) legY = Math.min(targetY, f.getY() + 10);
         info = "땅 위로 올라가는 중 (y " + f.getY() + " → " + targetY + ")";
