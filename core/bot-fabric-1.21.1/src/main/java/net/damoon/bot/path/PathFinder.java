@@ -158,6 +158,8 @@ public final class PathFinder {
         }
         BlockState below = st(x, y - 1, z);
         if (BlockUtil.isWater(below) || BlockUtil.isWater(st(x, y, z))) d += 6;
+        // 머리까지 잠기는 칸 (숨을 못 쉼): 물에 잠긴 동굴을 지나는 길을 피함 — 숨 쉴 곳이 먼 곳까지 헤엄쳐 들어가 익사하던 문제
+        if (BlockUtil.isWater(st(x, y + 1, z))) d += 30;
         // 낭떠러지 가장자리는 피함 (맞고 밀려 떨어지지 않게 다리 가운데로)
         for (int[] o : side) {
             int nx = x + o[0], nz = z + o[1];
