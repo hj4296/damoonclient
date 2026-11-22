@@ -168,6 +168,15 @@ public class BeatGameTask extends Task {
     /** 땅속인지: 높이 지도보다 4칸 넘게 아래이고, 하늘이 안 보이거나(나뭇잎 아래는 보임) 12칸 넘게 아래 (곧게 판 1칸 굴은 하늘이 보여도 땅속) */
     static boolean underground(ClientLevel l, BlockPos f, int top) {
         if (f.getY() >= top - 4) return false;
+        // 머리 위에 나뭇잎·나무·풀만 있으면 숲속일 뿐 땅 위 (빽빽한 숲에선 하늘빛이 어두워 땅속으로 착각하던 문제)
+        boolean onlyTrees = true;
+        for (int y = f.getY() + 2; y <= top && onlyTrees; y++) {
+            var st = l.getBlockState(new BlockPos(f.getX(), y, f.getZ()));
+            if (st.isAir() || st.is(net.minecraft.tags.BlockTags.LEAVES) || st.is(net.minecraft.tags.BlockTags.LOGS)
+                    || st.canBeReplaced() || !st.getFluidState().isEmpty() && false) continue;
+            onlyTrees = false;
+        }
+        if (onlyTrees) return false;
         return l.getBrightness(net.minecraft.world.level.LightLayer.SKY, f) < 12 || f.getY() < top - 12;
     }
 
