@@ -31,7 +31,7 @@ public final class BlazeBunker {
     private boolean sally;
     /** 벙커 없이 스포너 위·옆에서 방패+칼로 싸움 (블레이즈가 스폰되자마자 칼이 닿음) */
     private boolean open = false;
-    private int sallyStart, lastGain, lastRods = -1, sallyRods = -1;
+    private int sallyStart, lastGain, lastRods = -1, sallyRods = -1, rodTick;
     public String info = "";
 
     public BlazeBunker(BlockPos spawner) { this.spawner = spawner; }
@@ -225,7 +225,18 @@ public final class BlazeBunker {
             }
         }
         // 오래 막대가 안 늘거나 화살이 떨어지면: 잠깐 밖으로 나가 스포너 옆에서 방패 들고 칼로 싸우고, 땅에 꽂힌 화살도 주움
-        if (rods != lastRods) { lastRods = rods; lastGain = bot.ticks; }
+        if (rods != lastRods) { lastRods = rods; lastGain = bot.ticks; rodTick = bot.ticks; }
+        if (rodTick == 0) rodTick = bot.ticks;
+        // 벙커에서 3분 넘게 막대가 하나도 안 늘면 (블레이즈가 멀리 떠서 쏘기만 함) → 스포너 위에 서서
+        // 새로 생기는 블레이즈를 생기자마자 칼로 벰 (갓 생긴 블레이즈는 바로 옆이라 칼이 닿음)
+        if (!quick && phase == 2 && !sally && bot.ticks - rodTick > 20 * 60 * 3 && p.getHealth() >= 14
+                && Inv.count(p, Items.SHIELD) >= 1) {
+            open = true;
+            bot.reflex.camp = false;
+            bot.reflex.building = false;
+            bot.log("벙커에서 3분 동안 막대가 안 늘어남 → 스포너 위에 서서 생기는 블레이즈를 바로 벰");
+            return R.RUNNING;
+        }
         boolean noArrows = !Inv.has(p, Items.ARROW);
         if (!sally && phase == 2 && p.getHealth() >= 16 && (bot.ticks - lastGain > 20 * 45 || (noArrows && bot.ticks - lastGain > 20 * 15))) {
             sally = true;
