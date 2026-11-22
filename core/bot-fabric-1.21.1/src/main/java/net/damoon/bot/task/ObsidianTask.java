@@ -159,11 +159,14 @@ public class ObsidianTask extends Task {
         // 물 양동이 필요
         if (!Inv.has(p, Items.WATER_BUCKET)) {
             detail = "물 뜨러 가는 중";
-            BlockPos src = Scan.nearest(l, PathExec.feet(p), 3, p.getBlockY() - 24, p.getBlockY() + 40,
-                    s -> s.getFluidState().is(FluidTags.WATER) && s.getFluidState().isSource(), b -> l.getBlockState(b.above()).isAir() && !badWater.contains(b.asLong()));
+            // 한 번 고른 물 원천은 못 가거나 없어질 때까지 그대로 (걸어가며 가장 가까운 게 매 틱 바뀌면 길찾기가 계속 처음부터 다시 시작됨)
+            if (waterSrc == null || badWater.contains(waterSrc.asLong()) || !l.getFluidState(waterSrc).is(FluidTags.WATER) || !l.getFluidState(waterSrc).isSource()) {
+                waterSrc = Scan.nearest(l, PathExec.feet(p), 3, p.getBlockY() - 24, p.getBlockY() + 40,
+                        s -> s.getFluidState().is(FluidTags.WATER) && s.getFluidState().isSource(), b -> l.getBlockState(b.above()).isAir() && !badWater.contains(b.asLong()));
+                waterSrcTicks = 0;
+            }
+            BlockPos src = waterSrc;
             if (src == null) return S.FAILED;
-            // 같은 물 원천으로 30초 넘게 못 가면 (흐르는 물살에 밀림 등) 다른 원천
-            if (!src.equals(waterSrc)) { waterSrc = src; waterSrcTicks = 0; }
             // 못 가면 그 물 원천 하나만이 아니라 주변 물 전체를 포기 (큰 호수면 칸마다 30초씩 끝이 없음)
             if (++waterSrcTicks > 20 * 30) { badWaterAround(l, src); bot.nav.stop(); waterSrc = null; bot.log("물에 30초 동안 못 감 → 그 주변 물은 포기"); return S.RUNNING; }
             if (Act.reach(p, new net.minecraft.world.phys.AABB(src)) > 4.0) {
