@@ -25,7 +25,7 @@ import java.util.List;
  * 멀리 있는 엔더맨의 눈을 쳐다봐서 화나게 하면 순간이동해 굴 앞으로 옴. 벽·지붕이 화살도 막음.
  */
 public class EnderHutTask extends Task {
-    private int noEnder;
+    private int noEnder, lastPearls = -1, lastPearlTick;
     private final java.util.Map<Integer, Integer> pearlSeen = new java.util.HashMap<>();
     private BlockPos in, out;      // 안쪽 칸(내가 섬), 바깥 칸(입구)
     private Direction front;
@@ -78,6 +78,11 @@ public class EnderHutTask extends Task {
         ClientLevel l = bot.level();
         ticks++;
         if (pearls(p) >= want) return S.DONE;
+        // 4분 동안 진주가 하나도 안 늘면 이 굴은 그만 (어디서 멈춰 있든)
+        int pn = pearls(p);
+        if (pn != lastPearls) { lastPearls = pn; lastPearlTick = bot.ticks; }
+        if (lastPearlTick == 0) lastPearlTick = bot.ticks;
+        if (bot.ticks - lastPearlTick > 20 * 60 * 4) { bot.log("굴에서 4분 동안 진주가 안 늘어남 → 다른 곳으로"); bot.reflex.camp = false; return S.FAILED; }
         if (in == null) {
             BlockPos f = Placer.standCell(p);
             // 굴은 땅 위(하늘이 보이는 곳)에 지어야 멀리 있는 엔더맨이 보임 → 땅속이면 먼저 올라감
