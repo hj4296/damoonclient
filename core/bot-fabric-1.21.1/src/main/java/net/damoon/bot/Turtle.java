@@ -168,6 +168,10 @@ public final class Turtle {
         // 블레이즈가 바로 옆이면 벽 놓는 사이 칼 맞듯 근접 공격을 연달아 맞음 → 감싸지 않음 (방패 들고 물러남)
         for (Entity e : l.entitiesForRendering())
             if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && b.distanceTo(p) < 3.5) { engaged = true; break; }
+        // 스켈레톤처럼 활 쏘는 몹도 바로 옆(2.5칸)에 붙어 있으면 그 칸엔 벽을 못 놓음 → 감싸지 말고 먼저 벰
+        // (붙은 스켈레톤 때문에 벽 빈틈을 못 막아 감싸기·포기를 몇 분씩 되풀이하며 맞던 문제)
+        for (Entity e : l.entitiesForRendering())
+            if (Reflex.hostile(e) && e.isAlive() && e.distanceTo(p) < 2.5 && !(e instanceof net.minecraft.world.entity.monster.Creeper)) { engaged = true; break; }
         if (!active) {
             if (bot.ticks < cooldownUntil || !danger(bot, p) || !p.onGround() || p.isInLava()) return false;
             // 뜨거운 바닥(마그마 등) 위에서는 감싸지 않음 (갇힌 채 계속 데임)
@@ -199,6 +203,7 @@ public final class Turtle {
         if (hole) return holeTick(bot, reflex, p, l);
         // 회복 중인데 벽에 빈틈이 생겼으면 (못 놓았거나 부서짐) 다시 막음, 2초 안에 못 막으면 포기
         if (phase == 1 && openWalls > 0) {
+            if (engaged) { active = false; cooldownUntil = bot.ticks + 100; reflex.forceEat = false; bot.log("벽 빈틈에 몹이 붙음 → 감싸기 그만두고 싸움"); return false; }
             if (++fixTicks > 40) {
                 StringBuilder sb = new StringBuilder();
                 for (BlockPos w : walls()) if (l.getBlockState(w).canBeReplaced()) sb.append(w.toShortString()).append(' ');
