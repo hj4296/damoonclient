@@ -161,9 +161,15 @@ public class BeatGameTask extends Task {
     }
     private net.damoon.bot.Climb surfClimb;
 
+    /** 땅속인지: 높이 지도보다 4칸 넘게 아래이고, 하늘이 안 보이거나(나뭇잎 아래는 보임) 12칸 넘게 아래 (곧게 판 1칸 굴은 하늘이 보여도 땅속) */
+    static boolean underground(ClientLevel l, BlockPos f, int top) {
+        if (f.getY() >= top - 4) return false;
+        return l.getBrightness(net.minecraft.world.level.LightLayer.SKY, f) < 12 || f.getY() < top - 12;
+    }
+
     private boolean surfaceTrip(Bot bot, BlockPos f, int top, boolean need) {
         // 하늘이 보이면(하늘빛 12 이상) 이미 땅 위 — 나뭇잎·나무 아래라 높이 지도가 위로 잡힌 것 (나무 꼭대기로 올라가려다 멈추던 문제)
-        if (bot.level().getBrightness(net.minecraft.world.level.LightLayer.SKY, f) >= 12 && bot.p().onGround()) {
+        if (!underground(bot.level(), f, top) && bot.p().onGround()) {
             if (surfaceY != Integer.MIN_VALUE) { surfaceY = Integer.MIN_VALUE; surfClimb = null; bot.nav.stop(); }
             return false;
         }
@@ -349,7 +355,7 @@ public class BeatGameTask extends Task {
             stage = "먹을 게 없음 → 사냥하러";
             BlockPos fp = PathExec.feet(p);
             int top = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, fp.getX(), fp.getZ());
-            if (surfaceTrip(bot, fp, top, fp.getY() < top - 4 && l.getBrightness(net.minecraft.world.level.LightLayer.SKY, fp) < 8)) {
+            if (surfaceTrip(bot, fp, top, fp.getY() < top - 4 && underground(l, fp, top))) {
                 detail = "땅 위로 올라가는 중";
                 return S.RUNNING;
             }
@@ -600,7 +606,7 @@ public class BeatGameTask extends Task {
                 // 동물은 땅 위에 있음 → 땅속이면 먼저 올라감
                 BlockPos ff = PathExec.feet(p);
                 int ftop = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, ff.getX(), ff.getZ());
-                if (surfaceTrip(bot, ff, ftop, ff.getY() < ftop - 4 && l.getBrightness(net.minecraft.world.level.LightLayer.SKY, ff) < 8)) {
+                if (surfaceTrip(bot, ff, ftop, ff.getY() < ftop - 4 && underground(l, ff, ftop))) {
                     detail = "땅 위로 올라가는 중";
                     return S.RUNNING;
                 }
@@ -650,7 +656,7 @@ public class BeatGameTask extends Task {
             if (!(sub instanceof PortalTask) && (portalTask == null || portalTask.placedObsidian(l) == 0)) {
                 BlockPos pf = PathExec.feet(p);
                 int ptop = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, pf.getX(), pf.getZ());
-                if (surfaceTrip(bot, pf, ptop, pf.getY() < ptop - 6 && l.getBrightness(net.minecraft.world.level.LightLayer.SKY, pf) < 8)) {
+                if (surfaceTrip(bot, pf, ptop, pf.getY() < ptop - 6 && underground(l, pf, ptop))) {
                     detail = "포털 지을 땅 위로 올라가는 중";
                     return S.RUNNING;
                 }
