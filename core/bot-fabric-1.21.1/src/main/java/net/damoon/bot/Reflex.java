@@ -328,6 +328,19 @@ public final class Reflex {
                 bot.ctl.fwd = Math.abs(c.x - p.getX()) + Math.abs(c.z - p.getZ()) > 0.4;
                 if (step.getY() < net.minecraft.core.BlockPos.containing(p.getEyePosition()).getY()) { bot.ctl.sneak = true; bot.ctl.jump = false; bot.ctl.sprint = true; doing = "숨이 참 → 물길 따라 공기 쪽으로 (아래)"; return true; }
                 if (bot.ticks % 20 == 0) bot.dbg("숨이 참 → 물길 따라 " + step.toShortString());
+                // 천장이 막힌 1칸 높이 물길: 위로 뜨면(점프) 천장에 걸려 영영 못 들어감 → 높이를 그 칸에 맞추고 수평으로 헤엄침
+                net.minecraft.core.BlockPos sa = step.above();
+                if (step.getY() == net.minecraft.core.BlockPos.containing(p.getEyePosition()).getY()
+                        && !bot.level().getBlockState(sa).getCollisionShape(bot.level(), sa).isEmpty()) {
+                    var bb = p.getBoundingBox();
+                    boolean tooHigh = bb.maxY > step.getY() + 0.98;
+                    bot.ctl.sneak = tooHigh;
+                    bot.ctl.jump = !tooHigh && bb.minY < step.getY() + 0.02;
+                    bot.ctl.sprint = true; // 헤엄 자세 (높이 0.6칸)
+                    bot.ctl.fwd = true;
+                    doing = "숨이 참 → 낮은 물길로 수평으로";
+                    return true;
+                }
             } else if (air != null && ad < 12 * 12) {
                 Act.stopDig(bot);
                 bot.ctl.lookAt(p, Vec3.atCenterOf(air));
