@@ -333,6 +333,8 @@ public class BeatGameTask extends Task {
             // (배가 불러도 먹을 게 3개 안 되면 먼저 사냥 — 안 그러면 배고파질 때까지 딴 일만 하며 물건을 미룸)
             if (foodCount(p) < 3 && tier(p) >= 1 && !cool(bot, "emhunt")) huntLatch = true;
             if (tier(p) < 2 || !sword || foodCount(p) < 3) return null;
+            // 방패 없이 먼 길을 가면 동굴·밤 몹에게 또 죽음 (돌 도구로 가다 연달아 죽던 문제) → 철 1개로 방패부터 (물건은 멀어서 안 사라짐)
+            if (!p.getOffhandItem().is(Items.SHIELD) && !Inv.has(p, Items.SHIELD)) return null;
             if (foodCount(p) < 1 && (p.getHealth() < 12 || p.getFoodData().getFoodLevel() < 10)) return null;
             // 멀리 가야 하는데 방패·갑옷이 없으면 밤엔 가지 않음 (가다가 스켈레톤·좀비에게 죽음) → 밤엔 숨고 낮에 감
             boolean weakNow = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
@@ -534,6 +536,12 @@ public class BeatGameTask extends Task {
             S s = mine(bot, "coal", st -> st.is(Blocks.COAL_ORE) || st.is(Blocks.DEEPSLATE_COAL_ORE), is(Items.COAL), 10, true, 24, 24);
             if (miner == null && exploreTo != null) { fail(bot, "coal", 20 * 120); exploreTo = null; bot.nav.stop(); }
             return s;
+        }
+        // 방패가 없으면 철 35개를 다 모을 때까지 기다리지 않고 첫 철 1개를 바로 구워 방패부터 (스켈레톤 화살·먼 길)
+        if (!p.getOffhandItem().is(Items.SHIELD) && !Inv.has(p, Items.SHIELD) && Inv.count(p, Items.IRON_INGOT) == 0
+                && Inv.count(p, Items.RAW_IRON) >= 1 && hasFuel(p) && !cool(bot, "shieldsmelt")) {
+            stage = "5. 방패용 철 1개 굽기";
+            return run(bot, "shieldsmelt", () -> new SmeltTask(is(Items.RAW_IRON), Items.IRON_INGOT, 1));
         }
         // ---- 5. 철 ----
         int ironHave = Inv.count(p, Items.IRON_INGOT) + Inv.count(p, Items.RAW_IRON) + ironInGear(p);
