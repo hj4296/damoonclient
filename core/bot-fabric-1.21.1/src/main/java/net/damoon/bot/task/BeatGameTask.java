@@ -238,20 +238,49 @@ public class BeatGameTask extends Task {
     }
 
     /** 죽은 자리로 돌아가 떨어뜨린 물건 줍기 (아이템은 5분 뒤 사라지므로 4분 안에) */
+    private int recoverNear, recoverDeathTick = -1, recoverFails;
+    private boolean recoverLoaded, recoverFromMemory;
+
+    private void forgetDeath(Bot bot) {
+        bot.deathPos = null;
+        net.damoon.bot.Memory.put("deathPos", null);
+    }
+
     private S recover(Bot bot, LocalPlayer p, ClientLevel l) {
-        if (bot.deathPos == null || bot.deathDim != l.dimension()) return null;
-        if (bot.ticks - bot.deathTick > 20 * 60 * 4) { bot.deathPos = null; return null; }
-        BlockPos d = bot.deathPos;
-        // 용암에서 죽었으면 물건은 이미 탔고, 가면 또 빠짐 → 안 감
-        for (BlockPos q : BlockPos.betweenClosed(d.offset(-2, -2, -2), d.offset(2, 1, 2))) {
-            if (net.damoon.bot.BlockUtil.isLava(l.getBlockState(q))) { bot.log("죽은 자리가 용암 → 물건은 포기"); bot.deathPos = null; return null; }
+        // 게임을 다시 켰으면 적어 둔 죽은 자리를 다시 읽음
+        if (!recoverLoaded) {
+            recoverLoaded = true;
+            if (bot.deathPos == null) {
+                BlockPos mp = net.damoon.bot.Memory.getPos("deathPos");
+                String dd = net.damoon.bot.Memory.get("deathDim");
+                if (mp != null && dd != null) {
+                    bot.deathPos = mp;
+                    bot.deathDim = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.ResourceLocation.parse(dd));
+                    bot.deathTick = bot.ticks;
+                    recoverNear = 20 * 60 * 2; // 얼마나 지났는지 모르니 넉넉히 잡지 않음
+                    recoverFromMemory = true;
+                    bot.log("적어 둔 죽은 자리 " + mp.toShortString() + " → 물건 찾으러 감");
+                }
+            }
         }
+        if (bot.deathPos == null || bot.deathDim != l.dimension()) return null;
+        if (recoverDeathTick != bot.deathTick) { recoverDeathTick = bot.deathTick; if (!recoverFromMemory) recoverNear = 0; recoverFromMemory = false; recoverFails = 0; }
+        BlockPos d = bot.deathPos;
         double dist = Math.sqrt(p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(d)));
-        if (dist > 600) { bot.deathPos = null; return null; }
+        // 떨어진 물건은 그 자리가 플레이어 근처(약 8청크 안)라 움직일 때만 5분 시계가 감 → 멀리서 다시 태어났으면 시간은 멈춰 있음
+        if (dist < 130) recoverNear++;
+        if (recoverNear > 20 * 60 * 4 + 20 * 30) { bot.log("물건이 사라졌을 시간 → 포기"); forgetDeath(bot); return null; }
+        // 용암에 빠져 죽었으면 (죽은 칸·발밑이 용암) 물건은 이미 탔고, 가면 또 빠짐 → 안 감
+        if (l.isLoaded(d) && (net.damoon.bot.BlockUtil.isLava(l.getBlockState(d)) || net.damoon.bot.BlockUtil.isLava(l.getBlockState(d.below())))) {
+            bot.log("죽은 자리가 용암 → 물건은 포기"); forgetDeath(bot); return null;
+        }
+        if (dist > 1500) { forgetDeath(bot); return null; }
+        // 멀리서 다시 태어났고 맨손이면: 물건은 안 사라지니 먼저 돌 곡괭이·칼만 만들고 감 (맨손으로 땅속 먼 길은 위험)
+        if (dist > 140 && tier(p) < 2) return null;
         stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";
         if (dist > 6) {
             Nav.R r = bot.nav.go(new Goal.Near(d, 3));
-            if (r == Nav.R.FAILED) { bot.nav.stop(); bot.deathPos = null; }
+            if (r == Nav.R.FAILED) { bot.nav.stop(); if (++recoverFails >= 5) forgetDeath(bot); }
             return S.RUNNING;
         }
         for (var e : l.entitiesForRendering()) {
@@ -264,7 +293,8 @@ public class BeatGameTask extends Task {
             }
         }
         bot.log("떨어뜨린 물건 되찾기 끝");
-        bot.deathPos = null;
+        forgetDeath(bot);
+        recoverFails = 0;
         return null;
     }
 

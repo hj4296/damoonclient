@@ -163,6 +163,9 @@ public final class Bot {
             deathDim = mc.level.dimension();
             deathTick = ticks;
             deaths++;
+            // 게임을 다시 켜도 물건을 찾으러 갈 수 있게 적어 둠
+            Memory.putPos("deathPos", deathPos);
+            Memory.put("deathDim", deathDim.location().toString());
             log("죽었다… 다시 시작 (" + deaths + "번째)");
             mc.player.respawn();
             mc.setScreen(null);
