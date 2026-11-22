@@ -250,7 +250,8 @@ public final class Tower {
             Act.stopDig(bot);
             active = false;
             // 시간이 다 돼 내려왔으면 잠시 다시 쌓지 않음 (내려가자마자 다시 올라가던 반복)
-            if (forcedDown) cooldownUntil = bot.ticks + 20 * 30;
+            // 내려온 뒤엔 잠시 다시 쌓지 않음 (벽 너머 몹 때문에 쌓고 내려오기를 반복하던 문제)
+            cooldownUntil = bot.ticks + 20 * (forcedDown ? 30 : 20);
             forcedDown = false;
             bot.log("기둥에서 내려옴");
             return false;
