@@ -27,6 +27,11 @@ public class BedTask extends Task {
         return t >= 12600 && t <= 23300;
     }
 
+    /** 밤이거나 천둥 번개 (낮에도 어두워 몹이 잔뜩 나옴) */
+    public static boolean dark(ClientLevel l) {
+        return night(l) || l.isThundering();
+    }
+
     public static boolean hasBed(LocalPlayer p) {
         return Inv.count(p, s -> s.is(ItemTags.BEDS)) > 0;
     }

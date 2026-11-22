@@ -646,6 +646,7 @@ public final class Reflex {
                 if (away.lengthSqr() < 0.01) away = new Vec3(1, 0, 0);
                 Vec3 to = p.position().add(away.normalize().scale(6));
                 if (Bot.safeAheadToward(p, to.x, to.z)) {
+                    chaseTicks = 0; // 일부러 멀어지는 중 — '쫓아도 안 가까워짐'으로 세지 않음
                     bot.ctl.lookYaw(p, to, 0f);
                     bot.ctl.fwd = true;
                     bot.ctl.sprint = p.getFoodData().getFoodLevel() > 6;
@@ -995,7 +996,7 @@ public final class Reflex {
         var src = p.getLastDamageSource();
         if (src != null && src.getEntity() instanceof LivingEntity atk && atk.isAlive() && atk != p
                 && !(atk instanceof EnderMan && bot.ticks < ignoreEndermenUntil)
-                && !(ranged(atk) && bot.ticks < ignoreUntil.getOrDefault(atk.getId(), 0))
+                && !(ranged(atk) && bot.ticks < ignoreUntil.getOrDefault(atk.getId(), 0) && atk.distanceTo(p) > 4)
                 && bot.level().getGameTime() - lastHurtStamp(p) < 60 && atk.distanceTo(p) < 6 && p.hasLineOfSight(atk)) {
             return atk;
         }
@@ -1005,8 +1006,9 @@ public final class Reflex {
             if (e instanceof EnderMan && bot.ticks < ignoreEndermenUntil) continue;
             // 엔드에선 드래곤이 우선: 엔더맨은 바로 옆(3칸)에서 덤빌 때만
             if (inEnd && e instanceof EnderMan && e.distanceTo(p) > 3) continue;
-            if (bot.ticks < ignoreUntil.getOrDefault(e.getId(), 0)) continue;
             double d = e.distanceTo(p);
+            // (쫓다 포기한 몹이라도 코앞(4칸 안)까지 오면 다시 상대함 — 무시한 스켈레톤이 1~2칸에서 계속 쏘던 문제)
+            if (bot.ticks < ignoreUntil.getOrDefault(e.getId(), 0) && d > 4) continue;
             // 활 쏘는 몹은 멀리서도 보이면 달려가서 벰
             boolean bowReady = Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW);
             boolean blaze = e instanceof net.minecraft.world.entity.monster.Blaze;

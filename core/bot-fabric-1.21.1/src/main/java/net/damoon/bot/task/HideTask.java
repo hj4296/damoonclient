@@ -64,7 +64,7 @@ public class HideTask extends Task {
         }
         if (phase == 1) {
             bot.reflex.forceEat = p.getHealth() < 20;
-            if (BedTask.night(l)) {
+            if (BedTask.dark(l)) {
                 detail = "구멍 속에서 아침 기다리는 중";
                 if (l.getBlockState(top.below()).canBeReplaced()) { phase = 0; return S.RUNNING; }
                 return S.RUNNING;

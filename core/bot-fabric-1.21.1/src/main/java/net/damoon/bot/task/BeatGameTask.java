@@ -320,7 +320,7 @@ public class BeatGameTask extends Task {
         if (foodCount(p) < 1 && (p.getHealth() < 12 || p.getFoodData().getFoodLevel() < 10)) return null;
         // 멀리 가야 하는데 방패·갑옷이 없으면 밤엔 가지 않음 (가다가 스켈레톤·좀비에게 죽음) → 밤엔 숨고 낮에 감
         boolean weakNow = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
-        if (dist > 40 && weakNow && l.dimension() == Level.OVERWORLD && BedTask.night(l)) return null;
+        if (dist > 40 && weakNow && l.dimension() == Level.OVERWORLD && BedTask.dark(l)) return null;
         stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";
         if (dist > 6) {
             Nav.R r = bot.nav.go(new Goal.Near(d, 3));
@@ -381,7 +381,7 @@ public class BeatGameTask extends Task {
         }
         // 밤인데 침대가 없고 장비가 약하면 (방패나 갑옷 없음) 땅 속에 숨어서 아침까지 (오버월드 땅 위에서만)
         boolean weak = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
-        if (sub instanceof HideTask || (BedTask.night(l) && !BedTask.hasBed(p) && weak && l.dimension() == net.minecraft.world.level.Level.OVERWORLD
+        if (sub instanceof HideTask || (BedTask.dark(l) && !BedTask.hasBed(p) && weak && l.dimension() == net.minecraft.world.level.Level.OVERWORLD
                 && l.canSeeSky(PathExec.feet(p)) && !cool(bot, "hide") && HideTask.canHide(bot))) {
             stage = "밤 — 땅 속에 숨기";
             return run(bot, "hide", HideTask::new);
