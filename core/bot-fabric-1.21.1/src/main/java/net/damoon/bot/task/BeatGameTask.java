@@ -639,6 +639,26 @@ public class BeatGameTask extends Task {
                 stage = "7. 흑요석 만들기 (" + Inv.count(p, Items.OBSIDIAN) + "/10)";
                 // 실패한 뒤 쉬는 동안엔 다시 만들지 않음 (매 틱 새로 만들고 실패하던 문제)
                 S r = cool(bot, "obsidian") && !(sub instanceof ObsidianTask) ? S.RUNNING : run(bot, "obsidian", () -> new ObsidianTask(10));
+                if (cool(bot, "obsidian") && !Inv.has(p, Items.WATER_BUCKET) && Inv.has(p, Items.BUCKET)) {
+                    // 물이 없음 (근처에 물 원천이 없어 실패) → 땅 위로 올라가 물(강·호수·바다)을 찾아 돌아다님
+                    BlockPos wf = PathExec.feet(p);
+                    int wtop = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, wf.getX(), wf.getZ());
+                    if (surfaceTrip(bot, wf, wtop, underground(l, wf, wtop))) { detail = "물을 찾아 땅 위로 올라가는 중"; return S.RUNNING; }
+                    BlockPos ws = net.damoon.bot.Scan.nearest(l, wf, 4, wf.getY() - 16, wf.getY() + 24,
+                            st -> st.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && st.getFluidState().isSource(), b -> l.getBlockState(b.above()).isAir());
+                    if (ws != null) {
+                        detail = "물을 찾음 → 양동이로 뜨러 가는 중";
+                        if (net.damoon.bot.Act.reach(p, new net.minecraft.world.phys.AABB(ws)) > 4.0) {
+                            Nav.R wr = bot.nav.go(new Goal.Reach(ws, 3.0));
+                            if (wr == Nav.R.FAILED) bot.nav.stop();
+                            return S.RUNNING;
+                        }
+                        bot.nav.stop();
+                        ObsidianTask.useBucket(bot, Items.BUCKET, net.minecraft.world.phys.Vec3.atCenterOf(ws).add(0, 0.4, 0));
+                        return S.RUNNING;
+                    }
+                    return explore(bot, "물");
+                }
                 if (cool(bot, "obsidian")) {
                     // 근처에 용암이 없으면 더 깊이 내려가서 찾음
                     if (digger == null) digger = new Digger(Direction.fromYRot(p.getYRot()));
