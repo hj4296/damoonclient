@@ -135,7 +135,7 @@ public class BeatGameTask extends Task {
     }
 
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
-    private int surfaceY = Integer.MIN_VALUE, surfaceUntil;
+    private int surfaceY = Integer.MIN_VALUE, surfaceUntil, surfaceCool;
     private int shieldWoodSince;
     private boolean coalLatch, huntLatch;
     private int huntSince;
@@ -184,12 +184,14 @@ public class BeatGameTask extends Task {
         // 하늘이 보이면(하늘빛 12 이상) 이미 땅 위 — 나뭇잎·나무 아래라 높이 지도가 위로 잡힌 것 (나무 꼭대기로 올라가려다 멈추던 문제)
         // (공중에 떠 있을 때(점프 중)도 땅속이 아니면 새로 올라가기를 시작하지 않음 — 점프할 때마다 목표가 바뀌며 제자리 반복)
         if (!underground(bot.level(), f, top)) {
-            if (surfaceY != Integer.MIN_VALUE && bot.p().onGround()) { surfaceY = Integer.MIN_VALUE; surfClimb = null; bot.nav.stop(); }
+            if (surfaceY != Integer.MIN_VALUE && bot.p().onGround()) { surfaceY = Integer.MIN_VALUE; surfClimb = null; bot.nav.stop(); surfaceCool = bot.ticks + 20 * 30; }
             if (surfaceY == Integer.MIN_VALUE) return false;
         }
         if (surfaceY == Integer.MIN_VALUE || bot.ticks > surfaceUntil) {
             surfaceY = Integer.MIN_VALUE;
-            if (!need) return false;
+            // (땅 위라서 멈췄으면 30초 동안은 다시 시작 안 함: 절벽 밑 웅덩이처럼 한 칸 옆은 땅속·한 칸 옆은 땅 위인 곳에서
+            //  올라가기·탐험이 번갈아 길을 새로 찾으며 두 칸 사이를 몇 분씩 오가던 문제)
+            if (!need || bot.ticks < surfaceCool) return false;
             surfaceY = top - 1;
             surfaceUntil = bot.ticks + 20 * 90;
         }
