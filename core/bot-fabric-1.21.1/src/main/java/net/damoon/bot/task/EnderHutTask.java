@@ -193,7 +193,7 @@ public class EnderHutTask extends Task {
         for (Entity e : l.entitiesForRendering()) {
             if (!(e instanceof EnderMan em) || !em.isAlive()) continue;
             double d = em.distanceTo(p);
-            if (em.isCreepy() && d < nd) { nd = d; near = em; }
+            if (em.isCreepy() && d < nd && d < 12) { nd = d; near = em; } // (멀리서 끼어 못 오는 화난 엔더맨만 보며 기다리지 않게)
             if (!em.isCreepy() && d < 40 && d < fd && p.hasLineOfSight(em) && !ignoreFar.contains(em.getId())) { fd = d; far = em; }
         }
         detail = "굴 안에서 엔더맨 기다리는 중 (진주 " + pearls(p) + "/" + want + ")";
