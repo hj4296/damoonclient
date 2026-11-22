@@ -623,6 +623,17 @@ public final class Reflex {
                     return true;
                 }
             }
+            // 멀거나(6칸 넘게) 높은 곳(나무 위 등)에 있어 칼로 못 가는 스켈레톤은 쏘고 난 틈에 활로 맞춤
+            boolean bowOk = Inv.has(p, Items.BOW) && (Inv.has(p, Items.ARROW) || Inv.has(p, Items.SPECTRAL_ARROW));
+            if (ranged(threat) && !(threat instanceof net.minecraft.world.entity.monster.Blaze) && bowOk && p.hasLineOfSight(threat)
+                    && (r > 6.0 || threat.getY() - p.getY() > 1.5 || !Bot.safeAheadToward(p, threat.getX(), threat.getZ()))) {
+                if (eating) { eating = false; bot.ctl.use = false; }
+                if (p.isUsingItem() && p.getUseItem().is(Items.SHIELD)) { bot.ctl.use = false; return true; }
+                Vec3 vel = threat.position().subtract(threat.xo, threat.yo, threat.zo);
+                if (archer.tick(bot, threat.getBoundingBox().getCenter(), vel)) bot.log(threat.getName().getString() + "에게 화살 발사");
+                doing = threat.getName().getString() + " 활로 저격 (쏘고 난 틈에)";
+                return true;
+            }
             if (ranged(threat) && r > 3.0 && shieldOn) {
                 Inv.selectWeapon(p);
                 bot.ctl.lookAt(p, threat.getBoundingBox().getCenter());
@@ -952,7 +963,9 @@ public final class Reflex {
             double d = best.distanceTo(p);
             if (best.getId() != chaseId) { chaseId = best.getId(); chaseTicks = 0; chaseBest = d; }
             if (d < chaseBest - 0.5) { chaseBest = d; chaseTicks = 0; }
-            if (++chaseTicks > 100 && d > 3.5 && !(camp && best instanceof net.minecraft.world.entity.monster.Blaze)) { ignoreUntil.put(best.getId(), bot.ticks + 20 * 30); return null; }
+            // (활이 있으면 원거리 몹은 쫓지 않고 쏘므로 '안 가까워짐'으로 무시하지 않음)
+            boolean sniping = ranged(best) && Inv.has(p, Items.BOW) && Inv.has(p, Items.ARROW) && p.hasLineOfSight(best);
+            if (++chaseTicks > 100 && d > 3.5 && !sniping && !(camp && best instanceof net.minecraft.world.entity.monster.Blaze)) { ignoreUntil.put(best.getId(), bot.ticks + 20 * 30); return null; }
         }
         return best;
     }
