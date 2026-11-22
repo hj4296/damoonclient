@@ -51,6 +51,13 @@ public class CraftTask extends Task {
 
     public static boolean has(LocalPlayer p, Item item, int n) { return Inv.count(p, item) >= n; }
 
+    /** 가진 수 (만들자마자 입은 갑옷도 셈 — 입은 걸 못 세서 갑옷을 두 벌씩 만들던 문제) */
+    private int have(LocalPlayer p) {
+        int n = Inv.count(p, item);
+        for (net.minecraft.world.item.ItemStack st : p.getInventory().armor) if (st.is(item)) n += st.getCount();
+        return n;
+    }
+
     /** 재료가 있는 조합법 (없으면 아무거나) */
     public static RecipeHolder<CraftingRecipe> recipe(ClientLevel l, LocalPlayer p, Item item) {
         List<RecipeHolder<CraftingRecipe>> all = l.getRecipeManager().getAllRecipesFor(RecipeType.CRAFTING);
@@ -99,7 +106,7 @@ public class CraftTask extends Task {
             sub = null;
             if (s == S.FAILED) return S.FAILED;
         }
-        if (Inv.count(p, item) >= count) {
+        if (have(p) >= count) {
             if (p.containerMenu != p.inventoryMenu) { Clicks.dropCarried(p); p.closeContainer(); return S.RUNNING; }
             if (placed != null && item != Items.CRAFTING_TABLE && ++pickTicks < 100) {
                 detail = "작업대 다시 챙기는 중";
@@ -175,7 +182,7 @@ public class CraftTask extends Task {
         }
         // 재료 넣기
         int resultCount = r.getResultItem(l.registryAccess()).getCount();
-        int times = Math.max(1, (int) Math.ceil((count - Inv.count(p, item)) / (double) resultCount));
+        int times = Math.max(1, (int) Math.ceil((count - have(p)) / (double) resultCount));
         times = Math.min(times, 64);
         while (times > 1 && missing(p, r, times) != null) times--;
         if (!(p.containerMenu instanceof CraftingMenu || p.containerMenu instanceof InventoryMenu)) return S.RUNNING;
