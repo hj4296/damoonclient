@@ -91,7 +91,8 @@ public final class Miner {
             target = null;
         }
         if (target == null || ++targetTicks > 20 * 30) {
-            if (target != null) bad.add(target.asLong());
+            // (목표도 비워야 함: 표시만 하고 두면 다음 틱부터 같은 블록을 또 캐며 다시 찾기(10번에 1번)를 몇 분씩 미룸)
+            if (target != null) { bad.add(target.asLong()); target = null; digTarget = null; Act.stopDig(bot); }
             targetTicks = 0;
             bot.trace = "miner-scan";
             if (scanTick-- > 0) return R.RUNNING;
