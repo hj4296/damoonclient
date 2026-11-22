@@ -284,7 +284,7 @@ public class BeatGameTask extends Task {
                     bot.deathPos = mp;
                     bot.deathDim = net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, net.minecraft.resources.ResourceLocation.parse(dd));
                     bot.deathTick = bot.ticks;
-                    recoverNear = 20 * 60 * 2; // 얼마나 지났는지 모르니 넉넉히 잡지 않음
+                    recoverNear = 20 * 30; // 죽자마자 멀리서 다시 태어나면 거의 안 지났음 (30초로 잡음)
                     recoverFromMemory = true;
                     bot.log("적어 둔 죽은 자리 " + mp.toShortString() + " → 물건 찾으러 감");
                 }
