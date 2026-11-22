@@ -486,7 +486,7 @@ public class BeatGameTask extends Task {
         if (!p.getOffhandItem().is(Items.SHIELD) && !Inv.has(p, Items.SHIELD) && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shieldnow")) {
             if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "방패가 부서짐 → 새 방패"; return run(bot, "shieldnow", () -> new CraftTask(Items.SHIELD, 1)); }
             if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "새 방패용 판자"; return run(bot, "shieldnowplanks", () -> new CraftTask(pl, want)); }
-            if (l.dimension() == Level.OVERWORLD) { stage = "새 방패용 나무 모으기"; return gatherWood(bot, 4); }
+            if (l.dimension() == Level.OVERWORLD) { stage = "새 방패용 나무 모으기"; return gatherWood(bot, 8); }
         }
         // ---- 3. 음식 ----
         int food = foodCount(p);
@@ -548,7 +548,7 @@ public class BeatGameTask extends Task {
         }
         // 예비 방패 하나 (화살을 막다 보면 닳아 부서짐 — 부서지는 순간 바로 바꿔 듦)
         // (Inv.count는 왼손도 셈)
-        if (p.getOffhandItem().is(Items.SHIELD) && Inv.count(p, Items.SHIELD) < 2 && Inv.count(p, Items.IRON_INGOT) >= 1
+        if (p.getOffhandItem().is(Items.SHIELD) && Inv.count(p, Items.SHIELD) < 3 && Inv.count(p, Items.IRON_INGOT) >= 1
                 && Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6 && !cool(bot, "spareshield")) {
             stage = "5. 예비 방패";
             int wantSh = Inv.count(p, Items.SHIELD) + 1;
