@@ -249,6 +249,9 @@ public class BeatGameTask extends Task {
         }
         if (sub != null) { bot.trace = "sub " + subKey; return run(bot, subKey, () -> sub); }
         if (l.dimension() == Level.NETHER) {
+            // 네더에서 죽었으면 다시 왔을 때 먼저 떨어뜨린 물건을 찾음 (멀리 있던 동안은 물건 시계가 멈춰 있음)
+            S rec = recover(bot, p, l);
+            if (rec != null) { detail = stage; return rec; }
             stage = "8. 네더";
             if (nether == null) nether = new NetherTask();
             nether.tick(bot);
@@ -571,8 +574,8 @@ public class BeatGameTask extends Task {
                 }
             }
             // 예비 방패 (화염구를 막다 보면 방패가 닳아 부서짐)
-            int shields = Inv.count(p, Items.SHIELD); // 왼손 포함
-            if (shields < 3 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
+            int shields = Inv.count(p, Items.SHIELD); // 왼손 포함 — 블레이즈 여럿의 화염구를 막다 보면 금방 닳음
+            if (shields < 4 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
                 if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "7. 예비 방패"; return run(bot, "shield2", () -> new CraftTask(Items.SHIELD, Inv.count(p, Items.SHIELD) + 1)); }
                 if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "7. 예비 방패용 판자"; return run(bot, "shield2planks", () -> new CraftTask(pl, want)); }
                 // 판자도 나무도 없으면 나무를 구함 (네더에서 방패가 부서지면 새로 못 만듦). 못 찾으면 5분 뒤 다시
@@ -822,7 +825,7 @@ public class BeatGameTask extends Task {
             return S.RUNNING;
         }
         int arrows = Inv.count(p, Items.ARROW);
-        if (Inv.has(p, Items.BOW) && arrows < 32 && !cool(bot, "arrows")) {
+        if (Inv.has(p, Items.BOW) && arrows < 48 && !cool(bot, "arrows")) {
             if (Inv.count(p, Items.FLINT) > 0 && Inv.count(p, Items.FEATHER) > 0 && Inv.count(p, Items.STICK) > 0) {
                 stage = no + ". 화살 만들기";
                 return run(bot, "arrow", () -> new CraftTask(Items.ARROW, arrows + 4));

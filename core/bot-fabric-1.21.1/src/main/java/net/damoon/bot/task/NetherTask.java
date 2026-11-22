@@ -115,7 +115,7 @@ public class NetherTask extends Task {
         int shieldsAll = Inv.count(p, Items.SHIELD); // 왼손 포함
         if (!shieldTrip && hasShield && shieldsAll < 2 && !canCraftShield && bot.ticks > nextSpareTrip && Inv.count(p, Items.BLAZE_ROD) < RODS
                 && !bot.reflex.turtle.sealed()) {
-            nextSpareTrip = bot.ticks + 20 * 60 * 20;
+            nextSpareTrip = bot.ticks + 20 * 60 * 10;
             spareTrip = true;
             bot.log("예비 방패가 없고 만들 재료도 없음 → 오버월드로 돌아가 예비 방패를 만들어 옴");
         }

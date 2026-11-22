@@ -69,6 +69,8 @@ public final class Reflex {
         trackBlazes(p);
         // 갑옷·방패는 생기면 바로 착용 (어떤 작업 중이든)
         if (bot.ticks % 20 == 7 && !p.isUsingItem()) { Inv.equipArmor(p); Inv.equipShield(p); }
+        // 왼손 방패가 부서지면 예비 방패를 바로 듦 (막는 중·먹는 중이어도 — 기다리면 그 사이 맞음)
+        if (!p.getOffhandItem().is(Items.SHIELD) && bot.ticks % 4 == 1 && Inv.equipShield(p) && p.getOffhandItem().is(Items.SHIELD)) bot.dbg("예비 방패로 바꿔 듦");
         // 터지려는 크리퍼: 방패가 있으면 그쪽으로 방패를 듦 — 방패는 폭발을 통째로 막음 (도망은 굴·벽에 막히면 못 피함)
         if (p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed()) {
             Creeper boom = null;
