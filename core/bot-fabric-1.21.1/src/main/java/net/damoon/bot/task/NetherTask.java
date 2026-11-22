@@ -23,7 +23,7 @@ import net.minecraft.world.level.block.entity.SpawnerBlockEntity;
  * 네더: 요새를 찾아 블레이즈 막대를 모으고, 엔더맨을 잡아 엔더 진주를 모은 뒤 들어온 포털로 돌아감.
  */
 public class NetherTask extends Task {
-    public static final int RODS = 7, PEARLS = 14;
+    public static final int RODS = 7, PEARLS = 12; // 진주 12개: 엔드 포털 틀 12칸 (보통 몇 칸은 이미 차 있음) — 엔더맨이 드물어 14개는 너무 오래 걸림
     private BlockPos portal;
     private Hunter blazes, endermen;
     private Miner rack;
