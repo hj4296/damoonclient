@@ -30,6 +30,7 @@ public final class Miner {
     private BlockPos target, digTarget;
     private int scanTick, noFind, targetTicks;
     private final Set<Long> bad = new HashSet<>();
+    private int wetDigTicks;
     public int radius = 24;
     /** 이 높이보다 아래는 안 캠 (예: 발밑 엔드 돌만 캐서 섬에 구멍 뚫지 않게) */
     public int minY = Integer.MIN_VALUE;
@@ -111,6 +112,10 @@ public final class Miner {
             digTarget = target;
             bot.trace = "miner-dig";
             bot.nav.stop();
+            // 물속에서 캐는 중이면 (아주 느림) 8초 넘으면 이 블록은 포기
+            if (p.isUnderWater()) {
+                if (++wetDigTicks > 20 * 8) { bad.add(target.asLong()); target = null; digTarget = null; wetDigTicks = 0; Act.stopDig(bot); return R.RUNNING; }
+            } else wetDigTicks = 0;
             // 시야를 가리는 블록(잎 등)이 있으면 그것부터 부숨
             BlockPos dig = target;
             net.minecraft.world.phys.BlockHitResult hr = l.clip(new net.minecraft.world.level.ClipContext(p.getEyePosition(), Vec3.atCenterOf(target),
@@ -162,7 +167,8 @@ public final class Miner {
             // 물에 잠긴 광석(지하 대수층·물 동굴)은 캐러 가지 않음 — 헤엄쳐 들어갔다가 숨 쉴 곳을 못 찾아 익사하던 문제
             int wet = 0;
             for (Direction d : Direction.values()) if (BlockUtil.isWater(l.getBlockState(m.relative(d)))) wet++;
-            if (wet >= 2 || BlockUtil.isWater(l.getBlockState(m.above()))) continue;
+            // (한 면만 물에 닿아도 건너뜀: 물속에 서서 캐면 5~25배 느려 숨이 찰 때마다 처음부터 다시 캐며 끝없이 오르내림)
+            if (wet >= 1) continue;
             boolean exposed = false;
             for (Direction d : Direction.values()) if (l.getBlockState(m.relative(d)).isAir()) { exposed = true; break; }
             double dx = m.getX() - c.getX(), dy = m.getY() - c.getY(), dz = m.getZ() - c.getZ();
