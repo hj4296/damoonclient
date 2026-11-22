@@ -385,7 +385,11 @@ public class BeatGameTask extends Task {
             stage = "먹을 게 없음 → 사냥하러";
             BlockPos fp = PathExec.feet(p);
             int top = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, fp.getX(), fp.getZ());
-            if (surfaceTrip(bot, fp, top, fp.getY() < top - 4 && underground(l, fp, top))) {
+            // 사냥감이 보이면 땅 위로 올라가지 않고 바로 잡으러 감 (경계에서 올라가기↔사냥을 매 틱 오가던 문제)
+            boolean preyVisible = false;
+            for (var e : l.entitiesForRendering())
+                if (Hunter.foodAnimals().test(e) && e.distanceTo(p) < 32 && p.hasLineOfSight(e)) { preyVisible = true; break; }
+            if (!preyVisible && surfaceTrip(bot, fp, top, fp.getY() < top - 4 && underground(l, fp, top))) {
                 detail = "땅 위로 올라가는 중";
                 return S.RUNNING;
             }
