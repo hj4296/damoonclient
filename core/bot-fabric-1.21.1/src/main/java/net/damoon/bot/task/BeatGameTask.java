@@ -438,7 +438,9 @@ public class BeatGameTask extends Task {
         int sticks = Inv.count(p, Items.STICK);
         int needSticks = Math.max(0, 8 - sticks);
         // 처음(땅 위에 있을 때) 넉넉히 모아 두고, 나중엔 막대기가 정말 없을 때만 나무를 구하러 감
-        int needPlanks = tier < 2 ? 40
+        // (돌 곡괭이가 부서졌을 뿐이면(작업대·막대기·조약돌이 있음) 나무 40개를 다시 모으지 않고 바로 돌 곡괭이를 만듦)
+        boolean justRemakePick = tier == 1 && Inv.has(p, Items.CRAFTING_TABLE) && sticks >= 2 && cobble >= 3;
+        int needPlanks = tier < 2 && !justRemakePick ? 40
                 : (sticks < 3 ? 2 : 0) + (Inv.has(p, Items.CRAFTING_TABLE) || Inv.count(p, planks) >= 4 ? 0 : 4);
         // (다이아 곡괭이가 있어도 작업대를 잃어버렸고 판자도 없으면 오버월드에선 나무를 구함 — 양동이·방패 등을 못 만듦)
         boolean noTable = !Inv.has(p, Items.CRAFTING_TABLE) && l.dimension() == net.minecraft.world.level.Level.OVERWORLD;
