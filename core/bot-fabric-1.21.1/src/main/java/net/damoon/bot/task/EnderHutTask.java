@@ -26,6 +26,7 @@ import java.util.List;
  */
 public class EnderHutTask extends Task {
     private int noEnder;
+    private final java.util.Map<Integer, Integer> pearlSeen = new java.util.HashMap<>();
     private BlockPos in, out;      // 안쪽 칸(내가 섬), 바깥 칸(입구)
     private Direction front;
     private int phase, ticks, lookTicks, buildTicks, peekTicks;
@@ -169,7 +170,8 @@ public class EnderHutTask extends Task {
         bot.reflex.ignoreEndermenUntil = bot.ticks + 3;
         // 굴 입구 앞에 떨어진 진주 (입구 칸까지만 나가서 주움)
         for (Entity e : l.entitiesForRendering()) {
-            if (e instanceof ItemEntity ie && ie.getItem().is(Items.ENDER_PEARL) && ie.distanceTo(p) < 4) {
+            if (e instanceof ItemEntity ie && ie.getItem().is(Items.ENDER_PEARL) && ie.distanceTo(p) < 4
+                    && bot.ticks - pearlSeen.computeIfAbsent(ie.getId(), k -> bot.ticks) < 20 * 8) { // 8초 넘게 못 주우면 (벽에 낌) 포기
                 boolean angry = false;
                 for (Entity o : l.entitiesForRendering()) if (o instanceof EnderMan em && em.isCreepy() && em.distanceTo(p) < 8) angry = true;
                 if (!angry) {
