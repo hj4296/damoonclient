@@ -34,7 +34,9 @@ public class NetherTask extends Task {
     private net.damoon.bot.EnderTrap trap;
     private CraftTask boatCraft;
     private CraftTask shieldCraft;
-    private boolean foodTrip, shieldTrip, spareTrip;
+    private boolean foodTrip, shieldTrip, spareTrip, memSpawnerLoaded;
+    private BlockPos memSpawner;
+    private int memFails;
     private static int nextSpareTrip;
     private int shieldRetry;
     private boolean boatTried;
@@ -170,6 +172,11 @@ public class NetherTask extends Task {
         if (rods < RODS) {
             BlockPos f = PathExec.feet(p);
             BlockPos spawner = Scan.nearest(l, f, 6, l.getMinBuildHeight(), l.getMaxBuildHeight(), s -> s.is(Blocks.SPAWNER), b -> isBlazeSpawner(l, b));
+            // 찾은 블레이즈 스포너 자리를 기억 파일에 적어 둠 (다시 네더에 오면 요새를 처음부터 찾지 않고 바로 감)
+            if (!memSpawnerLoaded) { memSpawner = net.damoon.bot.Memory.getPos("blazeSpawner"); memSpawnerLoaded = true; }
+            if (spawner != null && !spawner.equals(memSpawner)) { memSpawner = spawner; net.damoon.bot.Memory.putPos("blazeSpawner", spawner); }
+            if (spawner == null && memSpawner != null && l.isLoaded(memSpawner) && p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(memSpawner)) < 20 * 20
+                    && !l.getBlockState(memSpawner).is(Blocks.SPAWNER)) { memSpawner = null; net.damoon.bot.Memory.put("blazeSpawner", null); }
             if (blazes == null) blazes = new Hunter(e -> e instanceof Blaze, Inv.is(Items.BLAZE_ROD));
             blazes.range = 24;
             if (spawner != null && safeSpot == null) {
@@ -270,6 +277,13 @@ public class NetherTask extends Task {
                     bot.nav.stop();
                     bot.ctl.lookAt(p, net.minecraft.world.phys.Vec3.atCenterOf(spawner).add(0, 1, 0));
                 }
+                return S.RUNNING;
+            }
+            // 전에 찾아 둔 스포너가 있으면 그리로 바로 감
+            if (memSpawner != null && memFails < 6) {
+                detail = "기억해 둔 블레이즈 스포너로 가는 중 (" + (int) Math.sqrt(p.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(memSpawner))) + "칸)";
+                Nav.R nr = bot.nav.go(new Goal.Near(memSpawner, 6));
+                if (nr == Nav.R.FAILED) { bot.nav.stop(); memFails++; }
                 return S.RUNNING;
             }
             // 요새 벽돌 위(걸을 수 있는 곳)를 따라 요새 안을 돌아다니며 스포너를 찾음
