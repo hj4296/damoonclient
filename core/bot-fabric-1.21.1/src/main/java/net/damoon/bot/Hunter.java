@@ -24,7 +24,8 @@ public final class Hunter {
     private final Predicate<ItemStack> loot;
     private int targetId = -1;
     private BlockPos goalPos;
-    private int chaseTicks;
+    private int chaseTicks, noReach;
+    private final java.util.Map<Integer, Integer> ignoreUntil = new java.util.HashMap<>();
     public int range = 48;
     public String info = "";
 
@@ -55,13 +56,17 @@ public final class Hunter {
             }
         }
         Entity t = targetId >= 0 ? l.getEntity(targetId) : null;
-        if (t == null || !t.isAlive() || ++chaseTicks > 20 * 40) {
+        // 40초 동안 못 잡았거나, 도착했는데 벽 너머라 못 때리면 그 녀석은 2분 동안 무시 (같은 걸 계속 다시 고르던 문제)
+        if (t != null && t.isAlive() && (chaseTicks > 20 * 40 || noReach > 20 * 6)) ignoreUntil.put(targetId, bot.ticks + 20 * 120);
+        if (t == null || !t.isAlive() || ++chaseTicks > 20 * 40 || noReach > 20 * 6) {
+            noReach = 0;
             targetId = -1;
             chaseTicks = 0;
             Entity best = null;
             double bd = 1e9;
             for (Entity e : l.entitiesForRendering()) {
                 if (!e.isAlive() || !(e instanceof LivingEntity) || !prey.test(e)) continue;
+                if (bot.ticks < ignoreUntil.getOrDefault(e.getId(), 0)) continue;
                 double d = e.distanceTo(p) + Math.abs(e.getY() - p.getY()) * 2;
                 if (d < range && d < bd) { bd = d; best = e; }
             }
@@ -82,7 +87,7 @@ public final class Hunter {
         if (goalPos == null || goalPos.distSqr(at) > 9) goalPos = at;
         Nav.R nr = bot.nav.go(new Goal.Near(goalPos, 1.5));
         if (nr == Nav.R.FAILED) { bot.nav.stop(); targetId = -1; }
-        if (nr == Nav.R.ARRIVED) goalPos = null;
+        if (nr == Nav.R.ARRIVED) { goalPos = null; noReach++; } else if (nr == Nav.R.RUNNING) noReach = Math.max(0, noReach - 1);
         return R.RUNNING;
     }
 }
