@@ -190,6 +190,7 @@ public class EnderHutTask extends Task {
             if (!em.isCreepy() && d < 40 && d < fd && p.hasLineOfSight(em) && !ignoreFar.contains(em.getId())) { fd = d; far = em; }
         }
         detail = "굴 안에서 엔더맨 기다리는 중 (진주 " + pearls(p) + "/" + want + ")";
+        if (near != null || far != null) noEnder = 0;
         if (near != null) {
             Inv.selectWeapon(p);
             // 다리를 봄 (몸통 아래쪽)
@@ -230,7 +231,8 @@ public class EnderHutTask extends Task {
         }
         peeking = false;
         // 엔더맨이 1분 넘게 하나도 안 보이면 이 자리는 그만 (다른 곳을 찾아감)
-        if (any == null) { if (++noEnder > 20 * 60) return S.FAILED; } else noEnder = 0;
+        // (부를 수 있는(보이는) 엔더맨도, 화난 엔더맨도 없이 1분이 지나면 이 자리는 그만 — 벽 너머에서 서성이는 엔더맨만 있으면 끝이 없음)
+        if (++noEnder > 20 * 60) return S.FAILED;
         // 엔더맨이 아예 없으면: 아침이 됐거나 근처에 없음
         if (l.dimension() == net.minecraft.world.level.Level.OVERWORLD && !BedTask.night(l) && ticks > 20 * 30) return S.FAILED;
         bot.ctl.look(front.toYRot(), 0f);
