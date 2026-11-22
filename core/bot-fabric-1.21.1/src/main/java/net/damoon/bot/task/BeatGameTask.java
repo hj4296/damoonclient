@@ -321,7 +321,13 @@ public class BeatGameTask extends Task {
         // 5분 시계가 감 → 멀리서 다시 태어났으면 시간은 멈춰 있음 (직선 130칸으로 재다가 145칸 근처에서 사냥하는 동안 물건이 사라짐)
         boolean ticking = pileTicking(p, d);
         if (ticking) recoverNear++;
-        if (recoverNear > 20 * 60 * 4 + 20 * 30) { bot.log("물건이 사라졌을 시간 → 포기"); forgetDeath(bot); return null; }
+        if (recoverNear > 20 * 60 * 4 + 20 * 30) {
+            // 어림한 시간일 뿐 → 죽은 자리 근처에 아이템이 아직 보이면 포기하지 않음 (바로 옆까지 와서 포기하던 문제)
+            boolean seen = false;
+            if (dist < 64) for (var e : l.entitiesForRendering())
+                if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(d)) < 12) { seen = true; break; }
+            if (!seen) { bot.log("물건이 사라졌을 시간 → 포기"); forgetDeath(bot); return null; }
+        }
         // 용암에 빠져 죽었으면 (죽은 칸·발밑이 용암) 물건은 이미 탔고, 가면 또 빠짐 → 안 감
         if (l.isLoaded(d) && (net.damoon.bot.BlockUtil.isLava(l.getBlockState(d)) || net.damoon.bot.BlockUtil.isLava(l.getBlockState(d.below())))) {
             bot.log("죽은 자리가 용암 → 물건은 포기"); forgetDeath(bot); return null;
@@ -348,9 +354,15 @@ public class BeatGameTask extends Task {
             if (r == Nav.R.FAILED) { bot.nav.stop(); if (++recoverFails >= 5) forgetDeath(bot); }
             return S.RUNNING;
         }
-        for (var e : l.entitiesForRendering()) {
-            if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(d)) < 10
-                    && lootTime.merge(ie.getId(), 1, Integer::sum) < 20 * 12) {
+        // 가장 가까운 아이템 하나만 쫓고 그 아이템의 시간만 셈 (모든 아이템의 시간을 한꺼번에 세서 12초 만에 다 포기하던 문제)
+        net.minecraft.world.entity.item.ItemEntity pick = null;
+        double pd = 1e9;
+        for (var e : l.entitiesForRendering())
+            if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(d)) < 12
+                    && lootTime.getOrDefault(ie.getId(), 0) < 20 * 20 && ie.distanceTo(p) < pd) { pd = ie.distanceTo(p); pick = ie; }
+        if (pick != null) lootTime.merge(pick.getId(), 1, Integer::sum);
+        for (var e : pick == null ? java.util.List.<net.minecraft.world.entity.Entity>of() : java.util.List.<net.minecraft.world.entity.Entity>of(pick)) {
+            if (e instanceof net.minecraft.world.entity.item.ItemEntity ie) {
                 detail = "떨어뜨린 " + ie.getItem().getHoverName().getString() + " 줍는 중";
                 boolean wet = ie.isInWater() || p.isInWater();
                 if (ie.distanceTo(p) < 2.5 || (wet && ie.distanceTo(p) < 10)) {
