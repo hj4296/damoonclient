@@ -273,7 +273,8 @@ public class BeatGameTask extends Task {
 
     private S recover(Bot bot, LocalPlayer p, ClientLevel l) {
         // 게임을 다시 켰으면 적어 둔 죽은 자리를 다시 읽음
-        if (!recoverLoaded) {
+        // 처음 한 번 + 그 뒤로도 10초마다 (다른 데서 죽은 자리를 적어 두면 이어서 찾으러 감)
+        if (!recoverLoaded || (bot.deathPos == null && bot.ticks % 200 == 0)) {
             recoverLoaded = true;
             if (bot.deathPos == null) {
                 BlockPos mp = net.damoon.bot.Memory.getPos("deathPos");

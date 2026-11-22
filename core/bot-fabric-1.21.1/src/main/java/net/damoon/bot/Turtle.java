@@ -170,6 +170,8 @@ public final class Turtle {
             if (e instanceof net.minecraft.world.entity.monster.Blaze b && b.isAlive() && b.distanceTo(p) < 3.5) { engaged = true; break; }
         if (!active) {
             if (bot.ticks < cooldownUntil || !danger(bot, p) || !p.onGround() || p.isInLava()) return false;
+            // 뜨거운 바닥(마그마 등) 위에서는 감싸지 않음 (갇힌 채 계속 데임)
+            if (BlockUtil.hurts(bot.level().getBlockState(PathExec.feet(p).below()))) return false;
             // 용암 옆에선 감싸지 않음 (벽 놓는 사이 불에 타 죽음) — 먼저 벗어남
             if (BlockUtil.fluidNear(l, Placer.standCell(p).getX(), Placer.standCell(p).getY(), Placer.standCell(p).getZ(), true)
                     || BlockUtil.isLava(l.getBlockState(Placer.standCell(p).below()))) return false;

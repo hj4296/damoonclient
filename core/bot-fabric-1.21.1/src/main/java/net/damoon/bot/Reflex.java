@@ -264,6 +264,36 @@ public final class Reflex {
             return true;
         }
         lavaTicks = 0;
+        // 마그마 블록(뜨거운 바닥) 위: 웅크리면 안 데이지만, 바로 옆의 안전한 바닥으로 웅크린 채 옮겨 감
+        {
+            net.minecraft.core.BlockPos ft = net.damoon.bot.path.PathExec.feet(p);
+            var under = bot.level().getBlockState(ft.below());
+            if (p.onGround() && (under.is(net.minecraft.world.level.block.Blocks.MAGMA_BLOCK) || under.getBlock() instanceof net.minecraft.world.level.block.CampfireBlock)) {
+                net.minecraft.core.BlockPos to = null;
+                double td = 1e9;
+                var l = bot.level();
+                for (net.minecraft.core.BlockPos q : net.minecraft.core.BlockPos.betweenClosed(ft.offset(-2, -1, -2), ft.offset(2, 1, 2))) {
+                    if (q.equals(ft)) continue;
+                    var fl = l.getBlockState(q.below());
+                    if (!BlockUtil.floor(l, q.getX(), q.getY() - 1, q.getZ(), fl) || BlockUtil.isWater(fl)) continue;
+                    if (!l.getBlockState(q).getCollisionShape(l, q).isEmpty() || !l.getBlockState(q.above()).getCollisionShape(l, q.above()).isEmpty()) continue;
+                    if (BlockUtil.hurts(l.getBlockState(q)) || BlockUtil.fluidNear(l, q.getX(), q.getY(), q.getZ(), true)) continue;
+                    double d = q.distToCenterSqr(p.position()) + Math.max(0, q.getY() - ft.getY()) * 2;
+                    if (d < td) { td = d; to = q.immutable(); }
+                }
+                if (eating) { eating = false; bot.ctl.use = false; }
+                bot.ctl.sneak = true; // 웅크리면 마그마 블록 피해 없음
+                if (to != null) {
+                    bot.ctl.lookYaw(p, Vec3.atBottomCenterOf(to), 0f);
+                    bot.ctl.fwd = true;
+                    bot.ctl.sneak = to.getY() <= ft.getY();
+                    if (to.getY() > ft.getY() && p.onGround()) bot.ctl.jump = true;
+                }
+                if (bot.ticks % 20 == 0) bot.dbg("마그마 블록 위 → " + (to == null ? "웅크림" : "옆으로 " + to.toShortString()));
+                doing = "마그마 블록 위 → 비키는 중";
+                return true;
+            }
+        }
         if (p.isUnderWater() && p.getAirSupply() < 200) {
             net.minecraft.core.BlockPos f = p.blockPosition();
             net.minecraft.core.BlockPos air = null;
