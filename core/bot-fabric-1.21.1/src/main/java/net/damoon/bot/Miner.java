@@ -159,6 +159,10 @@ public final class Miner {
             BlockState s = l.getBlockState(m);
             if (needTool && BlockUtil.breakTicks(p, l, m, s, true, null) >= BlockUtil.INF) continue;
             if (BlockUtil.fluidNear(l, m.getX(), m.getY(), m.getZ(), true)) continue;
+            // 물에 잠긴 광석(지하 대수층·물 동굴)은 캐러 가지 않음 — 헤엄쳐 들어갔다가 숨 쉴 곳을 못 찾아 익사하던 문제
+            int wet = 0;
+            for (Direction d : Direction.values()) if (BlockUtil.isWater(l.getBlockState(m.relative(d)))) wet++;
+            if (wet >= 2 || BlockUtil.isWater(l.getBlockState(m.above()))) continue;
             boolean exposed = false;
             for (Direction d : Direction.values()) if (l.getBlockState(m.relative(d)).isAir()) { exposed = true; break; }
             double dx = m.getX() - c.getX(), dy = m.getY() - c.getY(), dz = m.getZ() - c.getZ();
