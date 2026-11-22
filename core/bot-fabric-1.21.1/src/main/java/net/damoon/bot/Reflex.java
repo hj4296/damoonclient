@@ -95,9 +95,11 @@ public final class Reflex {
         }
         // 바로 앞의 근접 몹 (위더 스켈레톤 등): 이게 있으면 먹기·우유·불 끄기·화염구 방어보다 방패 싸움이 먼저
         // 날아오는 화염구·화살: 궤적을 계산해서 나를 맞힐 것만 방패로 막음 (방패는 들고 5틱 뒤부터 막힘)
-        Entity proj = turtle.sealed() || (tower.active() && !tower.onTop(p)) ? null : incoming(p, 15);
+        // 물속에서 숨이 모자라면 방패로 막는 것보다 숨 쉬러 올라가는 게 먼저 (삼지창을 막다가 익사하던 문제)
+        boolean needAir = p.isUnderWater() && p.getAirSupply() < 180;
+        Entity proj = turtle.sealed() || needAir || (tower.active() && !tower.onTop(p)) ? null : incoming(p, 15);
         // 한 번 막기 시작한 투사체는 지나갈 때까지 계속 막음 (예측이 틱마다 흔들려도)
-        if (proj == null && lastProj >= 0 && !turtle.sealed()) {
+        if (proj == null && lastProj >= 0 && !turtle.sealed() && !needAir) {
             Entity lp = bot.level().getEntity(lastProj);
             if (lp != null && lp.isAlive() && lp.distanceTo(p) < 20
                     && lp.getDeltaMovement().dot(p.getBoundingBox().getCenter().subtract(lp.position())) > 0) proj = lp;
@@ -117,7 +119,7 @@ public final class Reflex {
         // 활을 당기고 있는 스켈레톤(쇠뇌를 장전한 약탈자)이 나를 보고 있으면 쏘기 전에 미리 그쪽으로 방패를 듦
         // — 화살은 2~3틱 만에 날아오는데 방패는 들고 5틱 뒤부터 막히므로, 날아오는 걸 보고 들면 늦음.
         // 쏘고 난 뒤(다음 발까지 약 2초)엔 방패를 내리고 달려가서 벰 (아래 threat 쪽)
-        LivingEntity aimer = proj == null && p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed()
+        LivingEntity aimer = proj == null && !needAir && p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed()
                 && !(tower.active() && !tower.onTop(p)) ? aimingAtMe(p) : null;
         if (aimer != null && bot.ticks % 20 == 0) bot.dbg("활 당기는 " + aimer.getName().getString() + String.format(" %.1f칸 → 미리 방패", aimer.distanceTo(p)));
         if (aimer != null && nearMelee(p, 3.0) == null) {
@@ -135,7 +137,7 @@ public final class Reflex {
         }
         // 방금 화살을 쏴서 맞힌 몹(스켈레톤 등)이 있으면 그쪽을 계속 보며 방패를 듦 — 화살은 3틱 만에 날아와서 보고 나서 돌면 늦음
         // (활을 당기는 게 보이면 위에서 처리. 여긴 당기는 게 안 보이는데 맞고 있을 때 — 가까우면 아래에서 달려가 벰)
-        if (proj == null && p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed() && bot.lastAttacker instanceof LivingEntity sh
+        if (proj == null && !needAir && p.getOffhandItem().is(Items.SHIELD) && !turtle.sealed() && bot.lastAttacker instanceof LivingEntity sh
                 && sh.isAlive() && ranged(sh) && bot.ticks - bot.lastAttackTick < 20 * 5 && sh.distanceTo(p) < 20 && sh.distanceTo(p) > 6
                 && p.hasLineOfSight(sh) && nearMelee(p, 3.0) == null && !(sh instanceof net.minecraft.world.entity.monster.Blaze)) {
             if (eating) { eating = false; bot.ctl.use = false; }
