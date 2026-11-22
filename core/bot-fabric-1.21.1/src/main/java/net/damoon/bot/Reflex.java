@@ -30,6 +30,8 @@ public final class Reflex {
     /** 싸우지 않고 물러나는 중 (작업이 길을 감) */
     public boolean retreat;
     private int lavaTicks;
+    private net.minecraft.core.BlockPos lastAirPos;
+    private int lastAirTick;
     /** 벙커 짓는 중: 체력이 넉넉하면 방패보다 짓기를 먼저 */
     public boolean building;
     public final Turtle turtle = new Turtle();
@@ -296,6 +298,7 @@ public final class Reflex {
                 return true;
             }
         }
+        if (!p.isUnderWater()) { lastAirPos = p.blockPosition(); lastAirTick = bot.ticks; }
         if (p.isUnderWater() && p.getAirSupply() < 200) {
             net.minecraft.core.BlockPos f = p.blockPosition();
             net.minecraft.core.BlockPos air = null;
@@ -303,7 +306,7 @@ public final class Reflex {
             // 가까운 공기 칸 (위쪽 우선, 물에 닿아 있어야 헤엄쳐 갈 수 있음)
             for (net.minecraft.core.BlockPos q : net.minecraft.core.BlockPos.betweenClosed(f.offset(-10, -3, -10), f.offset(10, 16, 10))) {
                 var st = bot.level().getBlockState(q);
-                if (!st.isAir() || !bot.level().getBlockState(q.above()).isAir()) continue;
+                if (!st.isAir()) continue; // (머리만 내밀 1칸 공기여도 숨은 쉼)
                 boolean touchesWater = false;
                 for (net.minecraft.core.Direction dd : net.minecraft.core.Direction.values())
                     if (bot.level().getFluidState(q.relative(dd)).is(net.minecraft.tags.FluidTags.WATER)) { touchesWater = true; break; }
@@ -320,6 +323,12 @@ public final class Reflex {
                 Act.stopDig(bot);
                 bot.ctl.lookAt(p, Vec3.atCenterOf(air));
                 bot.ctl.fwd = Math.abs(air.getX() + 0.5 - p.getX()) + Math.abs(air.getZ() + 0.5 - p.getZ()) > 0.6;
+            } else if (lastAirPos != null && bot.ticks - lastAirTick < 20 * 60 && lastAirPos.distSqr(f) < 40 * 40) {
+                // 근처에 공기가 안 보이면 마지막으로 숨을 쉬던 자리로 되돌아감 (들어온 길에는 공기가 있음)
+                Act.stopDig(bot);
+                bot.ctl.lookAt(p, Vec3.atCenterOf(lastAirPos).add(0, 0.5, 0));
+                bot.ctl.fwd = true;
+                if (bot.ticks % 20 == 0) bot.dbg("숨 쉴 곳이 안 보임 → 마지막으로 숨 쉬던 " + lastAirPos.toShortString() + " 쪽으로");
             } else if (ceiling && BlockUtil.breakable(bot.level(), head.getX(), head.getY(), head.getZ(), hs)) {
                 // 위가 막혀 있고 공기가 안 보이면 위로 파 올라감
                 Act.dig(bot, head);
