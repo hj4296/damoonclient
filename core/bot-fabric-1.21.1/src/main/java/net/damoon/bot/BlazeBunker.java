@@ -31,7 +31,7 @@ public final class BlazeBunker {
     private boolean sally;
     /** 벙커 없이 스포너 위·옆에서 방패+칼로 싸움 (블레이즈가 스폰되자마자 칼이 닿음) */
     private boolean open = false;
-    private int sallyStart, lastGain, lastRods = -1, sallyRods = -1, rodTick;
+    private int sallyStart, lastGain, lastRods = -1, sallyRods = -1, rodTick, returnStart;
     public String info = "";
 
     public BlazeBunker(BlockPos spawner) { this.spawner = spawner; }
@@ -229,7 +229,7 @@ public final class BlazeBunker {
         if (rodTick == 0) rodTick = bot.ticks;
         // 벙커에서 3분 넘게 막대가 하나도 안 늘면 (블레이즈가 멀리 떠서 쏘기만 함) → 스포너 위에 서서
         // 새로 생기는 블레이즈를 생기자마자 칼로 벰 (갓 생긴 블레이즈는 바로 옆이라 칼이 닿음)
-        if (!quick && phase == 2 && !sally && bot.ticks - rodTick > 20 * 60 * 3 && p.getHealth() >= 14
+        if (!quick && phase != 0 && !sally && bot.ticks - rodTick > 20 * 60 * 3 && p.getHealth() >= 14
                 && Inv.count(p, Items.SHIELD) >= 1) {
             open = true;
             bot.reflex.camp = false;
@@ -287,11 +287,22 @@ public final class BlazeBunker {
         if (!inCell) {
             info = phase == 0 ? "벙커 자리로 이동" : "벙커로 돌아가는 중";
             bot.reflex.camp = false;
+            // 블레이즈 화염구를 막느라 45초 넘게 벙커로 못 들어가면 → 스포너 위에서 싸움
+            if (!quick) {
+                if (returnStart == 0) returnStart = bot.ticks;
+                if (bot.ticks - returnStart > 20 * (phase == 0 ? 60 : 45)) {
+                    open = true;
+                    returnStart = 0;
+                    bot.log("45초 동안 벙커로 못 돌아감 → 스포너 위에 서서 생기는 블레이즈를 바로 벰");
+                    return R.RUNNING;
+                }
+            }
             Nav.R r = bot.nav.go(new Goal.Block(cell));
             if (r == Nav.R.FAILED) { bot.nav.stop(); cell = null; phase = 0; return R.FAILED; }
             return R.RUNNING;
         }
         bot.nav.stop();
+        returnStart = 0;
         if (phase == 0) phase = 1;
         double cx = cell.getX() + 0.5 - p.getX(), cz = cell.getZ() + 0.5 - p.getZ();
         if (phase == 1 && cx * cx + cz * cz > 0.02) {
