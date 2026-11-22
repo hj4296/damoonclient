@@ -64,7 +64,9 @@ public class HideTask extends Task {
         }
         if (phase == 1) {
             bot.reflex.forceEat = p.getHealth() < 20;
-            if (BedTask.dark(l)) {
+            // (해가 막 떴을 땐 스켈레톤·좀비가 아직 안 탐 → 해가 조금 더 오를 때까지 기다림: 새벽에 나갔다가 스켈레톤에게 죽던 문제)
+            long tod = l.getDayTime() % 24000;
+            if (BedTask.dark(l) || tod > 23300 || tod < 700) {
                 detail = "구멍 속에서 아침 기다리는 중";
                 if (l.getBlockState(top.below()).canBeReplaced()) { phase = 0; return S.RUNNING; }
                 return S.RUNNING;
