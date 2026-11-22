@@ -19,6 +19,7 @@ public final class PitEscape {
     public String info = "";
     /** 구덩이가 아니어도 바로 계단을 파서 땅 위까지 올라감 (땅속 깊은 곳에서 길찾기가 너무 오래 걸릴 때) */
     public boolean force;
+    private boolean pillarBlocked;
 
     private static boolean pass(ClientLevel l, BlockPos b) {
         return BlockUtil.passable(l, b.getX(), b.getY(), b.getZ(), l.getBlockState(b));
@@ -111,7 +112,7 @@ public final class PitEscape {
             int r = Placer.placeAt(bot, floor, Inv.throwaway());
             if (r == -1) {
                 // 뚫린 동굴이라 앞에 디딜 곳을 못 만들면 발밑에 쌓아 한 칸 올라감
-                if (force && blocks > 0 && pass(l, f.above(2))) return pillar(bot, p, l, f, 2);
+                if (force && blocks > 0 && pass(l, f.above(2)) && !pillarBlocked) return pillar(bot, p, l, f, 2);
                 turn(bot, "발판이 없음");
                 return turns <= 8;
             }
@@ -134,7 +135,14 @@ public final class PitEscape {
     /** 발밑에 블록을 쌓아 올라감 (기둥 쌓기) */
     private boolean pillar(Bot bot, LocalPlayer p, ClientLevel l, BlockPos f, int d0) {
         info = "블록을 쌓아 올라가는 중 (" + d0 + "칸)";
-        if (stepTicks > 20 * 10) { dir = pickDir(l, f); bot.log("쌓아 올라가기가 막힘 → 계단 파기"); return true; }
+        if (stepTicks > 20 * 10) {
+            // 쌓기가 막혔으면 다시 쌓기로 돌아오지 않음 (계단↔쌓기를 매 틱 오가던 문제) + 다른 방향으로 계단
+            pillarBlocked = true;
+            stepTicks = 0;
+            dir = dir == null ? pickDir(l, f) : dir;
+            turn(bot, "쌓아 올라가기가 막힘");
+            return turns <= 8;
+        }
         Inv.select(p, Inv.throwaway());
         bot.ctl.look(p.getYRot(), 90f);
         bot.ctl.speed = 60f;
