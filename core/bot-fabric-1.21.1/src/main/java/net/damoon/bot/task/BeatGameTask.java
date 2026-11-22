@@ -137,7 +137,8 @@ public class BeatGameTask extends Task {
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil;
     private int shieldWoodSince;
-    private boolean coalLatch;
+    private boolean coalLatch, huntLatch;
+    private int huntSince;
     private int waterSeekStart;
     private final java.util.Set<Long> badWaterZone = new java.util.HashSet<>();
     /** 오버월드 쪽 네더 포털 자리 (기억 파일에도 적어 둠) — 멀리 나갔다가 포털을 새로 짓지 않고 돌아오게 */
@@ -358,7 +359,14 @@ public class BeatGameTask extends Task {
         }
         // ---- 0. 급할 때: 먹을 게 떨어짐 → 땅 위로 올라가 사냥 ----
         int foodNow = foodCount(p);
-        if (foodNow < 2 && (p.getFoodData().getFoodLevel() < 17 || p.getHealth() < 12) && tier >= 1) {
+        // 한 번 사냥을 시작하면 6개 모을 때까지 (1~2개 얻으면 철 캐러 갔다가 먹고 다시 오던 반복)
+        if (foodNow < 2 && (p.getFoodData().getFoodLevel() < 17 || p.getHealth() < 12) && tier >= 1) huntLatch = true;
+        if (foodNow >= 6 || cool(bot, "emhunt")) huntLatch = false;
+        if (!huntLatch) huntSince = 0;
+        if (huntLatch && tier >= 1) {
+            if (huntSince == 0) huntSince = bot.ticks;
+            // 10분 넘게 못 채우면 잠시 다른 일 (그 사이 배고프면 다시 시작)
+            if (bot.ticks - huntSince > 20 * 60 * 10 && foodNow >= 2) { huntLatch = false; huntSince = 0; fail(bot, "emhunt", 20 * 60 * 3); }
             stage = "먹을 게 없음 → 사냥하러";
             BlockPos fp = PathExec.feet(p);
             int top = l.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, fp.getX(), fp.getZ());
