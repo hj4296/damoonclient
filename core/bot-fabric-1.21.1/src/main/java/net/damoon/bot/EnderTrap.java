@@ -24,7 +24,7 @@ import java.util.Set;
  */
 public final class EnderTrap {
     private BlockPos boatGoal;
-    private int boatGoTicks;
+    private int boatGoTicks, angryTicks;
     public enum R { RUNNING, NONE }
 
     private int targetId = -1, boatId = -1, placeWait, pushTicks;
@@ -116,8 +116,9 @@ public final class EnderTrap {
             return R.RUNNING;
         }
         if (em.isCreepy()) {
-            // 이미 화남: 방패·거리 유지·치명타로 싸움
-            bot.nav.stop();
+            // 이미 화남: 방패·거리 유지·치명타로 싸움. 칼이 안 닿으면 길찾기를 멈추지 않음 (매 틱 멈춰 제자리이던 문제)
+            if (Act.reach(p, em.getBoundingBox()) <= 3.5) { bot.nav.stop(); angryTicks = 0; }
+            else if (++angryTicks > 20 * 60) { bot.nav.stop(); ignore.add(em.getId()); targetId = -1; angryTicks = 0; return R.RUNNING; }
             info = "화난 엔더맨과 싸우는 중 (" + Melee.fight(bot, em, true) + ")";
             return R.RUNNING;
         }
