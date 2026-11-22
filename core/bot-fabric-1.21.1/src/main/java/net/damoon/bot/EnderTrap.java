@@ -23,6 +23,8 @@ import java.util.Set;
  * (보트에 탄 엔더맨은 순간이동을 못 함) 벰. 끝나면 보트를 다시 챙김.
  */
 public final class EnderTrap {
+    private BlockPos boatGoal;
+    private int boatGoTicks;
     public enum R { RUNNING, NONE }
 
     private int targetId = -1, boatId = -1, placeWait, pushTicks;
@@ -97,10 +99,20 @@ public final class EnderTrap {
         EnderMan em = (EnderMan) t;
         double d = em.distanceTo(p);
         if (em.isPassenger()) {
-            // 보트에 탄 엔더맨: 순간이동·이동 불가 → 팔이 안 닿는 끝 거리에서 벰
-            info = "보트에 태운 엔더맨 공격! (" + Melee.fight(bot, em, true) + ")";
-            bot.nav.stop();
             pushTicks = 0;
+            // 멀면 먼저 길찾기로 다가감 (보트에 탄 채 둥둥 떠서 목표가 매 틱 바뀌지 않게 칸을 고정). 1분 넘게 못 가면 포기
+            if (Act.reach(p, em.getBoundingBox()) > 3.5) {
+                if (boatGoal == null || boatGoal.distSqr(em.blockPosition()) > 4) { boatGoal = em.blockPosition(); boatGoTicks = 0; }
+                if (++boatGoTicks > 20 * 60) { bot.nav.stop(); ignore.add(em.getId()); targetId = -1; boatGoal = null; return R.RUNNING; }
+                info = "보트에 태운 엔더맨에게 다가가는 중";
+                Nav.R r = bot.nav.go(new Goal.Near(boatGoal, 2.0));
+                if (r == Nav.R.FAILED) { bot.nav.stop(); ignore.add(em.getId()); targetId = -1; boatGoal = null; }
+                return R.RUNNING;
+            }
+            boatGoal = null;
+            // 보트에 탄 엔더맨: 순간이동·이동 불가 → 팔이 안 닿는 끝 거리에서 벰
+            bot.nav.stop();
+            info = "보트에 태운 엔더맨 공격! (" + Melee.fight(bot, em, false) + ")";
             return R.RUNNING;
         }
         if (em.isCreepy()) {
