@@ -173,9 +173,10 @@ public class BeatGameTask extends Task {
 
     private boolean surfaceTrip(Bot bot, BlockPos f, int top, boolean need) {
         // 하늘이 보이면(하늘빛 12 이상) 이미 땅 위 — 나뭇잎·나무 아래라 높이 지도가 위로 잡힌 것 (나무 꼭대기로 올라가려다 멈추던 문제)
-        if (!underground(bot.level(), f, top) && bot.p().onGround()) {
-            if (surfaceY != Integer.MIN_VALUE) { surfaceY = Integer.MIN_VALUE; surfClimb = null; bot.nav.stop(); }
-            return false;
+        // (공중에 떠 있을 때(점프 중)도 땅속이 아니면 새로 올라가기를 시작하지 않음 — 점프할 때마다 목표가 바뀌며 제자리 반복)
+        if (!underground(bot.level(), f, top)) {
+            if (surfaceY != Integer.MIN_VALUE && bot.p().onGround()) { surfaceY = Integer.MIN_VALUE; surfClimb = null; bot.nav.stop(); }
+            if (surfaceY == Integer.MIN_VALUE) return false;
         }
         if (surfaceY == Integer.MIN_VALUE || bot.ticks > surfaceUntil) {
             surfaceY = Integer.MIN_VALUE;
