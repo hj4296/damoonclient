@@ -841,6 +841,19 @@ public class BeatGameTask extends Task {
         if (stronghold != null && eyesAll < 6 && Inv.count(p, Items.ENDER_PEARL) == 0) stronghold = null;
         if (NetherTask.pearls(p) + placedEyes < NetherTask.PEARLS && stronghold == null) {
             stage = "9. 엔더 진주 (" + NetherTask.pearls(p) + "/" + NetherTask.PEARLS + ")";
+            // 먼저 네더의 뒤틀린 숲에서 (엔더맨이 아주 많음 — 오버월드에선 진주 1개에 10분 넘게 걸림). 한 번 해 보고 못 찾았으면 오버월드에서
+            BlockPos owp = l.dimension() == Level.OVERWORLD ? knownOverworldPortal(l) : null;
+            if (owp != null && !"1".equals(net.damoon.bot.Memory.get("netherPearlTried")) && foodCount(p) >= 8
+                    && p.getOffhandItem().is(Items.SHIELD) && worn(p, Items.IRON_CHESTPLATE)) {
+                stage = "9. 엔더 진주 — 네더 뒤틀린 숲으로 (" + NetherTask.pearls(p) + "/" + NetherTask.PEARLS + ")";
+                if (nether != null) nether = null; // 새로 들어가면 진주 찾기를 처음부터
+                BlockPos fp = PathExec.feet(p);
+                if (l.getBlockState(fp).is(Blocks.NETHER_PORTAL)) { bot.nav.stop(); detail = "포털 안에서 기다리는 중"; return S.RUNNING; }
+                Nav.R r = bot.nav.go(new Goal.Block(owp.getX(), owp.getY(), owp.getZ(), true));
+                detail = "포털로 가는 중";
+                if (r == Nav.R.FAILED) { bot.nav.stop(); net.damoon.bot.Memory.put("netherPearlTried", "1"); }
+                return S.RUNNING;
+            }
             if (!net.damoon.bot.EnderTrap.hasBoat(p) && net.damoon.bot.EnderTrap.boatFor(p) != null && !cool(bot, "boat")) {
                 Item boat = net.damoon.bot.EnderTrap.boatFor(p);
                 return run(bot, "boat", () -> new CraftTask(boat, 1));

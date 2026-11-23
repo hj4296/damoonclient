@@ -47,9 +47,10 @@ public class NetherTask extends Task {
     private boolean healing;
     private int fortTicks, rackGiveUp;
     private EnderHutTask hut;
-    private boolean pearlGiveUp;
+    private boolean pearlGiveUp, pearlGiveUpSaved;
     private int pearlStart, hutFails, warpedTicks, warpedFails, waitEnders;
     private BlockPos warped;
+    private int warpedSearchSince, lastWarpedScan;
     private boolean warpedHere;
     private int hutRetry;
     private final java.util.Set<Long> visited = new java.util.HashSet<>();
@@ -318,6 +319,7 @@ public class NetherTask extends Task {
         bot.reflex.building = false;
         bot.reflex.forceEat = false;
         // 2) 엔더 진주: 근처에 뒤틀린 숲(엔더맨이 많고 가스트가 없음)이 있으면 거기에 엔더맨 굴을 짓고 모음
+        if (pearlGiveUp && !pearlGiveUpSaved) { pearlGiveUpSaved = true; net.damoon.bot.Memory.put("netherPearlTried", "1"); }
         if (pearls < PEARLS && !pearlGiveUp) {
             if (pearlStart == 0) pearlStart = bot.ticks;
             if (bot.ticks - pearlStart > 20 * 60 * 15) { pearlGiveUp = true; bot.log("네더에서 진주를 충분히 못 모음 → 오버월드에서 마저"); }
@@ -363,10 +365,19 @@ public class NetherTask extends Task {
             }
             if (warped == null || warpedTicks++ > 20 * 90) {
                 warpedTicks = 0;
+                // (탐험 중엔 5초마다만 다시 훑음 — 훑기가 무거움)
+                if (warped == null && warpedSearchSince != 0 && bot.ticks - lastWarpedScan < 100) return explore(bot, "뒤틀린 숲 찾기");
+                lastWarpedScan = bot.ticks;
                 warped = Scan.nearest(l, f0, 6, 32, 120, st -> st.is(Blocks.WARPED_NYLIUM),
                         b -> l.getBlockState(b.above()).isAir() && l.getBlockState(b.above(2)).isAir() && b.distSqr(f0) > 9);
-                if (warped == null) { pearlGiveUp = true; bot.log("근처에 뒤틀린 숲이 없음 → 오버월드에서 진주"); return S.RUNNING; }
+                if (warped == null) {
+                    // 근처에 없으면 네더를 돌아다니며 찾음 (엔더맨이 많아 진주를 몇 분이면 모음 — 오버월드에선 1개에 10분 넘게 걸림). 8분 넘게 못 찾으면 포기
+                    if (warpedSearchSince == 0) { warpedSearchSince = bot.ticks; bot.log("근처에 뒤틀린 숲이 없음 → 네더를 돌아다니며 찾기"); }
+                    if (bot.ticks - warpedSearchSince > 20 * 60 * 8) { pearlGiveUp = true; bot.log("뒤틀린 숲을 못 찾음 → 오버월드에서 진주"); return S.RUNNING; }
+                    return explore(bot, "뒤틀린 숲 찾기");
+                }
                 bot.log("뒤틀린 숲으로 (엔더맨 사냥) → " + warped.toShortString());
+                exploreTo = null;
             }
             detail = "뒤틀린 숲으로 가는 중 (진주 " + pearls + "/" + PEARLS + ")";
             Nav.R nr = bot.nav.go(new Goal.Near(warped.above(), 2));
