@@ -78,7 +78,7 @@ public final class EnderTrap {
                     // 혼자 있는 엔더맨만 (여러 마리를 한꺼번에 화나게 하지 않게)
                     boolean alone = true;
                     for (Entity o : l.entitiesForRendering())
-                        if (o != em && o instanceof EnderMan && o.distanceTo(em) < (stare ? 5 : 14)) { alone = false; break; }
+                        if (o != em && o instanceof EnderMan && o.distanceTo(em) < 4) { alone = false; break; }
                     if (!alone && !em.isCreepy()) continue;
                     if (d < 48 && d < bd) { bd = d; t = em; }
                 }

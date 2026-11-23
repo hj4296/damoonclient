@@ -82,7 +82,7 @@ public class EnderHutTask extends Task {
         int pn = pearls(p);
         if (pn != lastPearls) { lastPearls = pn; lastPearlTick = bot.ticks; }
         if (lastPearlTick == 0) lastPearlTick = bot.ticks;
-        if (bot.ticks - lastPearlTick > 20 * 60 * 4) { bot.log("굴에서 4분 동안 진주가 안 늘어남 → 다른 곳으로"); bot.reflex.camp = false; return S.FAILED; }
+        if (bot.ticks - lastPearlTick > 20 * 60 * 2) { bot.log("굴에서 2분 동안 진주가 안 늘어남 → 다른 곳으로"); bot.reflex.camp = false; return S.FAILED; }
         if (in == null) {
             BlockPos f = Placer.standCell(p);
             // 굴은 땅 위(하늘이 보이는 곳)에 지어야 멀리 있는 엔더맨이 보임 → 땅속이면 먼저 올라감
