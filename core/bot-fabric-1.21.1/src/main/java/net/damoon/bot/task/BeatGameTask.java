@@ -843,8 +843,23 @@ public class BeatGameTask extends Task {
             stage = "9. 엔더 진주 (" + NetherTask.pearls(p) + "/" + NetherTask.PEARLS + ")";
             // 먼저 네더의 뒤틀린 숲에서 (엔더맨이 아주 많음 — 오버월드에선 진주 1개에 10분 넘게 걸림). 한 번 해 보고 못 찾았으면 오버월드에서
             BlockPos owp = l.dimension() == Level.OVERWORLD ? knownOverworldPortal(l) : null;
-            if (owp != null && !"1".equals(net.damoon.bot.Memory.get("netherPearlTried")) && foodCount(p) >= 8
-                    && p.getOffhandItem().is(Items.SHIELD) && worn(p, Items.IRON_CHESTPLATE)) {
+            boolean netherPearlOk = owp != null && !"1".equals(net.damoon.bot.Memory.get("netherPearlTried"))
+                    && p.getOffhandItem().is(Items.SHIELD) && worn(p, Items.IRON_CHESTPLATE);
+            if (netherPearlOk && foodCount(p) < 10 && !cool(bot, "pearlfood")) {
+                // 네더엔 먹을 게 없음 → 먼저 10개까지 사냥 (못 찾으면 5분 뒤 다시)
+                stage = "9. 엔더 진주 — 네더 가기 전 음식 (" + foodCount(p) + "/10)";
+                if (Inv.count(p, rawMeat()) >= 3 && hasFuel(p) && !cool(bot, "cook")) {
+                    Item out = cookedFor(p);
+                    int want = Inv.count(p, out) + Inv.count(p, rawMeat());
+                    return run(bot, "cook", () -> new SmeltTask(rawMeat(), out, want));
+                }
+                if (hunterFood == null) hunterFood = new Hunter(Hunter.foodAnimals(), st -> st.has(net.minecraft.core.component.DataComponents.FOOD) || st.is(Items.LEATHER) || st.is(Items.FEATHER));
+                Hunter.R hr = hunterFood.tick(bot);
+                detail = hunterFood.info;
+                if (hr == Hunter.R.NONE) { fail(bot, "pearlfood", 20 * 60 * 5); bot.nav.stop(); }
+                return S.RUNNING;
+            }
+            if (netherPearlOk && foodCount(p) >= 6) {
                 stage = "9. 엔더 진주 — 네더 뒤틀린 숲으로 (" + NetherTask.pearls(p) + "/" + NetherTask.PEARLS + ")";
                 if (nether != null) nether = null; // 새로 들어가면 진주 찾기를 처음부터
                 BlockPos fp = PathExec.feet(p);
