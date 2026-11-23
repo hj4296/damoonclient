@@ -589,10 +589,17 @@ public final class Reflex {
             // (칼은 칼을 쓸 때만 쥠 — 활을 당기는 중에 칼로 바꾸면 당기기가 취소됨)
             // 칼이 닿는 블레이즈가 있으면 그중 체력이 가장 낮은 것
             net.minecraft.world.entity.monster.Blaze bz = bz0;
-            float lowHp = 999;
+            // 칼이 닿는 블레이즈 중: 방금 나를 때린 것 → 가장 가까운 것 (뒤에 붙어 계속 때리는 블레이즈를 두고
+            // 체력 낮은 다른 블레이즈만 보다가 등 뒤에서 맞아 죽던 문제)
+            double nearD = 999;
+            net.minecraft.world.entity.monster.Blaze hitter = null;
+            var lsrc = p.getLastDamageSource();
+            if (lsrc != null && lsrc.getEntity() instanceof net.minecraft.world.entity.monster.Blaze hb && hb.isAlive()
+                    && bot.level().getGameTime() - lastHurtStamp(p) < 40 && Act.reach(p, hb.getBoundingBox()) <= 3.0) hitter = hb;
             for (Entity e : bot.level().entitiesForRendering())
                 if (e instanceof net.minecraft.world.entity.monster.Blaze o && o.isAlive() && Act.reach(p, o.getBoundingBox()) <= 3.0
-                        && o.getHealth() < lowHp) { lowHp = o.getHealth(); bz = o; }
+                        && o.distanceTo(p) < nearD) { nearD = o.distanceTo(p); bz = o; }
+            if (hitter != null) bz = hitter;
             double r = Act.reach(p, bz.getBoundingBox());
             boolean danger = false, soon = false;
             for (Entity e : bot.level().entitiesForRendering())
