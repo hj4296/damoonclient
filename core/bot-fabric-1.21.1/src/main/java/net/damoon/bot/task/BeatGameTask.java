@@ -688,12 +688,13 @@ public class BeatGameTask extends Task {
             S ba = bowAndArrows(bot, p, l, "7");
             if (ba != null) return ba;
             // ---- 7. 네더 준비: 금 투구(피글린), 부싯돌, 흑요석, 포털 ----
-            if (!SPEEDRUN && !Inv.has(p, Items.GOLDEN_HELMET) && !worn(p, Items.GOLDEN_HELMET) && !cool(bot, "gold")) {
+            // (금 투구는 스피드런에서도 꼭 챙김: 없으면 피글린 여럿이 금칼로 한 대 6.7씩 때려 죽음 — 대신 4분 넘게 못 찾으면 건너뜀)
+            if (!Inv.has(p, Items.GOLDEN_HELMET) && !worn(p, Items.GOLDEN_HELMET) && !cool(bot, "gold")) {
                 int gold = Inv.count(p, Items.GOLD_INGOT) + Inv.count(p, Items.RAW_GOLD);
                 if (gold < 5) {
                     stage = "7. 금 캐기 (" + gold + "/5) — 피글린이 공격하지 않게";
                     S r = mineDeep(bot, "gold", st -> st.is(Blocks.GOLD_ORE) || st.is(Blocks.DEEPSLATE_GOLD_ORE), is(Items.RAW_GOLD), Inv.count(p, Items.RAW_GOLD) + 5 - gold, -16);
-                    if (++goldTicks > 20 * 60 * 8) { fail(bot, "gold", 20 * 60 * 30); bot.log("금을 못 찾음 → 금 투구 없이 감"); }
+                    if (++goldTicks > 20 * 60 * (SPEEDRUN ? 4 : 8)) { fail(bot, "gold", 20 * 60 * 30); bot.log("금을 못 찾음 → 금 투구 없이 감"); }
                     return r;
                 }
                 if (Inv.count(p, Items.RAW_GOLD) > 0) {
