@@ -215,8 +215,23 @@ public class BeatGameTask extends Task {
     private S explore(Bot bot, String why) {
         LocalPlayer p = bot.p();
         if (exploreTo == null || ++exploreTicks > 20 * 60) {
-            double a = bot.p().getRandom().nextDouble() * Math.PI * 2;
-            exploreTo = new BlockPos((int) (p.getX() + Math.cos(a) * 90), 0, (int) (p.getZ() + Math.sin(a) * 90));
+            // 바다(물 위)로는 가지 않음: 삼지창 드라운드에게 맞고 물에 빠져 죽던 문제 → 땅인 방향을 몇 번 골라 봄
+            var lv = bot.level();
+            BlockPos pick = null;
+            for (int tries = 0; tries < 10 && pick == null; tries++) {
+                double a = bot.p().getRandom().nextDouble() * Math.PI * 2;
+                BlockPos cand = new BlockPos((int) (p.getX() + Math.cos(a) * 90), 0, (int) (p.getZ() + Math.sin(a) * 90));
+                if (!lv.hasChunkAt(cand)) { if (tries >= 6) pick = cand; continue; }
+                int top = lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, cand.getX(), cand.getZ());
+                boolean water = net.damoon.bot.BlockUtil.isWater(lv.getBlockState(new BlockPos(cand.getX(), top - 1, cand.getZ())));
+                // 가는 길 중간도 물이면 건너뜀 (가운데 한 곳만 봄)
+                BlockPos mid = new BlockPos((p.getBlockX() + cand.getX()) / 2, 0, (p.getBlockZ() + cand.getZ()) / 2);
+                int topM = lv.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, mid.getX(), mid.getZ());
+                boolean waterM = lv.hasChunkAt(mid) && net.damoon.bot.BlockUtil.isWater(lv.getBlockState(new BlockPos(mid.getX(), topM - 1, mid.getZ())));
+                if (!water && !waterM) pick = cand;
+            }
+            if (pick == null) { double a = bot.p().getRandom().nextDouble() * Math.PI * 2; pick = new BlockPos((int) (p.getX() + Math.cos(a) * 90), 0, (int) (p.getZ() + Math.sin(a) * 90)); }
+            exploreTo = pick;
             exploreTicks = 0;
             bot.log("주변에 없음(" + why + ") → 탐험");
         }
