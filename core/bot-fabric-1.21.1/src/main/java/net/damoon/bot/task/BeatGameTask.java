@@ -374,7 +374,7 @@ public class BeatGameTask extends Task {
         // 가까이 와서 3분이 지나도 다 못 주웠으면 남은 건 포기 (못 닿는 곳의 아이템 몇 개 때문에 블레이즈 옆에서 몇 분씩 맴돌던 문제)
         if (dist < 16) {
             if (recoverCloseSince == 0) recoverCloseSince = bot.ticks;
-            if (bot.ticks - recoverCloseSince > 20 * 180) { bot.log("죽은 자리 근처에서 3분 → 남은 물건은 포기"); recoverCloseSince = 0; forgetDeath(bot); return null; }
+            if (bot.ticks - recoverCloseSince > 20 * 300) { bot.log("죽은 자리 근처에서 5분 → 남은 물건은 포기"); recoverCloseSince = 0; forgetDeath(bot); return null; }
         } else recoverCloseSince = 0;
         // 물건이 물속(물 찬 동굴)에 있고 가까우면 길찾기 대신 바로 헤엄쳐 들어감 (물속 목표로는 길을 못 찾고 위에서 맴돌던 문제)
         boolean pileWet = false;
@@ -397,7 +397,9 @@ public class BeatGameTask extends Task {
             if (e instanceof net.minecraft.world.entity.item.ItemEntity ie) {
                 detail = "떨어뜨린 " + ie.getItem().getHoverName().getString() + " 줍는 중";
                 boolean wet = ie.isInWater() || p.isInWater();
-                if (ie.distanceTo(p) < 2.5 || (wet && ie.distanceTo(p) < 16)) {
+                // (물속 아이템이라도 벽 너머(안 보임)면 곧장 가지 못함 → 길찾기로 입구 근처까지 돌아감)
+                boolean seeIt = p.hasLineOfSight(ie) || p.isInWater();
+                if (ie.distanceTo(p) < 2.5 || (wet && ie.distanceTo(p) < 16 && seeIt)) {
                     // 가깝거나 물속이면 길찾기 없이 바로 그쪽으로 헤엄침 (물속 길찾기가 자주 막힘)
                     bot.nav.stop();
                     bot.ctl.lookAt(p, ie.position());
@@ -409,7 +411,7 @@ public class BeatGameTask extends Task {
                         else if (ie.getY() > p.getY() + 0.4) bot.ctl.jump = true;
                     } else if (ie.getY() > p.getY() + 0.6 && p.onGround() || p.horizontalCollision) bot.ctl.jump = true;
                 }
-                else { Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0)); if (r == Nav.R.FAILED) bot.nav.stop(); }
+                else { Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), wet ? 3.0 : 1.0)); if (r == Nav.R.FAILED) bot.nav.stop(); }
                 return S.RUNNING;
             }
         }
