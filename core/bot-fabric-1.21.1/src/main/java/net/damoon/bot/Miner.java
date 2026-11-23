@@ -183,6 +183,11 @@ public final class Miner {
             for (Direction d : Direction.values()) if (BlockUtil.isWater(l.getBlockState(m.relative(d)))) wet++;
             // (한 면만 물에 닿아도 건너뜀: 물속에 서서 캐면 5~25배 느려 숨이 찰 때마다 처음부터 다시 캐며 끝없이 오르내림)
             if (wet >= 1) continue;
+            // 2칸 안에 물이 여러 칸이면 (물 찬 동굴 옆) 다가가려면 물속을 지나야 함 → 건너뜀 (물속을 오가며 익사·드라운드에게 맞던 문제)
+            int water2 = 0;
+            for (BlockPos q : BlockPos.betweenClosed(m.offset(-2, -2, -2), m.offset(2, 2, 2)))
+                if (BlockUtil.isWater(l.getBlockState(q)) && ++water2 > 3) break;
+            if (water2 > 3) continue;
             boolean exposed = false;
             for (Direction d : Direction.values()) if (l.getBlockState(m.relative(d)).isAir()) { exposed = true; break; }
             double dx = m.getX() - c.getX(), dy = m.getY() - c.getY(), dz = m.getZ() - c.getZ();
