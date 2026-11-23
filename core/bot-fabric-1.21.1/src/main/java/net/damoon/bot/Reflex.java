@@ -31,6 +31,9 @@ public final class Reflex {
     public boolean retreat;
     private int lavaTicks;
     private net.minecraft.core.BlockPos lastAirPos;
+    private net.minecraft.core.BlockPos swimStep;
+    private int swimStepSince;
+    private final java.util.Set<Long> swimBlocked = new java.util.HashSet<>();
     private int lastAirTick;
     /** 벙커 짓는 중: 체력이 넉넉하면 방패보다 짓기를 먼저 */
     public boolean building;
@@ -298,7 +301,7 @@ public final class Reflex {
                 return true;
             }
         }
-        if (!p.isUnderWater()) { lastAirPos = p.blockPosition(); lastAirTick = bot.ticks; }
+        if (!p.isUnderWater()) { lastAirPos = p.blockPosition(); lastAirTick = bot.ticks; if (!swimBlocked.isEmpty()) swimBlocked.clear(); swimStep = null; }
         if (p.isUnderWater() && p.getAirSupply() < 200) {
             net.minecraft.core.BlockPos f = p.blockPosition();
             net.minecraft.core.BlockPos air = null;
@@ -321,6 +324,16 @@ public final class Reflex {
             boolean ceiling = !hs.getCollisionShape(bot.level(), head).isEmpty();
             // 물을 따라 실제로 헤엄쳐 갈 수 있는 가장 가까운 공기 칸 (벽 너머 공기로 가다 익사하던 문제)
             net.minecraft.core.BlockPos step = swimToAir(net.minecraft.core.BlockPos.containing(p.getEyePosition()));
+            // 같은 걸음 칸에 3초 넘게 못 닿으면 (뭔가에 막힘) 그 칸은 막힌 것으로 치고 다른 길을 찾음
+            if (step != null) {
+                if (!step.equals(swimStep)) { swimStep = step; swimStepSince = bot.ticks; }
+                else if (bot.ticks - swimStepSince > 60) {
+                    swimBlocked.add(step.asLong());
+                    bot.dbg("숨이 참 → " + step.toShortString() + " 에 못 닿음 → 다른 길");
+                    swimStep = null;
+                    step = swimToAir(net.minecraft.core.BlockPos.containing(p.getEyePosition()));
+                }
+            }
             if (step != null) {
                 Act.stopDig(bot);
                 Vec3 c = Vec3.atCenterOf(step);
@@ -759,7 +772,7 @@ public final class Reflex {
             for (net.minecraft.core.Direction d : new net.minecraft.core.Direction[]{net.minecraft.core.Direction.UP, net.minecraft.core.Direction.NORTH,
                     net.minecraft.core.Direction.SOUTH, net.minecraft.core.Direction.EAST, net.minecraft.core.Direction.WEST, net.minecraft.core.Direction.DOWN}) {
                 net.minecraft.core.BlockPos n = c.relative(d);
-                if (parent.containsKey(n) || Math.abs(n.getY() - start.getY()) > 20) continue;
+                if (parent.containsKey(n) || Math.abs(n.getY() - start.getY()) > 20 || swimBlocked.contains(n.asLong())) continue;
                 var ns = l.getBlockState(n);
                 boolean open = ns.isAir() || (ns.getFluidState().is(net.minecraft.tags.FluidTags.WATER) && ns.getCollisionShape(l, n).isEmpty());
                 if (!open || BlockUtil.isLava(ns)) continue;
