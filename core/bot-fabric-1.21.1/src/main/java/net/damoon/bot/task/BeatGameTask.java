@@ -137,6 +137,7 @@ public class BeatGameTask extends Task {
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
     // 스피드런 설정: 꼭 필요한 것만 (철 22개: 곡괭이·칼·방패·양동이·흉갑·부츠, 금 투구·우유 생략, 음식 12, 화살 24)
     static final boolean SPEEDRUN = true;
+    private int portalPearlFails;
     static final int IRON_TARGET = SPEEDRUN ? 22 : 35, NETHER_FOOD = SPEEDRUN ? 12 : 20, ARROWS = SPEEDRUN ? 24 : 48;
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil, surfaceCool;
     private int caveDescY = Integer.MIN_VALUE, caveDescSince;
@@ -878,7 +879,7 @@ public class BeatGameTask extends Task {
                 if (l.getBlockState(fp).is(Blocks.NETHER_PORTAL)) { bot.nav.stop(); detail = "포털 안에서 기다리는 중"; return S.RUNNING; }
                 Nav.R r = bot.nav.go(new Goal.Block(owp.getX(), owp.getY(), owp.getZ(), true));
                 detail = "포털로 가는 중";
-                if (r == Nav.R.FAILED) { bot.nav.stop(); net.damoon.bot.Memory.put("netherPearlTried", "1"); }
+                if (r == Nav.R.FAILED) { bot.nav.stop(); if (++portalPearlFails >= 3) net.damoon.bot.Memory.put("netherPearlTried", "1"); }
                 return S.RUNNING;
             }
             if (!net.damoon.bot.EnderTrap.hasBoat(p) && net.damoon.bot.EnderTrap.boatFor(p) != null && !cool(bot, "boat")) {
