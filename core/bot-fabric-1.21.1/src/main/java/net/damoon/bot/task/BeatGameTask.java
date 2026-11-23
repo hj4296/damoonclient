@@ -136,6 +136,7 @@ public class BeatGameTask extends Task {
 
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil, surfaceCool;
+    private int caveDescY = Integer.MIN_VALUE, caveDescSince;
     private int shieldWoodSince;
     private boolean coalLatch, huntLatch;
     private int huntSince;
@@ -990,11 +991,18 @@ public class BeatGameTask extends Task {
         if (digger == null) digger = new Digger(Direction.fromYRot(p.getYRot()));
         // 계단 파기가 막혔으면 (방향을 계속 바꿈) 길찾기로 동굴을 따라 내려감
         if (digger.recentTurns >= 4 && f.getY() > targetY) {
-            detail = "동굴을 따라 내려가는 중 (y=" + f.getY() + ")";
-            Nav.R r = bot.nav.go(new Goal.Below(Math.max(targetY, f.getY() - 12)));
-            if (r != Nav.R.RUNNING) { digger.recentTurns = 0; bot.nav.stop(); if (r == Nav.R.FAILED) digger = new Digger(Direction.fromYRot(p.getYRot() + 90)); }
+            // 목표 높이는 시작할 때 한 번만 정함 (점프할 때마다 발 높이가 바뀌어 목표가 바뀌고 길을 처음부터 다시 찾으며 제자리에서 뛰던 문제)
+            if (caveDescY == Integer.MIN_VALUE) { caveDescY = Math.max(targetY, f.getY() - 12); caveDescSince = bot.ticks; }
+            detail = "동굴을 따라 내려가는 중 (y=" + f.getY() + " → " + caveDescY + ")";
+            Nav.R r = bot.nav.go(new Goal.Below(caveDescY));
+            if (r != Nav.R.RUNNING || bot.ticks - caveDescSince > 20 * 60) {
+                boolean failed = r == Nav.R.FAILED || r == Nav.R.RUNNING;
+                digger.recentTurns = 0; bot.nav.stop(); caveDescY = Integer.MIN_VALUE;
+                if (failed) digger = new Digger(Direction.fromYRot(p.getYRot() + 90));
+            }
             return S.RUNNING;
         }
+        caveDescY = Integer.MIN_VALUE;
         if (bot.ticks % 400 == 0) digger.recentTurns = 0;
         bot.nav.stop();
         digger.tick(bot, f.getY() > targetY ? Digger.Mode.STAIRS : Digger.Mode.TUNNEL);
