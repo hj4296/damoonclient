@@ -349,7 +349,12 @@ public class BeatGameTask extends Task {
             if (weakNow && l.dimension() == Level.OVERWORLD && BedTask.dark(l)) return null;
         }
         stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";
-        if (dist > 6) {
+        // 물건이 물속(물 찬 동굴)에 있고 가까우면 길찾기 대신 바로 헤엄쳐 들어감 (물속 목표로는 길을 못 찾고 위에서 맴돌던 문제)
+        boolean pileWet = false;
+        if (dist <= 16) for (var e : l.entitiesForRendering())
+            if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.isInWater()
+                    && ie.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(d)) < 12) { pileWet = true; break; }
+        if (dist > 6 && !pileWet) {
             Nav.R r = bot.nav.go(new Goal.Near(d, 3));
             if (r == Nav.R.FAILED) { bot.nav.stop(); if (++recoverFails >= 5) forgetDeath(bot); }
             return S.RUNNING;
@@ -359,20 +364,22 @@ public class BeatGameTask extends Task {
         double pd = 1e9;
         for (var e : l.entitiesForRendering())
             if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(d)) < 12
-                    && lootTime.getOrDefault(ie.getId(), 0) < 20 * 20 && ie.distanceTo(p) < pd) { pd = ie.distanceTo(p); pick = ie; }
+                    && lootTime.getOrDefault(ie.getId(), 0) < 20 * (ie.isInWater() ? 45 : 20) && ie.distanceTo(p) < pd) { pd = ie.distanceTo(p); pick = ie; }
         if (pick != null) lootTime.merge(pick.getId(), 1, Integer::sum);
         for (var e : pick == null ? java.util.List.<net.minecraft.world.entity.Entity>of() : java.util.List.<net.minecraft.world.entity.Entity>of(pick)) {
             if (e instanceof net.minecraft.world.entity.item.ItemEntity ie) {
                 detail = "떨어뜨린 " + ie.getItem().getHoverName().getString() + " 줍는 중";
                 boolean wet = ie.isInWater() || p.isInWater();
-                if (ie.distanceTo(p) < 2.5 || (wet && ie.distanceTo(p) < 10)) {
+                if (ie.distanceTo(p) < 2.5 || (wet && ie.distanceTo(p) < 16)) {
                     // 가깝거나 물속이면 길찾기 없이 바로 그쪽으로 헤엄침 (물속 길찾기가 자주 막힘)
                     bot.nav.stop();
                     bot.ctl.lookAt(p, ie.position());
                     bot.ctl.fwd = true;
                     if (p.isInWater()) {
+                        // 물속에선 달리기 헤엄(바라보는 쪽으로 3D로 감)으로 아이템까지 곧장 잠수
+                        bot.ctl.sprint = true;
                         if (ie.getY() < p.getY() - 0.4 && p.getAirSupply() > 120) bot.ctl.sneak = true; // 가라앉기
-                        else bot.ctl.jump = true;
+                        else if (ie.getY() > p.getY() + 0.4) bot.ctl.jump = true;
                     } else if (ie.getY() > p.getY() + 0.6 && p.onGround() || p.horizontalCollision) bot.ctl.jump = true;
                 }
                 else { Nav.R r = bot.nav.go(new Goal.Near(ie.blockPosition(), 1.0)); if (r == Nav.R.FAILED) bot.nav.stop(); }
