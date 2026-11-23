@@ -48,6 +48,8 @@ public final class EnderTrap {
         return Inv.count(p, s -> s.is(ItemTags.BOATS)) > 0;
     }
 
+    private int stareTarget = -1, placeTarget = -1, placeTicks;
+
     public R tick(Bot bot) {
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
@@ -122,7 +124,7 @@ public final class EnderTrap {
             info = "화난 엔더맨과 싸우는 중 (" + Melee.fight(bot, em, true) + ")";
             return R.RUNNING;
         }
-        if (stare || (!hasBoat(p) && boat == null)) {
+        if (stare || em.getId() == stareTarget || (!hasBoat(p) && boat == null)) {
             // 쳐다보기: 보이는 거리까지 다가간 뒤 눈을 쳐다봄 → 화나서 순간이동해 오면 반사 행동(방패 반격)이 싸움
             boolean los = p.hasLineOfSight(em);
             if (d > 20 || !los) {
@@ -162,6 +164,9 @@ public final class EnderTrap {
             BlockPos floor = BlockPos.containing(p.position().add(dir.scale(1.6))).below();
             var fs = l.getBlockState(floor);
             info = "엔더맨 앞에 보트 놓는 중";
+            // 10초 안에 못 놓으면 (엔더맨이 턱 위·좁은 곳) 이 엔더맨은 쳐다봐서 불러 방패·칼로 잡음 (몇 분씩 보트만 들고 서 있던 문제)
+            if (placeTarget != em.getId()) { placeTarget = em.getId(); placeTicks = 0; }
+            if (++placeTicks > 20 * 10) { stareTarget = em.getId(); placeTicks = 0; return R.RUNNING; }
             if (BlockUtil.floor(l, floor.getX(), floor.getY(), floor.getZ(), fs) && l.getBlockState(floor.above()).isAir() && placeWait == 0) {
                 Inv.select(p, s -> s.is(ItemTags.BOATS));
                 Vec3 aim = Vec3.atCenterOf(floor).add(0, 0.5, 0);
