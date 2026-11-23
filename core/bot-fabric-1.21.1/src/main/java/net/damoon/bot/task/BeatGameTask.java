@@ -333,6 +333,12 @@ public class BeatGameTask extends Task {
             bot.log("죽은 자리가 용암 → 물건은 포기"); forgetDeath(bot); return null;
         }
         if (dist > 1500) { forgetDeath(bot); return null; }
+        // 값진 물건이 거의 없는 죽음(돌 도구·흙 등)이면 먼 길은 가지 않음 (돌 도구를 찾으러 800칸을 가다 또 죽던 문제)
+        if (!ticking) {
+            int val = -1;
+            try { String o = net.damoon.bot.Memory.get("deathValue"); if (o != null) val = Integer.parseInt(o); } catch (RuntimeException ignored) {}
+            if (val >= 0 && val < 6) { bot.log("죽은 자리에 값진 물건이 없음 (점수 " + val + ") → 안 감"); forgetDeath(bot); return null; }
+        }
         // 멀리서 다시 태어났고 맨손이면: 물건은 안 사라지니 먼저 돌 곡괭이·칼만 만들고 감 (맨손으로 땅속 먼 길은 위험)
         // 먼 길이면 돌 곡괭이·칼과 음식 3개는 챙긴 뒤에 감 (빈손·굶주린 채 가다 죽음). 체력이 낮고 먹을 게 없으면 먼저 사냥
         boolean sword = Inv.has(p, Items.STONE_SWORD) || Inv.has(p, Items.IRON_SWORD) || Inv.has(p, Items.DIAMOND_SWORD);

@@ -167,12 +167,16 @@ public final class Bot {
             deaths++;
             // 게임을 다시 켜도 물건을 찾으러 갈 수 있게 적어 둠
             // (빈손으로 또 죽었으면 전에 적어 둔 — 물건이 더 많은 — 자리를 덮어쓰지 않음)
-            int oldItems = 0;
+            int oldItems = 0, oldValue = -1;
             try { String o = Memory.get("deathItems"); if (o != null && Memory.get("deathPos") != null) oldItems = Integer.parseInt(o); } catch (RuntimeException ignored) {}
-            if (lastInvStacks >= oldItems) {
+            try { String o = Memory.get("deathValue"); if (o != null && Memory.get("deathPos") != null) oldValue = Integer.parseInt(o); } catch (RuntimeException ignored) {}
+            // 값진 물건(철·다이아 장비, 블레이즈 막대, 진주 등)이 더 많은 쪽을 기억 (칸 수만 보면 돌·흙으로 가득 찬 빈손 죽음이 덮어씀)
+            boolean better = oldValue >= 0 ? lastInvValue >= oldValue : lastInvStacks >= oldItems;
+            if (better) {
                 Memory.putPos("deathPos", deathPos);
                 Memory.put("deathDim", deathDim.location().toString());
                 Memory.put("deathItems", String.valueOf(lastInvStacks));
+                Memory.put("deathValue", String.valueOf(lastInvValue));
             } else {
                 log("빈손에 가까워 (" + lastInvStacks + "칸) 전에 죽은 자리 (" + oldItems + "칸)를 계속 기억");
                 deathPos = Memory.getPos("deathPos");
@@ -193,6 +197,7 @@ public final class Bot {
             for (var st : mc.player.getInventory().armor) if (!st.isEmpty()) n++;
             if (!mc.player.getOffhandItem().isEmpty()) n++;
             lastInvStacks = n;
+            lastInvValue = invValue(mc.player);
         }
         if (mc.screen instanceof WinScreen) {
             if (!victory) {
@@ -387,5 +392,26 @@ public final class Bot {
             case "skipcredits" -> { if (mc().screen instanceof WinScreen) mc().setScreen(null); if (p() != null) p().connection.send(new net.minecraft.network.protocol.game.ServerboundClientCommandPacket(net.minecraft.network.protocol.game.ServerboundClientCommandPacket.Action.PERFORM_RESPAWN)); }
             default -> log("모르는 명령");
         }
+    }
+
+    /** 죽으면 되찾으러 갈 만한 값진 물건 점수 (철·다이아 장비, 블레이즈 막대, 진주·눈, 철 주괴) */
+    public int lastInvValue;
+
+    public static int invValue(net.minecraft.client.player.LocalPlayer p) {
+        int v = 0;
+        java.util.List<net.minecraft.world.item.ItemStack> all = new java.util.ArrayList<>(p.getInventory().items);
+        all.addAll(p.getInventory().armor);
+        all.add(p.getOffhandItem());
+        for (var st : all) {
+            if (st.isEmpty()) continue;
+            String id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).getPath();
+            if (id.startsWith("diamond")) v += 5 * st.getCount();
+            else if (id.startsWith("iron_") && !id.equals("iron_ingot") && !id.equals("iron_nugget")) v += 3;
+            else if (id.equals("iron_ingot") || id.equals("raw_iron")) v += st.getCount() / 4;
+            else if (id.equals("blaze_rod") || id.equals("blaze_powder")) v += 2 * st.getCount();
+            else if (id.equals("ender_pearl") || id.equals("ender_eye")) v += 3 * st.getCount();
+            else if (id.equals("bow") || id.equals("shield") || id.equals("bucket") || id.endsWith("_bucket")) v += 1;
+        }
+        return v;
     }
 }
