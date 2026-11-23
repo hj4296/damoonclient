@@ -135,6 +135,9 @@ public class BeatGameTask extends Task {
     }
 
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
+    // 스피드런 설정: 꼭 필요한 것만 (철 22개: 곡괭이·칼·방패·양동이·흉갑·부츠, 금 투구·우유 생략, 음식 12, 화살 24)
+    static final boolean SPEEDRUN = true;
+    static final int IRON_TARGET = SPEEDRUN ? 22 : 35, NETHER_FOOD = SPEEDRUN ? 12 : 20, ARROWS = SPEEDRUN ? 24 : 48;
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil, surfaceCool;
     private int caveDescY = Integer.MIN_VALUE, caveDescSince;
     private int shieldWoodSince;
@@ -461,10 +464,10 @@ public class BeatGameTask extends Task {
         // 밤엔 땅 위 일(나무·사냥) 대신 땅속에서 철을 캠 — 밤 시간을 놀리지 않음 (굴 속은 밤낮이 같음)
         if (BedTask.dark(l) && l.dimension() == Level.OVERWORLD && tier >= 2 && foodCount(p) >= 2 && sub == null && !cool(bot, "nightiron")) {
             int ironNight = Inv.count(p, Items.IRON_INGOT) + Inv.count(p, Items.RAW_IRON) + ironInGear(p);
-            if (ironNight < 35) {
-                stage = "밤 — 땅속에서 철 캐기 (" + ironNight + "/35)";
+            if (ironNight < IRON_TARGET) {
+                stage = "밤 — 땅속에서 철 캐기 (" + ironNight + "/" + IRON_TARGET + ")";
                 return mineDeep(bot, "iron", st -> st.is(Blocks.IRON_ORE) || st.is(Blocks.DEEPSLATE_IRON_ORE), is(Items.RAW_IRON),
-                        Inv.count(p, Items.RAW_IRON) + (35 - ironNight), 16);
+                        Inv.count(p, Items.RAW_IRON) + (IRON_TARGET - ironNight), 16);
             }
         }
         // ---- 0. 급할 때: 먹을 게 떨어짐 → 땅 위로 올라가 사냥 ----
@@ -614,17 +617,18 @@ public class BeatGameTask extends Task {
         }
         // ---- 5. 철 ----
         int ironHave = Inv.count(p, Items.IRON_INGOT) + Inv.count(p, Items.RAW_IRON) + ironInGear(p);
-        if (ironHave < 35) {
-            stage = "5. 철 캐기 (" + ironHave + "/35)";
+        if (ironHave < IRON_TARGET) {
+            stage = "5. 철 캐기 (" + ironHave + "/" + IRON_TARGET + ")";
             return mineDeep(bot, "iron", st -> st.is(Blocks.IRON_ORE) || st.is(Blocks.DEEPSLATE_IRON_ORE), is(Items.RAW_IRON),
-                    Inv.count(p, Items.RAW_IRON) + (35 - ironHave), 16);
+                    Inv.count(p, Items.RAW_IRON) + (IRON_TARGET - ironHave), 16);
         }
         if (Inv.count(p, Items.RAW_IRON) > 0 && !cool(bot, "smeltiron")) {
             stage = "5. 철 굽기";
             int want = Inv.count(p, Items.IRON_INGOT) + Inv.count(p, Items.RAW_IRON);
             return run(bot, "smeltiron", () -> new SmeltTask(is(Items.RAW_IRON), Items.IRON_INGOT, want));
         }
-        Item[] gear = {Items.IRON_PICKAXE, Items.IRON_SWORD, Items.SHIELD, Items.BUCKET, Items.IRON_CHESTPLATE, Items.IRON_LEGGINGS, Items.IRON_BOOTS};
+        // (스피드런: 바지는 건너뜀 — 철 7개·캐는 시간을 아낌)
+        Item[] gear = {Items.IRON_PICKAXE, Items.IRON_SWORD, Items.SHIELD, Items.BUCKET, Items.IRON_CHESTPLATE, Items.IRON_BOOTS};
         for (Item g : gear) {
             if (g == Items.SHIELD && p.getOffhandItem().is(Items.SHIELD)) continue;
             if (g == Items.SHIELD && Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) < 6) {
@@ -644,7 +648,7 @@ public class BeatGameTask extends Task {
         }
         // 예비 방패 하나 (화살을 막다 보면 닳아 부서짐 — 부서지는 순간 바로 바꿔 듦)
         // (Inv.count는 왼손도 셈)
-        if (p.getOffhandItem().is(Items.SHIELD) && Inv.count(p, Items.SHIELD) < 3 && Inv.count(p, Items.IRON_INGOT) >= 1
+        if (p.getOffhandItem().is(Items.SHIELD) && Inv.count(p, Items.SHIELD) < 2 && Inv.count(p, Items.IRON_INGOT) >= 1
                 && Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6 && !cool(bot, "spareshield")) {
             stage = "5. 예비 방패";
             int wantSh = Inv.count(p, Items.SHIELD) + 1;
@@ -683,7 +687,7 @@ public class BeatGameTask extends Task {
             S ba = bowAndArrows(bot, p, l, "7");
             if (ba != null) return ba;
             // ---- 7. 네더 준비: 금 투구(피글린), 부싯돌, 흑요석, 포털 ----
-            if (!Inv.has(p, Items.GOLDEN_HELMET) && !worn(p, Items.GOLDEN_HELMET) && !cool(bot, "gold")) {
+            if (!SPEEDRUN && !Inv.has(p, Items.GOLDEN_HELMET) && !worn(p, Items.GOLDEN_HELMET) && !cool(bot, "gold")) {
                 int gold = Inv.count(p, Items.GOLD_INGOT) + Inv.count(p, Items.RAW_GOLD);
                 if (gold < 5) {
                     stage = "7. 금 캐기 (" + gold + "/5) — 피글린이 공격하지 않게";
@@ -700,7 +704,7 @@ public class BeatGameTask extends Task {
                 return run(bot, "ghelm", () -> new CraftTask(Items.GOLDEN_HELMET, 1));
             }
             // 우유 (위더 스켈레톤의 위더 효과를 풀기 위해) — 빈 양동이가 없으면 하나 더 만듦
-            if (!Inv.has(p, Items.MILK_BUCKET) && !cool(bot, "milk")) {
+            if (!SPEEDRUN && !Inv.has(p, Items.MILK_BUCKET) && !cool(bot, "milk")) {
                 if (!Inv.has(p, Items.BUCKET)) {
                     if (Inv.count(p, Items.IRON_INGOT) >= 3 && !cool(bot, "bucket2")) { stage = "7. 우유용 양동이"; return run(bot, "bucket2", () -> new CraftTask(Items.BUCKET, 1)); }
                 } else {
@@ -711,7 +715,7 @@ public class BeatGameTask extends Task {
             }
             // 예비 방패 (화염구를 막다 보면 방패가 닳아 부서짐)
             int shields = Inv.count(p, Items.SHIELD); // 왼손 포함 — 블레이즈 여럿의 화염구를 막다 보면 금방 닳음
-            if (shields < 4 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
+            if (shields < 2 && Inv.count(p, Items.IRON_INGOT) >= 1 && !cool(bot, "shield2")) {
                 if (Inv.count(p, s2 -> s2.is(ItemTags.PLANKS)) >= 6) { stage = "7. 예비 방패"; return run(bot, "shield2", () -> new CraftTask(Items.SHIELD, Inv.count(p, Items.SHIELD) + 1)); }
                 if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "7. 예비 방패용 판자"; return run(bot, "shield2planks", () -> new CraftTask(pl, want)); }
                 // 판자도 나무도 없으면 나무를 구함 (네더에서 방패가 부서지면 새로 못 만듦). 못 찾으면 5분 뒤 다시
@@ -744,8 +748,8 @@ public class BeatGameTask extends Task {
             else lit = knownOverworldPortal(l);
             // 네더에 들어가기 전 음식을 넉넉히 (네더엔 먹을 게 거의 없음) — 포털을 짓기 전에 (짓자마자 들어가 버리므로)
             // (못 채워 쉬는 중이어도 8개 밑이면 무조건 더 구함 — 3개로 들어가면 네더에서 바로 '먹을 게 없음'으로 돌아나와 포털을 오가던 문제)
-            if ((foodCount(p) < 20 && !cool(bot, "netherfood") || foodCount(p) < 8) && !(sub instanceof PortalTask)) {
-                stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/20)";
+            if ((foodCount(p) < NETHER_FOOD && !cool(bot, "netherfood") || foodCount(p) < 8) && !(sub instanceof PortalTask)) {
+                stage = "7. 네더 가기 전 음식 챙기기 (" + foodCount(p) + "/" + NETHER_FOOD + ")";
                 if (Inv.count(p, rawMeat()) >= 3 && hasFuel(p) && !cool(bot, "cook")) {
                     Item out = cookedFor(p);
                     int want = Inv.count(p, out) + Inv.count(p, rawMeat());
@@ -991,7 +995,7 @@ public class BeatGameTask extends Task {
             return S.RUNNING;
         }
         int arrows = Inv.count(p, Items.ARROW);
-        if (Inv.has(p, Items.BOW) && arrows < 48 && !cool(bot, "arrows")) {
+        if (Inv.has(p, Items.BOW) && arrows < ARROWS && !cool(bot, "arrows")) {
             if (Inv.count(p, Items.FLINT) > 0 && Inv.count(p, Items.FEATHER) > 0 && Inv.count(p, Items.STICK) > 0) {
                 stage = no + ". 화살 만들기";
                 return run(bot, "arrow", () -> new CraftTask(Items.ARROW, arrows + 4));
