@@ -31,6 +31,10 @@ public final class Miner {
     private int scanTick, noFind, targetTicks;
     private final Set<Long> bad = new HashSet<>();
     private int wetDigTicks;
+    // 포기한 블록·쫓기 시작한 때는 Miner를 새로 만들어도 기억 (5분)
+    private static final java.util.Map<Long, Integer> globalBad = new java.util.HashMap<>();
+    private static final java.util.Map<Long, Integer> chaseStart = new java.util.HashMap<>();
+    private static int nowTicks;
     public int radius = 24;
     /** 이 높이보다 아래는 안 캠 (예: 발밑 엔드 돌만 캐서 섬에 구멍 뚫지 않게) */
     public int minY = Integer.MIN_VALUE;
@@ -48,6 +52,7 @@ public final class Miner {
 
     public R tick(Bot bot) {
         bot.trace = "miner";
+        nowTicks = bot.ticks;
         LocalPlayer p = bot.p();
         ClientLevel l = bot.level();
         int have = Inv.count(p, item);
@@ -88,11 +93,19 @@ public final class Miner {
         }
         // 2) 캘 블록 찾기
         if (target != null && !block.test(l.getBlockState(target))) {
+            chaseStart.remove(target.asLong());
             target = null;
         }
-        if (target == null || ++targetTicks > 20 * 30) {
+        // 한 블록을 실제 시간으로 45초 넘게 쫓았으면 포기 (Miner가 새로 만들어져도 이어서 셈 — 물 건너 광석을 몇 분씩 쫓던 문제)
+        boolean chasedTooLong = false;
+        if (target != null) {
+            int since = chaseStart.computeIfAbsent(target.asLong(), k -> bot.ticks);
+            if (bot.ticks - since > 20 * 45 || bot.ticks < since) chasedTooLong = true;
+        }
+        if (target == null || ++targetTicks > 20 * 30 || chasedTooLong) {
             // (목표도 비워야 함: 표시만 하고 두면 다음 틱부터 같은 블록을 또 캐며 다시 찾기(10번에 1번)를 몇 분씩 미룸)
-            if (target != null) { bad.add(target.asLong()); target = null; digTarget = null; Act.stopDig(bot); }
+            if (target != null) { bad.add(target.asLong()); globalBad.put(target.asLong(), bot.ticks + 20 * 300); chaseStart.remove(target.asLong()); target = null; digTarget = null; Act.stopDig(bot); }
+            if (chaseStart.size() > 2000) chaseStart.clear();
             targetTicks = 0;
             bot.trace = "miner-scan";
             if (scanTick-- > 0) return R.RUNNING;
@@ -158,7 +171,7 @@ public final class Miner {
     private BlockPos find(LocalPlayer p, ClientLevel l) {
         BlockPos c = PathExec.feet(p);
         int lo = Math.max(minY, c.getY() - below), hi = c.getY() + above;
-        java.util.List<BlockPos> cands = Scan.find(l, c, chunks, lo, hi, block, q -> !bad.contains(q.asLong()), 40);
+        java.util.List<BlockPos> cands = Scan.find(l, c, chunks, lo, hi, block, q -> !bad.contains(q.asLong()) && globalBad.getOrDefault(q.asLong(), Integer.MIN_VALUE) < nowTicks, 40);
         BlockPos best = null;
         double bs = 1e9;
         for (BlockPos m : cands) {
