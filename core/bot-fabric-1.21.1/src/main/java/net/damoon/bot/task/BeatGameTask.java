@@ -282,7 +282,7 @@ public class BeatGameTask extends Task {
     }
 
     /** 죽은 자리로 돌아가 떨어뜨린 물건 줍기 (아이템은 5분 뒤 사라지므로 4분 안에) */
-    private int recoverNear, recoverDeathTick = -1, recoverFails;
+    private int recoverNear, recoverDeathTick = -1, recoverFails, recoverCloseSince;
     private boolean recoverLoaded, recoverFromMemory;
 
     /** 떨어뜨린 물건 자리의 청크가 움직이는(5분 시계가 가는) 범위 안인지 — 시뮬레이션 거리 8청크 + 여유 1 */
@@ -356,6 +356,11 @@ public class BeatGameTask extends Task {
             if (weakNow && l.dimension() == Level.OVERWORLD && BedTask.dark(l)) return null;
         }
         stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";
+        // 가까이 와서 3분이 지나도 다 못 주웠으면 남은 건 포기 (못 닿는 곳의 아이템 몇 개 때문에 블레이즈 옆에서 몇 분씩 맴돌던 문제)
+        if (dist < 16) {
+            if (recoverCloseSince == 0) recoverCloseSince = bot.ticks;
+            if (bot.ticks - recoverCloseSince > 20 * 180) { bot.log("죽은 자리 근처에서 3분 → 남은 물건은 포기"); recoverCloseSince = 0; forgetDeath(bot); return null; }
+        } else recoverCloseSince = 0;
         // 물건이 물속(물 찬 동굴)에 있고 가까우면 길찾기 대신 바로 헤엄쳐 들어감 (물속 목표로는 길을 못 찾고 위에서 맴돌던 문제)
         boolean pileWet = false;
         if (dist <= 16) for (var e : l.entitiesForRendering())
