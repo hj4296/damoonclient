@@ -297,7 +297,7 @@ public class BeatGameTask extends Task {
     }
 
     /** 죽은 자리로 돌아가 떨어뜨린 물건 줍기 (아이템은 5분 뒤 사라지므로 4분 안에) */
-    private int recoverNear, recoverDeathTick = -1, recoverFails, recoverCloseSince;
+    private int recoverNear, recoverDeathTick = -1, recoverFails, recoverCloseSince, recoverNoItemSince;
     private boolean recoverLoaded, recoverFromMemory;
 
     /** 떨어뜨린 물건 자리의 청크가 움직이는(5분 시계가 가는) 범위 안인지 — 시뮬레이션 거리 8청크 + 여유 1 */
@@ -392,7 +392,7 @@ public class BeatGameTask extends Task {
         for (var e : l.entitiesForRendering())
             if (e instanceof net.minecraft.world.entity.item.ItemEntity ie && ie.position().distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(d)) < 12
                     && lootTime.getOrDefault(ie.getId(), 0) < 20 * (ie.isInWater() ? 45 : 20) && ie.distanceTo(p) < pd) { pd = ie.distanceTo(p); pick = ie; }
-        if (pick != null) lootTime.merge(pick.getId(), 1, Integer::sum);
+        if (pick != null) { lootTime.merge(pick.getId(), 1, Integer::sum); recoverNoItemSince = 0; }
         for (var e : pick == null ? java.util.List.<net.minecraft.world.entity.Entity>of() : java.util.List.<net.minecraft.world.entity.Entity>of(pick)) {
             if (e instanceof net.minecraft.world.entity.item.ItemEntity ie) {
                 detail = "떨어뜨린 " + ie.getItem().getHoverName().getString() + " 줍는 중";
@@ -415,6 +415,10 @@ public class BeatGameTask extends Task {
                 return S.RUNNING;
             }
         }
+        // (월드를 막 불러왔을 땐 아이템이 아직 안 보임 → 5초 넘게 하나도 안 보일 때만 끝 — 불러오자마자 '끝'으로 잊던 문제)
+        if (recoverNoItemSince == 0 || recoverNoItemSince > bot.ticks) recoverNoItemSince = bot.ticks;
+        if (bot.ticks - recoverNoItemSince < 100 || bot.ticks < 200) { detail = "떨어뜨린 물건 찾는 중"; return S.RUNNING; }
+        recoverNoItemSince = 0;
         bot.log("떨어뜨린 물건 되찾기 끝");
         forgetDeath(bot);
         recoverFails = 0;
