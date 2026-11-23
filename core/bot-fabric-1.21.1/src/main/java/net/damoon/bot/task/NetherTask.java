@@ -116,7 +116,8 @@ public class NetherTask extends Task {
         boolean canCraftShield = Inv.count(p, Items.IRON_INGOT) >= 1 && Inv.count(p, s -> s.is(net.minecraft.tags.ItemTags.PLANKS)) >= 6;
         // 예비 방패가 없는데 만들 재료도 없으면 (블레이즈 싸움 중 부서지면 끝): 아직 막대를 다 못 모았으면 한 번 돌아가서 예비를 만들어 옴 (20분에 한 번까지)
         int shieldsAll = Inv.count(p, Items.SHIELD); // 왼손 포함
-        if (!shieldTrip && hasShield && shieldsAll < 2 && !canCraftShield && bot.ticks > nextSpareTrip && Inv.count(p, Items.BLAZE_ROD) < RODS
+        // (스피드런: 지금 든 방패가 있으면 돌아가지 않고 계속 싸움 — 부서지면 그때 돌아감)
+        if (!BeatGameTask.SPEEDRUN && !shieldTrip && hasShield && shieldsAll < 2 && !canCraftShield && bot.ticks > nextSpareTrip && Inv.count(p, Items.BLAZE_ROD) < RODS
                 && !bot.reflex.turtle.sealed()) {
             nextSpareTrip = bot.ticks + 20 * 60 * 10;
             spareTrip = true;

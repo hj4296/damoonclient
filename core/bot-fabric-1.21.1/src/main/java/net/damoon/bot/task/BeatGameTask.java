@@ -137,7 +137,7 @@ public class BeatGameTask extends Task {
     /** 땅 위로 올라가기: 한 번 시작하면 다 올라갈 때까지 계속 (높이가 경계에서 오르내리며 목표가 매 틱 바뀌던 문제) */
     // 스피드런 설정: 꼭 필요한 것만 (철 22개: 곡괭이·칼·방패·양동이·흉갑·부츠, 금 투구·우유 생략, 음식 12, 화살 24)
     static final boolean SPEEDRUN = true;
-    private int portalPearlFails;
+    private int portalPearlFails, netherPlankSince;
     static final int IRON_TARGET = SPEEDRUN ? 22 : 35, NETHER_FOOD = SPEEDRUN ? 12 : 20, ARROWS = SPEEDRUN ? 24 : 48;
     private int surfaceY = Integer.MIN_VALUE, surfaceUntil, surfaceCool;
     private int caveDescY = Integer.MIN_VALUE, caveDescSince;
@@ -728,6 +728,15 @@ public class BeatGameTask extends Task {
                 }
             }
             shieldWoodSince = 0;
+            // 네더에서 방패가 부서지면 그 자리에서 새로 만들 수 있게 판자 6개는 들고 감 (오버월드까지 돌아오지 않게)
+            if (SPEEDRUN && l.dimension() == Level.OVERWORLD && Inv.count(p, planks) < 6 && !cool(bot, "netherplanks")) {
+                if (Inv.count(p, logs) >= 2) { Item pl = plankFor(p); int want = Inv.count(p, planks) + 8; stage = "7. 네더용 판자"; return run(bot, "netherplanks", () -> new CraftTask(pl, want)); }
+                stage = "7. 네더용 판자 (나무 모으기)";
+                if (netherPlankSince == 0) netherPlankSince = bot.ticks;
+                if (bot.ticks - netherPlankSince > 20 * 60 * 3) { fail(bot, "netherplanks", 20 * 60 * 10); netherPlankSince = 0; }
+                return gatherWood(bot, 2);
+            }
+            netherPlankSince = 0;
             if (!Inv.has(p, Items.FLINT_AND_STEEL)) {
                 if (Inv.count(p, Items.FLINT) < 1) {
                     stage = "7. 부싯돌 (자갈 캐기)";
