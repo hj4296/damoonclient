@@ -486,6 +486,11 @@ public class BeatGameTask extends Task {
             if (r == Hunter.R.NONE) return explore(bot, "동물");
             return S.RUNNING;
         }
+        // 곡괭이가 다 부서졌는데 작업대·막대기·조약돌이 있으면 무엇보다 먼저 돌 곡괭이 (땅속에서 맨손으로 계단을 파다 몇 분씩 걸리던 문제)
+        if (tier < 2 && Inv.has(p, Items.CRAFTING_TABLE) && Inv.count(p, Items.STICK) >= 2 && cobble >= 3 && !cool(bot, "spick0")) {
+            stage = "곡괭이가 부서짐 → 돌 곡괭이";
+            return run(bot, "spick0", () -> new CraftTask(Items.STONE_PICKAXE, 1));
+        }
         // ---- 1. 나무 ----
         int sticks = Inv.count(p, Items.STICK);
         int needSticks = Math.max(0, 8 - sticks);
