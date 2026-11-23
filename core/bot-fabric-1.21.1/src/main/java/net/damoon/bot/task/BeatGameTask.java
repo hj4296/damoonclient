@@ -366,9 +366,7 @@ public class BeatGameTask extends Task {
             // 방패 없이 먼 길을 가면 동굴·밤 몹에게 또 죽음 (돌 도구로 가다 연달아 죽던 문제) → 철 1개로 방패부터 (물건은 멀어서 안 사라짐)
             if (!p.getOffhandItem().is(Items.SHIELD) && !Inv.has(p, Items.SHIELD)) return null;
             if (foodCount(p) < 1 && (p.getHealth() < 12 || p.getFoodData().getFoodLevel() < 10)) return null;
-            // 멀리 가야 하는데 방패·갑옷이 없으면 밤엔 가지 않음 (가다가 스켈레톤·좀비에게 죽음) → 밤엔 숨고 낮에 감
-            boolean weakNow = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
-            if (weakNow && l.dimension() == Level.OVERWORLD && BedTask.dark(l)) return null;
+            // (방패와 칼이 있으면 밤에도 감 — 잘하는 플레이어는 밤이라고 멈추지 않음)
         }
         stage = "죽은 자리로 물건 되찾으러 (" + (int) dist + "칸)";
         // 가까이 와서 3분이 지나도 다 못 주웠으면 남은 건 포기 (못 닿는 곳의 아이템 몇 개 때문에 블레이즈 옆에서 몇 분씩 맴돌던 문제)
@@ -452,12 +450,22 @@ public class BeatGameTask extends Task {
             stage = "밤 — 침대에서 자기";
             return run(bot, "bed", BedTask::new);
         }
-        // 밤인데 침대가 없고 장비가 약하면 (방패나 갑옷 없음) 땅 속에 숨어서 아침까지 (오버월드 땅 위에서만)
-        boolean weak = !p.getOffhandItem().is(Items.SHIELD) || !worn(p, Items.IRON_CHESTPLATE);
+        // 밤에 숨는 건 칼도 곡괭이도 없는 맨손일 때만 (그 밖엔 잘하는 플레이어처럼 칼·방패로 싸우거나 땅속에서 일함)
+        boolean armedNow = Inv.count(p, s2 -> s2.getItem() instanceof net.minecraft.world.item.SwordItem || s2.getItem() instanceof net.minecraft.world.item.AxeItem) > 0;
+        boolean weak = tier == 0 || !armedNow;
         if (sub instanceof HideTask || (BedTask.dark(l) && !BedTask.hasBed(p) && weak && l.dimension() == net.minecraft.world.level.Level.OVERWORLD
                 && l.canSeeSky(PathExec.feet(p)) && !cool(bot, "hide") && HideTask.canHide(bot))) {
             stage = "밤 — 땅 속에 숨기";
             return run(bot, "hide", HideTask::new);
+        }
+        // 밤엔 땅 위 일(나무·사냥) 대신 땅속에서 철을 캠 — 밤 시간을 놀리지 않음 (굴 속은 밤낮이 같음)
+        if (BedTask.dark(l) && l.dimension() == Level.OVERWORLD && tier >= 2 && foodCount(p) >= 2 && sub == null && !cool(bot, "nightiron")) {
+            int ironNight = Inv.count(p, Items.IRON_INGOT) + Inv.count(p, Items.RAW_IRON) + ironInGear(p);
+            if (ironNight < 35) {
+                stage = "밤 — 땅속에서 철 캐기 (" + ironNight + "/35)";
+                return mineDeep(bot, "iron", st -> st.is(Blocks.IRON_ORE) || st.is(Blocks.DEEPSLATE_IRON_ORE), is(Items.RAW_IRON),
+                        Inv.count(p, Items.RAW_IRON) + (35 - ironNight), 16);
+            }
         }
         // ---- 0. 급할 때: 먹을 게 떨어짐 → 땅 위로 올라가 사냥 ----
         int foodNow = foodCount(p);
