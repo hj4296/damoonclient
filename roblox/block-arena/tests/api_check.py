@@ -52,6 +52,9 @@ ALLOWED_METHODS = {
     "set", "get", "remove", "builder", "cellCenter", "standCFrame", "toCell",
     "show", "destroy", "isSolid", "next", "int", "chance", "pick", "shuffle",
     "mask", "spawnPart", "refresh", "decor", "materialize",
+    "ToEulerAnglesYXZ", "ToEulerAnglesXYZ",
+    # 로블록스 기본 PlayerModule (ControlModule)
+    "GetControls", "GetMoveVector",
 }
 
 errors = []

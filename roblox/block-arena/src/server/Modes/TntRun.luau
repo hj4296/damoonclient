@@ -135,7 +135,7 @@ function TntRun.tick(match, dt: number)
 		local root = state and state.root
 		local humanoid = state and state.humanoid
 		if not pd.eliminated and state and state.alive and root and humanoid then
-			local feet = root.Position - Vector3.new(0, humanoid.HipHeight + root.Size.Y / 2 + 0.3, 0)
+			local feet = root.Position - Vector3.new(0, Session.legLength(humanoid) + root.Size.Y / 2 + 0.3, 0)
 			for _, offset in FOOT_OFFSETS do
 				local x, y, z = world:toCell(feet + offset)
 				if data.floors[y] then

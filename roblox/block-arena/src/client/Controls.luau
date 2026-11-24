@@ -13,10 +13,12 @@ local State = require(script.Parent.State)
 local Hud = require(script.Parent.UI.Hud)
 local Windows = require(script.Parent.UI.Windows)
 local Theme = require(script.Parent.UI.Theme)
+local CharacterVisuals = require(script.Parent.CharacterVisuals)
 
 local player = Players.LocalPlayer
 
 local Controls = {}
+Controls.onCameraChanged = function(_thirdPerson: boolean) end
 
 local thirdPerson = false
 local attackHeld = false
@@ -152,6 +154,7 @@ end
 local function tryAttack()
 	if target and target.kind == "player" and target.player and State.context.pvp then
 		lastAttack = os.clock()
+		CharacterVisuals.swing(player)
 		Net.send("attack", target.player)
 		return true
 	end
@@ -165,6 +168,7 @@ local function tryPlace()
 	end
 	if target and target.kind == "block" and target.place then
 		local p = target.place
+		CharacterVisuals.swing(player)
 		Net.send("place", p[1], p[2], p[3])
 		lastPlace = os.clock()
 		return true
@@ -213,6 +217,13 @@ local function toggleCamera()
 		player.CameraMinZoomDistance = 0.5
 		player.CameraMaxZoomDistance = 0.5
 		player.CameraMode = Enum.CameraMode.LockFirstPerson
+	end
+	Controls.onCameraChanged(thirdPerson)
+end
+
+function Controls.setThirdPerson(third: boolean)
+	if third ~= thirdPerson then
+		toggleCamera()
 	end
 end
 

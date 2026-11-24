@@ -5,6 +5,9 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Items = require(Shared.Items)
+local Skins = require(Shared.Skins)
+local CharacterRig = require(Shared.CharacterRig)
+local Preferences = require(Shared.Preferences)
 local Inventory = require(script.Parent.Logic.Inventory)
 local Net = require(script.Parent.Net)
 
@@ -38,6 +41,11 @@ export type State = {
 	deathCause: string?,
 	respawnToken: any,
 	waitingRespawn: boolean,
+	skin: string, -- 스킨 코드 (Skins.encode)
+	savedSkin: string?, -- 저장해 둔 커스텀 스킨 (패스가 없으면 입지는 못하고 보관만)
+	settings: { [string]: any },
+	passes: { [string]: boolean },
+	armorKey: string,
 }
 
 local states: { [Player]: State } = {}
@@ -46,9 +54,7 @@ local states: { [Player]: State } = {}
 Session.onDied = function(_player: Player, _state: State) end
 Session.onSpawned = function(_player: Player, _state: State, _character: Model) end
 
-local SKIN = Color3.fromRGB(240, 198, 160)
-local DEFAULT_SHIRT = Color3.fromRGB(60, 150, 190)
-local DEFAULT_PANTS = Color3.fromRGB(52, 54, 120)
+local NEUTRAL = Color3.fromRGB(235, 235, 235)
 
 function Session.create(player: Player): State
 	local state: State = {
@@ -79,8 +85,14 @@ function Session.create(player: Player): State
 		deathCause = nil,
 		respawnToken = nil,
 		waitingRespawn = false,
+		skin = Skins.DefaultCode,
+		savedSkin = nil,
+		settings = Preferences.defaults(),
+		passes = {},
+		armorKey = "",
 	}
 	states[player] = state
+	player:SetAttribute("Skin", state.skin)
 	return state
 end
 
@@ -104,25 +116,35 @@ function Session.teamColor(state: State): Color3
 			end
 		end
 	end
-	return DEFAULT_SHIRT
+	return NEUTRAL
 end
 
-local function colorCharacter(character: Model, shirt: Color3)
-	for _, part in character:GetChildren() do
-		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-			local name = part.Name
-			if name == "Head" or string.find(name, "Hand") or string.find(name, "LowerArm") then
-				part.Color = SKIN
-			elseif string.find(name, "Leg") or string.find(name, "Foot") then
-				part.Color = DEFAULT_PANTS
-			else
-				part.Color = shirt
-			end
+function Session.isVip(player: Player): boolean
+	local state = states[player]
+	return state ~= nil and state.passes.vip == true
+end
+
+-- 다리 길이 (R6 블록 캐릭터는 HipHeight 가 0 이고 다리가 2스터드)
+function Session.legLength(humanoid: Humanoid): number
+	if humanoid.RigType == Enum.HumanoidRigType.R6 then
+		return 2
+	end
+	return humanoid.HipHeight
+end
+
+-- 텍스처가 없을 때도 보이는 기본 색 (클라이언트가 그 위에 픽셀 스킨을 입힘)
+local function colorCharacter(character: Model, skinCode: string)
+	local skin = Skins.decode(skinCode)
+	for _, name in CharacterRig.BodyParts do
+		local part = character:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			part.Color = Skins.partColor(skin, name)
 		end
 	end
 end
 
-local function nametag(character: Model, player: Player, color: Color3)
+-- 머리 위 이름표: 팀 색 이름, VIP 는 앞에 금색 [VIP]
+local function nametag(character: Model, player: Player, color: Color3, vip: boolean)
 	local head = character:FindFirstChild("Head")
 	if not head then
 		return
@@ -133,8 +155,8 @@ local function nametag(character: Model, player: Player, color: Color3)
 	end
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Nametag"
-	gui.Size = UDim2.new(6, 0, 1, 0)
-	gui.StudsOffset = Vector3.new(0, 2.4, 0)
+	gui.Size = UDim2.new(if vip then 8 else 6, 0, 1, 0)
+	gui.StudsOffset = Vector3.new(0, 2.2, 0)
 	gui.MaxDistance = 70
 	gui.LightInfluence = 0
 	local label = Instance.new("TextLabel")
@@ -144,10 +166,58 @@ local function nametag(character: Model, player: Player, color: Color3)
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.Font = Enum.Font.Arcade
 	label.TextScaled = true
+	label.RichText = true
 	label.TextColor3 = color
-	label.Text = player.DisplayName
+	label.Text = (if vip then '<font color="#FFD24A">[VIP]</font> ' else "") .. player.DisplayName
 	label.Parent = gui
 	gui.Parent = head
+end
+
+function Session.refreshNametag(player: Player)
+	local state = states[player]
+	if state and state.character then
+		nametag(state.character, player, if state.team then Session.teamColor(state) else Color3.new(1, 1, 1), state.passes.vip == true)
+	end
+end
+
+-- 스킨 바꾸기 (검사는 부르는 쪽에서)
+function Session.setSkin(player: Player, code: string)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.skin = Skins.encode(Skins.decode(code))
+	player:SetAttribute("Skin", state.skin)
+	if state.character then
+		colorCharacter(state.character, state.skin)
+	end
+end
+
+-- 입은 갑옷을 다른 사람에게도 보이게 캐릭터 속성으로 적어 둠 (예: "helmet=leather:FF5555;chestplate=iron")
+-- 베드워즈 가죽 갑옷은 팀 색으로 물들임
+function Session.refreshArmor(state: State)
+	local character = state.character
+	if not character then
+		return
+	end
+	local dye = if state.team then Session.teamColor(state):ToHex() else nil
+	local parts = {}
+	for _, slot in Items.ArmorSlots do
+		local id = state.inv.armor[slot]
+		local def = if id then Items.get(id) else nil
+		if def and def.armorTier then
+			local entry = slot .. "=" .. def.armorTier
+			if def.armorTier == "leather" and dye then
+				entry ..= ":" .. dye
+			end
+			table.insert(parts, entry)
+		end
+	end
+	local key = table.concat(parts, ";")
+	if key ~= state.armorKey or character:GetAttribute("Armor") ~= key then
+		state.armorKey = key
+		character:SetAttribute("Armor", key)
+	end
 end
 
 -- 들고 있는 아이템을 오른손에 보이게 붙입니다.
@@ -271,9 +341,11 @@ local function onCharacterAdded(player: Player, character: Model)
 		root.AssemblyLinearVelocity = Vector3.zero
 	end
 
-	colorCharacter(character, Session.teamColor(state))
-	nametag(character, player, if state.team then Session.teamColor(state) else Color3.new(1, 1, 1))
+	colorCharacter(character, state.skin)
+	nametag(character, player, if state.team then Session.teamColor(state) else Color3.new(1, 1, 1), state.passes.vip == true)
+	state.armorKey = ""
 	Session.refreshHeld(state)
+	Session.refreshArmor(state)
 
 	humanoid.Died:Connect(function()
 		if state.character ~= character then
@@ -320,6 +392,7 @@ RunService.Heartbeat:Connect(function()
 			state.inv.dirty = false
 			Net.send(player, "inv", Inventory.serialize(state.inv))
 			Session.refreshHeld(state)
+			Session.refreshArmor(state)
 		end
 	end
 end)

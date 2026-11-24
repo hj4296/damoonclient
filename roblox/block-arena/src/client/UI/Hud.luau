@@ -39,6 +39,7 @@ local actionToken = 0
 local itemNameToken = 0
 
 Hud.onSlotClicked = function(_index: number) end
+Hud.onMenu = function(_name: string) end
 
 local function heartWidget(parent: Instance, x: number, color: Color3, emptyColor: Color3?)
 	local holder = create("Frame", {
@@ -280,9 +281,40 @@ function Hud.init(playerGui: Instance)
 	})
 
 	-- 왼쪽 위 키 안내
+	-- 왼쪽 위 메뉴 버튼 (로블록스 기본 버튼 줄 바로 아래)
+	local menu = create("Frame", {
+		Name = "Menu",
+		Position = UDim2.fromOffset(12, 64),
+		Size = UDim2.fromOffset(300, 34),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	})
+	create("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = menu,
+	})
+	for i, entry in { { "store", "상점", Color3.fromRGB(200, 150, 30) }, { "skins", "스킨", Color3.fromRGB(60, 130, 190) }, { "settings", "설정", C.Button } } do
+		local button = Theme.button(entry[2], {
+			Name = entry[1],
+			Size = UDim2.fromOffset(84, 32),
+			LayoutOrder = i,
+			BackgroundColor3 = entry[3],
+			Parent = menu,
+		})
+		local base = entry[3]
+		button.MouseLeave:Connect(function()
+			button.BackgroundColor3 = base
+		end)
+		button.MouseButton1Click:Connect(function()
+			Hud.onMenu(entry[1])
+		end)
+	end
+
 	hintLabel = create("TextLabel", {
 		Name = "Hint",
-		Position = UDim2.fromOffset(10, 62),
+		Position = UDim2.fromOffset(12, 104),
 		Size = UDim2.fromOffset(520, 18),
 		BackgroundTransparency = 1,
 		Font = Theme.Font,
@@ -463,6 +495,10 @@ function Hud.actionbar(text: string, duration: number?)
 			end
 		end)
 	end
+end
+
+function Hud.setChatVisible(visible: boolean)
+	chatFrame.Visible = visible
 end
 
 function Hud.setHint(text: string)

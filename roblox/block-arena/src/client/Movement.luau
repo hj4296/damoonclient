@@ -151,7 +151,8 @@ function Movement.init()
 		local char = player.Character :: Model
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		if sneak and State.context.location == "match" then
-			local depth = humanoid.HipHeight + root.Size.Y / 2 + 1.2
+			local leg = if humanoid.RigType == Enum.HumanoidRigType.R6 then 2 else humanoid.HipHeight
+			local depth = leg + root.Size.Y / 2 + 1.2
 			if grounded and groundBelow(root.Position, char, depth) then
 				lastSafe = root.CFrame
 			elseif lastSafe and not grounded and root.AssemblyLinearVelocity.Y <= 0 then

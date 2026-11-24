@@ -71,7 +71,8 @@ end
 function Matches.coloredName(player: Player): string
 	local state = Session.get(player)
 	local hex = if state and state.team then Matches.teamHex(state.team) else "#AAAAAA"
-	return string.format('<font color="%s">%s</font>', hex, player.DisplayName)
+	local vip = if Session.isVip(player) then '<font color="#FFD24A">[VIP]</font> ' else ""
+	return string.format('%s<font color="%s">%s</font>', vip, hex, player.DisplayName)
 end
 
 function Matches.inGame(match): { Player }
@@ -189,6 +190,7 @@ function Matches.sendVote(match)
 			mine = match.votes[player],
 			locked = match.voteLocked,
 			chosen = if match.map then match.map.id else nil,
+			canVote = Session.isVip(player),
 		})
 	end
 end
@@ -210,10 +212,14 @@ local function lockVote(match)
 	end
 	match.map = match.map or match.maps[1]
 	local counts = Vote.counts(match.votes, ids)
-	Session.chat(
-		match.players,
-		string.format('맵 투표 결과: <font color="#FFFF55">%s</font> (%d표)', match.map.name, counts[match.map.id] or 0)
-	)
+	if next(match.votes) then
+		Session.chat(
+			match.players,
+			string.format('<font color="#FFD24A">VIP</font>가 고른 맵: <font color="#FFFF55">%s</font> (%d표)', match.map.name, counts[match.map.id] or 0)
+		)
+	else
+		Session.chat(match.players, string.format('무작위로 정해진 맵: <font color="#FFFF55">%s</font>', match.map.name))
+	end
 	Matches.sendVote(match)
 end
 
@@ -223,10 +229,16 @@ function Matches.vote(player: Player, mapId: string)
 	if not match or match.state ~= "waiting" or match.voteLocked then
 		return
 	end
+	-- 맵은 기본적으로 무작위, VIP 만 고를 수 있음 (VIP 가 여럿이면 VIP 끼리 투표)
+	if not Session.isVip(player) then
+		Session.chat({ player }, '<font color="#FFD24A">맵 고르기는 VIP 전용이에요.</font> 왼쪽 위 상점에서 VIP 패키지를 볼 수 있어요.')
+		Net.send(player, "needVip")
+		return
+	end
 	for _, map in match.maps do
 		if map.id == mapId then
 			match.votes[player] = mapId
-			Session.chat({ player }, string.format('<font color="#55FF55">%s</font>에 투표했습니다.', map.name))
+			Session.chat({ player }, string.format('<font color="#55FF55">%s</font>을(를) 골랐습니다.', map.name))
 			Matches.sendVote(match)
 			return
 		end
@@ -305,7 +317,11 @@ function Matches.join(player: Player, modeId: string)
 		string.format('<font color="#FFFF55">%s</font>님이 참가했습니다 (%d/%d)', player.DisplayName, #match.players, def.maxPlayers)
 	)
 	Matches.sendVote(match)
-	Net.send(player, "openVote")
+	if Session.isVip(player) then
+		Net.send(player, "openVote")
+	else
+		Session.chat({ player }, '<font color="#AAAAAA">맵은 무작위로 정해집니다. VIP는 원하는 맵을 고를 수 있어요.</font>')
+	end
 end
 
 function Matches.leave(player: Player)
@@ -643,12 +659,12 @@ local function sidebarFor(player: Player, state)
 			title = match.def.name,
 			lines = {
 				"",
-				"맵: " .. (if match.map then '<font color="#55FF55">' .. match.map.name .. "</font>" else "투표 중"),
+				"맵: " .. (if match.map then '<font color="#55FF55">' .. match.map.name .. "</font>" elseif next(match.votes) then "VIP 선택 중" else "무작위"),
 				string.format("인원: %d/%d", #match.players, match.def.maxPlayers),
 				"",
 				status,
 				"",
-				'<font color="#AAAAAA">종이 아이템으로 맵 투표</font>',
+				'<font color="#AAAAAA">종이 아이템: 맵 선택 (VIP)</font>',
 			},
 		}
 	elseif match and match.state ~= "waiting" then

@@ -7,10 +7,14 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Items = require(Shared:WaitForChild("Items"))
 local Shop = require(Shared:WaitForChild("Shop"))
+local Skins = require(Shared:WaitForChild("Skins"))
+local CharacterRig = require(Shared:WaitForChild("CharacterRig"))
+local Preferences = require(Shared:WaitForChild("Preferences"))
 local Theme = require(script.Parent.Theme)
 local IconRender = require(script.Parent.IconRender)
 local State = require(script.Parent.Parent.State)
 local Net = require(script.Parent.Parent.Net)
+local CharacterVisuals = require(script.Parent.Parent.CharacterVisuals)
 
 local create = Theme.create
 local C = Theme.Colors
@@ -31,6 +35,9 @@ local cursorIcon: Frame
 local shopCategory = 1
 
 Windows.onChanged = function(_open: boolean) end
+-- 설정 버튼을 눌렀을 때 (Main 에서 채움: 적용 + 서버에 저장)
+Windows.onSetting = function(_key: string, _value: any) end
+Windows.onFlyToggle = function() end
 
 local function hex(color: Color3): string
 	return "#" .. color:ToHex()
@@ -499,7 +506,7 @@ function Windows.openVote()
 	end
 	local count = #vote.maps
 	local width = 420
-	local frame = window("맵 투표", width, 70 + count * 58 + 30)
+	local frame = window("맵 선택 (VIP)", width, 70 + count * 58 + 70)
 	local buttons = {}
 	for i, map in vote.maps do
 		local button = Theme.button("", {
@@ -513,11 +520,21 @@ function Windows.openVote()
 		end)
 	end
 	local footer = heading(frame, "", 44 + count * 58, width)
+	local vipButton = Theme.button("VIP 패키지 보기", {
+		Position = UDim2.fromOffset(16, 70 + count * 58),
+		Size = UDim2.fromOffset(width - 32, 36),
+		BackgroundColor3 = Color3.fromRGB(200, 150, 30),
+		Parent = frame,
+	})
+	vipButton.MouseButton1Click:Connect(function()
+		Windows.openStore()
+	end)
 	table.insert(refreshers, function()
 		local v = State.vote
 		if not v then
 			return
 		end
+		vipButton.Visible = not v.canVote and not v.locked
 		for i, map in v.maps do
 			local button = buttons[i]
 			if button then
@@ -529,7 +546,13 @@ function Windows.openVote()
 				end
 			end
 		end
-		footer.Text = if v.locked then '<font color="#AA0000">투표가 끝났습니다</font>' else '<font color="#555555">가장 많은 표를 받은 맵에서 게임을 합니다</font>'
+		if v.locked then
+			footer.Text = '<font color="#AA0000">맵이 정해졌습니다</font>'
+		elseif v.canVote then
+			footer.Text = '<font color="#555555">VIP 가 고른 맵에서 게임을 합니다 (아무도 안 고르면 무작위)</font>'
+		else
+			footer.Text = '<font color="#AA6600">맵은 무작위로 정해집니다. VIP 는 원하는 맵을 고를 수 있어요.</font>'
+		end
 	end)
 	open("vote", frame)
 	Windows.refresh()
@@ -591,6 +614,327 @@ function Windows.openGames()
 		end
 	end)
 	open("games", frame)
+	Windows.refresh()
+end
+
+----------------------------------------------------------------------------
+-- 상점 (게임패스)
+----------------------------------------------------------------------------
+local function card(parent: Instance, x: number, y: number, w: number, h: number): Frame
+	local f = create("Frame", {
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(w, h),
+		BackgroundColor3 = Color3.fromRGB(170, 170, 170),
+		BorderSizePixel = 0,
+		Parent = parent,
+	})
+	create("UIStroke", { Color = Color3.fromRGB(85, 85, 85), Thickness = 2, Parent = f })
+	return f
+end
+
+local function text(parent: Instance, value: string, x: number, y: number, w: number, h: number, size: number, color: Color3?)
+	return create("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(w, h),
+		Font = Theme.Font,
+		TextSize = size,
+		TextWrapped = true,
+		RichText = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = color or C.Text,
+		Text = value,
+		Parent = parent,
+	})
+end
+
+function Windows.openStore()
+	local width = 16 + #Config.PassOrder * 272
+	local frame = window("상점", width, 340)
+	local buttons = {}
+	local prices = {}
+	for i, key in Config.PassOrder do
+		local pass = Config.Passes[key]
+		local c = card(frame, 16 + (i - 1) * 272, 40, 256, 284)
+		local slot = Theme.slot(56)
+		slot.Position = UDim2.fromOffset(10, 10)
+		slot.Parent = c
+		local icon = IconRender.draw(pass.icon, pass.color)
+		icon.Parent = slot:FindFirstChild("Icon")
+		text(c, pass.name, 76, 12, 170, 24, 20, C.Text)
+		prices[key] = text(c, "", 76, 38, 170, 22, 18, Color3.fromRGB(30, 120, 30))
+		for j, perk in pass.perks do
+			text(c, "· " .. perk, 12, 76 + (j - 1) * 40, 236, 38, 16, C.Text)
+		end
+		local button = Theme.button("", {
+			Position = UDim2.fromOffset(12, 232),
+			Size = UDim2.fromOffset(232, 40),
+			BackgroundColor3 = Color3.fromRGB(60, 140, 60),
+			Parent = c,
+		})
+		buttons[key] = button
+		button.MouseButton1Click:Connect(function()
+			local info = State.passes[key]
+			if info and info.owned then
+				if key == "skin" then
+					Windows.openSkins()
+				end
+			else
+				Net.send("buyPass", key)
+			end
+		end)
+	end
+	table.insert(refreshers, function()
+		for _, key in Config.PassOrder do
+			local info = State.passes[key]
+			local pass = Config.Passes[key]
+			local price = if info then info.price else pass.price
+			prices[key].Text = string.format("R$ %d", price)
+			local label = buttons[key]:FindFirstChild("Label") :: TextLabel?
+			local value
+			if info and info.owned then
+				value = if key == "skin" then "스킨 꾸미기" else '<font color="#FFFF55">보유 중</font>'
+			elseif info and not info.available then
+				value = "준비 중"
+			elseif info and info.studioTest then
+				value = "구매 (스튜디오 시험)"
+			else
+				value = string.format("구매  R$ %d", price)
+			end
+			if label then
+				label.Text = value
+			end
+		end
+	end)
+	open("store", frame)
+	Net.send("passes")
+	Windows.refresh()
+end
+
+----------------------------------------------------------------------------
+-- 스킨 꾸미기
+----------------------------------------------------------------------------
+function Windows.openSkins()
+	local width, height = 640, 430
+	local frame = window("스킨 꾸미기", width, height)
+	local draft = Skins.decode(if State.skinCode ~= "" then State.skinCode else Skins.DefaultCode)
+
+	-- 미리보기 인형 (천천히 돌아감)
+	local viewport = create("ViewportFrame", {
+		Position = UDim2.fromOffset(16, 40),
+		Size = UDim2.fromOffset(200, 300),
+		BackgroundColor3 = Color3.fromRGB(130, 178, 230),
+		Ambient = Color3.fromRGB(170, 170, 170),
+		LightColor = Color3.new(1, 1, 1),
+		LightDirection = Vector3.new(-1, -1, 1),
+		Parent = frame,
+	})
+	create("UIStroke", { Color = C.SlotDark, Thickness = 2, Parent = viewport })
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 30
+	camera.CFrame = CFrame.lookAt(Vector3.new(0, 3.2, -12), Vector3.new(0, 2.6, 0))
+	camera.Parent = viewport
+	viewport.CurrentCamera = camera
+	local doll = CharacterRig.build(CFrame.new(0, 3, 0), false)
+	doll.Parent = viewport
+	local angle = 0
+	local spin
+	spin = RunService.RenderStepped:Connect(function(dt)
+		if not frame.Parent then
+			spin:Disconnect()
+			return
+		end
+		angle += dt * 0.8
+		doll:PivotTo(CFrame.new(0, 3, 0) * CFrame.Angles(0, math.sin(angle) * 0.9, 0))
+	end)
+
+	local swatches: { [string]: { [string]: GuiObject } } = {}
+	local styleButtons: { [string]: { [string]: TextButton } } = {}
+	local status = text(frame, "", 232, 350, 392, 22, 16, C.Text)
+	local save = Theme.button("", {
+		Position = UDim2.fromOffset(232, 380),
+		Size = UDim2.fromOffset(250, 36),
+		BackgroundColor3 = Color3.fromRGB(60, 140, 60),
+		Parent = frame,
+	})
+	local reset = Theme.button("기본으로", {
+		Position = UDim2.fromOffset(492, 380),
+		Size = UDim2.fromOffset(132, 36),
+		Parent = frame,
+	})
+
+	local function owned(): boolean
+		local info = State.passes.skin
+		return info ~= nil and info.owned
+	end
+
+	local function render()
+		local code = Skins.encode(draft)
+		CharacterVisuals.applySkin(doll, code)
+		for key, list in swatches do
+			for hex, swatch in list do
+				local stroke = swatch:FindFirstChildOfClass("UIStroke")
+				if stroke then
+					local selected = (draft :: any)[key] == hex
+					stroke.Color = if selected then Color3.new(1, 1, 1) else Color3.fromRGB(40, 40, 40)
+					stroke.Thickness = if selected then 3 else 1
+				end
+			end
+		end
+		for key, list in styleButtons do
+			for value, button in list do
+				button.BackgroundColor3 = if (draft :: any)[key] == value then Color3.fromRGB(60, 120, 60) else C.Button
+			end
+		end
+		local saveLabel = save:FindFirstChild("Label") :: TextLabel?
+		local isDefault = code == Skins.DefaultCode
+		if saveLabel then
+			if owned() or isDefault then
+				saveLabel.Text = if code == State.skinCode then "저장됨" else "저장하기"
+			else
+				local info = State.passes.skin
+				saveLabel.Text = string.format("구매하고 저장 (R$ %d)", if info then info.price else Config.Passes.skin.price)
+			end
+		end
+		status.Text = if owned()
+			then '<font color="#1E7A1E">커스텀 스킨 패스 보유 중</font>'
+			else '<font color="#8A5A00">입어 보기는 무료! 저장하려면 커스텀 스킨 패스가 필요해요.</font>'
+	end
+
+	-- 색 고르기 줄
+	for row, key in Skins.ColorOrder do
+		local y = 40 + (row - 1) * 30
+		text(frame, Skins.ColorNames[key], 232, y + 3, 64, 22, 16, C.Text)
+		swatches[key] = {}
+		for i, hex in Skins.Palettes[key] do
+			local swatch = create("TextButton", {
+				AutoButtonColor = false,
+				Text = "",
+				BackgroundColor3 = Color3.fromHex(hex),
+				BorderSizePixel = 0,
+				Position = UDim2.fromOffset(300 + (i - 1) * 27, y),
+				Size = UDim2.fromOffset(24, 24),
+				Parent = frame,
+			})
+			create("UIStroke", { Color = Color3.fromRGB(40, 40, 40), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = swatch })
+			swatches[key][hex] = swatch
+			swatch.MouseButton1Click:Connect(function()
+				(draft :: any)[key] = hex
+				render()
+			end)
+		end
+	end
+	-- 모양 고르기 줄
+	local styleRows = {
+		{ key = "hairStyle", label = "머리", values = Skins.HairStyles, names = Skins.HairStyleNames },
+		{ key = "shirtStyle", label = "옷 모양", values = Skins.ShirtStyles, names = Skins.ShirtStyleNames },
+	}
+	for row, info in styleRows do
+		local y = 222 + (row - 1) * 36
+		text(frame, info.label, 232, y + 6, 64, 22, 16, C.Text)
+		styleButtons[info.key] = {}
+		for i, value in info.values do
+			local button = Theme.button(info.names[value], {
+				Position = UDim2.fromOffset(300 + (i - 1) * 82, y),
+				Size = UDim2.fromOffset(78, 30),
+				Parent = frame,
+			})
+			styleButtons[info.key][value] = button
+			button.MouseLeave:Connect(function()
+				render()
+			end)
+			button.MouseButton1Click:Connect(function()
+				(draft :: any)[info.key] = value
+				render()
+			end)
+		end
+	end
+	-- 프리셋
+	text(frame, "프리셋", 232, 300, 64, 22, 16, C.Text)
+	for i, preset in Skins.Presets do
+		local button = Theme.button(preset.name, {
+			Position = UDim2.fromOffset(300 + (i - 1) * 66, 296),
+			Size = UDim2.fromOffset(62, 30),
+			Parent = frame,
+		})
+		button.MouseButton1Click:Connect(function()
+			draft = Skins.sanitize(preset.skin :: any)
+			render()
+		end)
+	end
+
+	save.MouseButton1Click:Connect(function()
+		local code = Skins.encode(draft)
+		if owned() or code == Skins.DefaultCode then
+			Net.send("setSkin", code)
+		else
+			Net.send("buyPass", "skin")
+		end
+	end)
+	reset.MouseButton1Click:Connect(function()
+		draft = Skins.decode(Skins.DefaultCode)
+		render()
+	end)
+
+	table.insert(refreshers, render)
+	open("skins", frame)
+	Net.send("passes")
+	render()
+end
+
+----------------------------------------------------------------------------
+-- 설정
+----------------------------------------------------------------------------
+function Windows.openSettings()
+	local items = Preferences.Items
+	local width = 460
+	local frame = window("설정", width, 50 + #items * 40 + 56)
+	local buttons = {}
+	for i, item in items do
+		local y = 40 + (i - 1) * 40
+		text(frame, item.name, 18, y + 6, 220, 24, 18, C.Text)
+		local button = Theme.button("", {
+			Position = UDim2.fromOffset(240, y),
+			Size = UDim2.fromOffset(200, 34),
+			Parent = frame,
+		})
+		buttons[item.key] = button
+		button.MouseButton1Click:Connect(function()
+			if item.vip and not (State.passes.vip and State.passes.vip.owned) then
+				Windows.openStore()
+				return
+			end
+			local current = State.settings[item.key]
+			local index = table.find(item.choices, current) or 1
+			local nextValue = item.choices[index % #item.choices + 1]
+			Windows.onSetting(item.key, nextValue)
+			Windows.refresh()
+		end)
+	end
+	local flyButton = Theme.button("지금 날기 / 내려오기", {
+		Position = UDim2.fromOffset(18, 50 + #items * 40),
+		Size = UDim2.fromOffset(width - 36, 36),
+		BackgroundColor3 = Color3.fromRGB(200, 150, 30),
+		Parent = frame,
+	})
+	flyButton.MouseButton1Click:Connect(function()
+		Windows.onFlyToggle()
+	end)
+	table.insert(refreshers, function()
+		local vip = State.passes.vip and State.passes.vip.owned
+		for _, item in items do
+			local label = buttons[item.key]:FindFirstChild("Label") :: TextLabel?
+			if label then
+				if item.vip and not vip then
+					label.Text = '<font color="#FFD24A">VIP 전용</font>'
+				else
+					label.Text = tostring(item.labels[State.settings[item.key]] or State.settings[item.key])
+				end
+			end
+		end
+		flyButton.Visible = vip == true and State.context.location == "lobby" and State.settings.fly ~= false
+	end)
+	open("settings", frame)
 	Windows.refresh()
 end
 

@@ -13,6 +13,9 @@ State.vote = nil :: any
 State.lobbyInfo = {} :: { [string]: { waiting: number, playing: number } }
 State.shop = nil :: any
 State.chest = nil :: { id: number, title: string, slots: { [number]: Stack? } }?
+State.passes = {} :: { [string]: { owned: boolean, price: number, available: boolean, studioTest: boolean } }
+State.settings = {} :: { [string]: any } -- Main 에서 기본값으로 채움
+State.skinCode = "" -- 저장된 내 스킨
 
 local listeners: { [string]: { () -> () } } = {}
 

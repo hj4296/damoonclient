@@ -500,6 +500,74 @@ do
 	end
 end
 
+section("스킨/캐릭터/설정")
+do
+	local Skins = requireModule(Shared.Skins)
+	local CharacterRig = requireModule(Shared.CharacterRig)
+	local Preferences = requireModule(Shared.Preferences)
+	check(Skins.decode(Skins.DefaultCode).shirt == Skins.Default.shirt, "기본 스킨 되돌리기")
+	check(Skins.isDefault(Skins.DefaultCode), "기본 스킨 판별")
+	check(Skins.encode(Skins.decode("이상한 값")) == Skins.DefaultCode, "잘못된 스킨은 기본으로")
+	check(Skins.decode("v1|ZZZZZZ|2B1E16").skin == Skins.Default.skin, "팔레트 밖 색은 기본으로")
+	for _, preset in Skins.Presets do
+		local clean = Skins.sanitize(preset.skin)
+		for key, value in preset.skin do
+			check(clean[key] == value, "프리셋 " .. preset.name .. " " .. key .. " 이 팔레트 안에 있음")
+		end
+		local code = Skins.encode(preset.skin)
+		check(Skins.encode(Skins.decode(code)) == code, "프리셋 왕복 " .. preset.name)
+		check(#code < 120, "스킨 코드 길이")
+	end
+	for _, hairStyle in Skins.HairStyles do
+		for _, shirtStyle in Skins.ShirtStyles do
+			local skin = Skins.sanitize({ hairStyle = hairStyle, shirtStyle = shirtStyle })
+			for partName in Skins.Parts do
+				for _, face in { "Front", "Back", "Left", "Right", "Top", "Bottom" } do
+					local px, w, h = Skins.face(skin, partName, face)
+					local okSize = #px == w * h * 4
+					local okValues = true
+					for i = 1, #px do
+						local v = px[i]
+						if type(v) ~= "number" or v < 0 or v > 255 or v ~= math.floor(v) then
+							okValues = false
+						end
+					end
+					check(okSize and okValues, string.format("스킨 픽셀 %s/%s %s %s", hairStyle, shirtStyle, partName, face))
+				end
+			end
+		end
+	end
+	local rig = CharacterRig.build()
+	for _, name in CharacterRig.BodyParts do
+		check(rig:FindFirstChild(name) ~= nil, "캐릭터 부위 " .. name)
+	end
+	local root = rig:FindFirstChild("HumanoidRootPart")
+	check(root ~= nil and rig.PrimaryPart == root, "루트 파트")
+	check(math.abs(root.CFrame.Position.Y - 3) < 1e-6, "루트 높이 3 (일반 R6 와 같음)")
+	local leg = rig:FindFirstChild("Left Leg")
+	check(math.abs(leg.CFrame.Position.Y - leg.Size.Y / 2) < 1e-6, "다리 바닥이 땅(0)에 닿음")
+	check(math.abs(leg.Size.Y - 2) < 1e-6, "다리 길이 2 (R6 서 있는 높이 계산과 맞음)")
+	local torso = rig:FindFirstChild("Torso")
+	for _, name in { "Neck", "Right Shoulder", "Left Shoulder", "Right Hip", "Left Hip" } do
+		local m = torso:FindFirstChild(name)
+		check(m ~= nil and m.ClassName == "Motor6D" and m.Part0 == torso and m.Part1 ~= nil, "관절 " .. name)
+		if m then
+			-- 관절을 따라 계산한 위치가 실제 부위 위치와 같아야 함
+			local expected = m.Part0.CFrame * m.C0 * m.C1:Inverse()
+			check((expected.Position - m.Part1.CFrame.Position).Magnitude < 1e-5, "관절 위치 " .. name)
+		end
+	end
+	local rootJoint = root:FindFirstChild("RootJoint")
+	check(rootJoint ~= nil and rootJoint.Part1 == torso, "RootJoint")
+	local humanoid = rig:FindFirstChildOfClass("Humanoid")
+	check(humanoid ~= nil and humanoid.RigType == roblox.Enum.HumanoidRigType.R6, "R6 휴머노이드")
+	check(rig:GetAttribute("BlockRig") == true, "블록 캐릭터 표시")
+	local defaults = Preferences.defaults()
+	check(defaults.camera == "first" and defaults.textures == true, "설정 기본값")
+	local clean = Preferences.sanitize({ camera = "third", sounds = false, textureDistance = 9, hack = true })
+	check(clean.camera == "third" and clean.sounds == false and clean.textureDistance == 2 and clean.hack == nil, "설정 검사")
+end
+
 section("텍스처")
 local Textures = requireModule(Shared.Textures)
 local names = Textures.names()

@@ -9,6 +9,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local Net = require(script.Parent.Net)
 
 local Effects = {}
+Effects.enabled = true
 
 -- 효과음 이름 -> (소리, 속도)
 local SOUNDS: { [string]: { string | number } } = {
@@ -27,7 +28,7 @@ local pool: { [string]: Sound } = {}
 
 function Effects.play(name: string)
 	local entry = SOUNDS[name]
-	if not entry then
+	if not entry or not Effects.enabled then
 		return
 	end
 	local sound = pool[name]

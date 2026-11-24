@@ -1,6 +1,10 @@
 -- 클라이언트 시작점: 화면을 만들고 서버 메시지를 화면에 연결합니다.
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
+local TextChatService = game:GetService("TextChatService")
+
+local Preferences = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Preferences"))
 
 local Net = require(script.Parent.Net)
 local State = require(script.Parent.State)
@@ -10,6 +14,8 @@ local Controls = require(script.Parent.Controls)
 local Movement = require(script.Parent.Movement)
 local Effects = require(script.Parent.Effects)
 local BlockTextures = require(script.Parent.BlockTextures)
+local CharacterVisuals = require(script.Parent.CharacterVisuals)
+local Flight = require(script.Parent.Flight)
 
 local player = Players.LocalPlayer
 
@@ -34,6 +40,68 @@ Controls.init()
 Movement.init()
 Effects.init()
 task.spawn(BlockTextures.init)
+CharacterVisuals.init()
+Flight.init()
+
+-- 설정: 서버에서 받은 값을 화면/조작에 적용
+State.settings = Preferences.defaults()
+local function applySettings()
+	local s = State.settings
+	Controls.setThirdPerson(s.camera == "third")
+	BlockTextures.setRadius(if s.textures then Preferences.TextureRadius[s.textureDistance] or 130 else -1000)
+	Effects.enabled = s.sounds ~= false
+	CharacterVisuals.setNametagsVisible(s.nametags ~= false)
+	Hud.setChatVisible(s.chatFeed ~= false)
+	if s.fly == false then
+		Flight.stop()
+	end
+end
+applySettings()
+
+Windows.onSetting = function(key: string, value: any)
+	State.settings[key] = value
+	applySettings()
+	Net.send("settings", State.settings)
+end
+Windows.onFlyToggle = function()
+	Flight.toggle()
+end
+Controls.onCameraChanged = function(third: boolean)
+	local mode = if third then "third" else "first"
+	if State.settings.camera ~= mode then
+		State.settings.camera = mode
+		Net.send("settings", State.settings)
+		Windows.refresh()
+	end
+end
+
+-- 왼쪽 위 상점/스킨/설정 버튼
+Hud.onMenu = function(name: string)
+	if Windows.kind() == name then
+		Windows.close()
+	elseif name == "store" then
+		Windows.openStore()
+	elseif name == "skins" then
+		Windows.openSkins()
+	else
+		Windows.openSettings()
+	end
+end
+
+-- 채팅창에서 VIP 이름 앞에 [VIP]
+pcall(function()
+	TextChatService.OnIncomingMessage = function(message: TextChatMessage)
+		local props = Instance.new("TextChatMessageProperties")
+		local source = message.TextSource
+		if source then
+			local speaker = Players:GetPlayerByUserId(source.UserId)
+			if speaker and speaker:GetAttribute("VIP") == true then
+				props.PrefixText = '<font color="#FFD24A">[VIP]</font> ' .. message.PrefixText
+			end
+		end
+		return props
+	end
+end)
 
 local HINTS = {
 	lobby = "F: NPC  ·  우클릭: 아이템 사용  ·  V: 시점  ·  1~9: 핫바",
@@ -136,6 +204,28 @@ Net.on("closeChest", function()
 	if Windows.kind() == "chest" then
 		Windows.close()
 	end
+end)
+
+Net.on("settings", function(data)
+	State.settings = Preferences.sanitize(data)
+	applySettings()
+	Windows.refresh()
+end)
+
+Net.on("passes", function(info)
+	State.passes = if type(info) == "table" then info else {}
+	Windows.refresh()
+end)
+
+Net.on("skinSaved", function(code)
+	if type(code) == "string" then
+		State.skinCode = code
+		Windows.refresh()
+	end
+end)
+
+Net.on("needVip", function()
+	Windows.openStore()
 end)
 
 Net.on("crit", function()

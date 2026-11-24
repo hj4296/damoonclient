@@ -183,6 +183,7 @@ function Combat.melee(attacker: Player, victim: Player)
 		damage *= Config.Combat.CritMultiplier
 		Net.send(attacker, "crit", victim)
 	end
+	Net.broadcast("swing", attacker)
 	local flat = Vector3.new(offset.X, 0, offset.Z)
 	local dir = if flat.Magnitude > 0.05 then flat.Unit else a.root.CFrame.LookVector
 	local knock = dir * Config.Combat.KnockbackH + Vector3.new(0, Config.Combat.KnockbackV, 0)

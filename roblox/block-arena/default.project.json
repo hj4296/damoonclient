@@ -35,6 +35,9 @@
         "$className": "StarterCharacterScripts",
         "Health": {
           "$path": "src/character/Health.server.luau"
+        },
+        "Animate": {
+          "$path": "src/character/Animate.client.luau"
         }
       }
     },

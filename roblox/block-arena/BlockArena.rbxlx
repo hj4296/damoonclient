@@ -401,6 +401,101 @@ return Blocks
       </Item>
       <Item class="ModuleScript" referent="6">
         <Properties>
+          <string name="Name">CharacterRig</string>
+          <string name="Source"><![CDATA[-- 블록 캐릭터 몸 (R6 방식 관절). 머리 정육면체, 얇은 몸통, 네모난 팔다리.
+-- 서버는 이걸 StarterPlayer.StarterCharacter 로 넣어 모든 플레이어가 이 몸으로 태어나게 하고,
+-- 클라이언트는 스킨 미리보기 인형으로도 씁니다. 다리 2스터드 + 몸통 2스터드라 일반 R6 와 서 있는 높이가 같습니다.
+local Skins = require(script.Parent.Skins)
+
+local CharacterRig = {}
+
+local P = Skins.PixelStuds
+
+local function size(partName: string): Vector3
+	local d = Skins.Parts[partName]
+	return Vector3.new(d[1] * P, d[2] * P, d[3] * P)
+end
+
+CharacterRig.Sizes = {
+	Head = size("Head"),
+	Torso = size("Torso"),
+	Arm = size("Left Arm"),
+	Leg = size("Left Leg"),
+}
+
+local function part(model: Model, name: string, partSize: Vector3, cframe: CFrame, collide: boolean): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = partSize
+	p.CFrame = cframe
+	p.CanCollide = collide
+	p.Material = Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Color = Color3.fromRGB(200, 200, 200)
+	p.Parent = model
+	return p
+end
+
+local function motor(name: string, parent: BasePart, part0: BasePart, part1: BasePart, c0: CFrame, c1: CFrame): Motor6D
+	local m = Instance.new("Motor6D")
+	m.Name = name
+	m.Part0 = part0
+	m.Part1 = part1
+	m.C0 = c0
+	m.C1 = c1
+	m.Parent = parent
+	return m
+end
+
+-- origin: HumanoidRootPart 위치 (발바닥에서 3스터드 위)
+function CharacterRig.build(origin: CFrame?, withHumanoid: boolean?): Model
+	local base = origin or CFrame.new(0, 3, 0)
+	local S = CharacterRig.Sizes
+	local model = Instance.new("Model")
+	model.Name = "StarterCharacter"
+
+	local root = part(model, "HumanoidRootPart", S.Torso, base, false)
+	root.Transparency = 1
+	local torso = part(model, "Torso", S.Torso, base, true)
+	local head = part(model, "Head", S.Head, base * CFrame.new(0, S.Torso.Y / 2 + S.Head.Y / 2, 0), true)
+	local armX = S.Torso.X / 2 + S.Arm.X / 2
+	local rightArm = part(model, "Right Arm", S.Arm, base * CFrame.new(armX, 0, 0), false)
+	local leftArm = part(model, "Left Arm", S.Arm, base * CFrame.new(-armX, 0, 0), false)
+	local legX = S.Leg.X / 2
+	local legY = -S.Torso.Y / 2 - S.Leg.Y / 2
+	local rightLeg = part(model, "Right Leg", S.Leg, base * CFrame.new(legX, legY, 0), false)
+	local leftLeg = part(model, "Left Leg", S.Leg, base * CFrame.new(-legX, legY, 0), false)
+
+	motor("RootJoint", root, root, torso, CFrame.identity, CFrame.identity)
+	motor("Neck", torso, torso, head, CFrame.new(0, S.Torso.Y / 2, 0), CFrame.new(0, -S.Head.Y / 2, 0))
+	local shoulderY = S.Torso.Y / 2 - S.Arm.X / 2
+	local armPivot = S.Arm.Y / 2 - S.Arm.X / 2
+	motor("Right Shoulder", torso, torso, rightArm, CFrame.new(armX, shoulderY, 0), CFrame.new(0, armPivot, 0))
+	motor("Left Shoulder", torso, torso, leftArm, CFrame.new(-armX, shoulderY, 0), CFrame.new(0, armPivot, 0))
+	motor("Right Hip", torso, torso, rightLeg, CFrame.new(legX, -S.Torso.Y / 2, 0), CFrame.new(0, S.Leg.Y / 2, 0))
+	motor("Left Hip", torso, torso, leftLeg, CFrame.new(-legX, -S.Torso.Y / 2, 0), CFrame.new(0, S.Leg.Y / 2, 0))
+
+	if withHumanoid ~= false then
+		local humanoid = Instance.new("Humanoid")
+		humanoid.RigType = Enum.HumanoidRigType.R6
+		humanoid.HipHeight = 0
+		humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		humanoid.Parent = model
+	end
+	model.PrimaryPart = root
+	model:SetAttribute("BlockRig", true)
+	return model
+end
+
+CharacterRig.BodyParts = { "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg" }
+
+return CharacterRig
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="7">
+        <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[-- 게임 전체 설정. 숫자를 바꾸면 바로 게임 밸런스가 바뀝니다.
 local Config = {}
@@ -532,6 +627,36 @@ Config.TntRun = {
 	TimeLimit = 600,
 }
 
+-- 게임패스: 크리에이터 대시보드(create.roblox.com) → 내 게임 → 수익 창출 → 패스 에서 만들고,
+-- 받은 숫자 ID 를 id 에 적으세요. 실제 가격은 대시보드에서 정한 값이 쓰이고, price 는 ID 가 없을 때 보여 줄 값입니다.
+Config.Passes = {
+	vip = {
+		id = 0,
+		name = "VIP 패키지",
+		price = 199,
+		icon = "crown",
+		color = Color3.fromRGB(255, 200, 40),
+		perks = { "로비에서 날기 (스페이스 두 번)", "이름 옆 [VIP] 칭호", "게임 전에 원하는 맵 고르기" },
+	},
+	skin = {
+		id = 0,
+		name = "커스텀 스킨",
+		price = 67,
+		icon = "shirt",
+		color = Color3.fromRGB(90, 200, 255),
+		perks = { "피부·머리카락·눈·옷·바지·신발 색", "머리 모양과 옷 모양 바꾸기", "스킨 프리셋 5가지" },
+	},
+}
+Config.PassOrder = { "vip", "skin" }
+-- 스튜디오에서 패스 ID 가 0 이면 "구매" 버튼으로 바로 받아서 기능을 시험해 볼 수 있습니다(실제 게임에서는 안 됨).
+Config.StudioTestPurchases = true
+
+Config.Fly = {
+	Speed = 34,
+	Vertical = 26,
+	MaxHeight = 140, -- 로비 바닥에서 이 높이(스터드) 위로는 못 올라감
+}
+
 Config.Sounds = {
 	Hit = "rbxasset://sounds/swordslash.wav",
 	Click = "rbxasset://sounds/electronicpingshort.wav",
@@ -542,7 +667,7 @@ return Config
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="7">
+      <Item class="ModuleScript" referent="8">
         <Properties>
           <string name="Name">Icons</string>
           <string name="Source"><![CDATA[-- 직접 그린 10x10 픽셀 아이콘.
@@ -841,6 +966,42 @@ Icons.Art = {
 		"....K.....",
 		"..........",
 	},
+	crown = {
+		"..........",
+		"K...KK...K",
+		"KK.KLLK.KK",
+		"KMKMMMMKMK",
+		"KMMMMMMMMK",
+		"KMMRMMRMMK",
+		"KMMMMMMMMK",
+		"KDDDDDDDDK",
+		"KKKKKKKKKK",
+		"..........",
+	},
+	shirt = {
+		"..........",
+		".KKK..KKK.",
+		"KMMMKKMMMK",
+		"KMMMMMMMMK",
+		"KKKMMMMKKK",
+		"..KMMMMK..",
+		"..KMLMMK..",
+		"..KMMMMK..",
+		"..KDDDDK..",
+		"..KKKKKK..",
+	},
+	gear = {
+		"...K..K...",
+		"..KSKKSK..",
+		".KSSSSSSK.",
+		"KSSKKKKSSK",
+		".KSK..KSK.",
+		".KSK..KSK.",
+		"KSSKKKKSSK",
+		".KSSSSSSK.",
+		"..KSKKSK..",
+		"...K..K...",
+	},
 	question = {
 		"..KKKKKK..",
 		".KWWWWWWK.",
@@ -872,7 +1033,7 @@ return Icons
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="8">
+      <Item class="ModuleScript" referent="9">
         <Properties>
           <string name="Name">Items</string>
           <string name="Source"><![CDATA[-- 아이템 정의. 블록은 Blocks 에서 자동으로 아이템이 만들어집니다.
@@ -1034,12 +1195,12 @@ add("compass", {
 	lore = { "우클릭으로 미니게임 고르기" },
 })
 add("vote_paper", {
-	name = "맵 투표",
+	name = "맵 선택 (VIP)",
 	kind = "menu",
 	action = "vote",
 	icon = "paper",
 	color = rgb(240, 240, 230),
-	lore = { "우클릭으로 맵 투표" },
+	lore = { "우클릭으로 맵 고르기", "VIP 가 없으면 맵은 무작위" },
 })
 add("leave_bed", {
 	name = "로비로 돌아가기",
@@ -1082,7 +1243,58 @@ return Items
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="9">
+      <Item class="ModuleScript" referent="10">
+        <Properties>
+          <string name="Name">Preferences</string>
+          <string name="Source"><![CDATA[-- 설정 탭 항목 (서버 저장과 클라이언트 적용이 같이 씀)
+local Preferences = {}
+
+Preferences.Items = {
+	{ key = "camera", name = "시점", choices = { "first", "third" }, labels = { first = "1인칭", third = "3인칭" }, default = "first" },
+	{ key = "textures", name = "블록 텍스처", choices = { true, false }, labels = { [true] = "켜기", [false] = "끄기" }, default = true },
+	{
+		key = "textureDistance",
+		name = "텍스처 거리",
+		choices = { 1, 2, 3 },
+		labels = { [1] = "가까이", [2] = "보통", [3] = "멀리" },
+		default = 2,
+	},
+	{ key = "sounds", name = "효과음", choices = { true, false }, labels = { [true] = "켜기", [false] = "끄기" }, default = true },
+	{ key = "nametags", name = "다른 사람 이름표", choices = { true, false }, labels = { [true] = "보기", [false] = "숨기기" }, default = true },
+	{ key = "chatFeed", name = "게임 알림 채팅", choices = { true, false }, labels = { [true] = "보기", [false] = "숨기기" }, default = true },
+	{ key = "fly", name = "VIP 날기 (로비)", choices = { true, false }, labels = { [true] = "쓰기", [false] = "안 쓰기" }, default = true, vip = true },
+}
+
+Preferences.TextureRadius = { [1] = 90, [2] = 130, [3] = 190 }
+
+function Preferences.defaults(): { [string]: any }
+	local out = {}
+	for _, item in Preferences.Items do
+		out[item.key] = item.default
+	end
+	return out
+end
+
+-- 모르는 키나 잘못된 값은 기본값으로
+function Preferences.sanitize(input: any): { [string]: any }
+	local out = Preferences.defaults()
+	if type(input) ~= "table" then
+		return out
+	end
+	for _, item in Preferences.Items do
+		local value = input[item.key]
+		if table.find(item.choices, value) then
+			out[item.key] = value
+		end
+	end
+	return out
+end
+
+return Preferences
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="11">
         <Properties>
           <string name="Name">Rules</string>
           <string name="Source"><![CDATA[-- 서버와 클라이언트가 같이 쓰는 계산식 (채굴 시간, 공격력, 방어력)
@@ -1173,7 +1385,7 @@ return Rules
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="10">
+      <Item class="ModuleScript" referent="12">
         <Properties>
           <string name="Name">Shop</string>
           <string name="Source"><![CDATA[-- 베드워즈 상점과 팀 강화 목록. "$team" 은 구매한 사람의 팀 색으로 바뀝니다.
@@ -1364,7 +1576,368 @@ return Shop
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="11">
+      <Item class="ModuleScript" referent="13">
+        <Properties>
+          <string name="Name">Skins</string>
+          <string name="Source"><![CDATA[-- 캐릭터 스킨: 색 6가지 + 머리 모양 + 옷 모양. 문자열 하나로 저장/전송합니다.
+-- 스킨 픽셀(머리 8x8x8, 몸 8x12x4, 팔/다리 4x12x4)을 면마다 그려 줍니다. 기본 스킨은 이 게임의 오리지널 디자인입니다.
+local Skins = {}
+
+export type Skin = {
+	skin: string,
+	hair: string,
+	eyes: string,
+	shirt: string,
+	pants: string,
+	shoes: string,
+	hairStyle: string,
+	shirtStyle: string,
+}
+
+Skins.Palettes = {
+	skin = { "FFE0C8", "F5D0B0", "EBBE96", "D8A57C", "B9825A", "8D5A3C", "63402A", "A8C8A0" },
+	hair = { "1E1E1E", "2B1E16", "4A2F1D", "7A4A26", "C68A3A", "E8C870", "D9D9D9", "B03A2E", "3E64C8", "8E44AD" },
+	eyes = { "3A5BA0", "3D7A3A", "5A3A22", "222222", "7B4AA8", "1E9AA0", "B03A2E" },
+	shirt = { "C83C32", "3C6EC8", "3CA050", "E0B020", "8E44AD", "E67E22", "ECECEC", "2B2B2B", "1ABC9C", "F06292", "8A8F98", "6B4226" },
+	pants = { "3C3C46", "2E3F6E", "5A4632", "1E1E1E", "6E6E6E", "2E5E3E", "8B5A2B", "ECECEC", "7A1F1F" },
+	shoes = { "2A2A2A", "5A3A22", "ECECEC", "8B1E1E", "2E3F6E", "C68A3A" },
+}
+Skins.ColorOrder = { "skin", "hair", "eyes", "shirt", "pants", "shoes" }
+Skins.ColorNames = { skin = "피부", hair = "머리카락", eyes = "눈", shirt = "옷", pants = "바지", shoes = "신발" }
+
+Skins.HairStyles = { "short", "long", "cap", "bald" }
+Skins.HairStyleNames = { short = "짧은 머리", long = "긴 머리", cap = "모자", bald = "민머리" }
+Skins.ShirtStyles = { "hoodie", "plain", "stripe", "vest" }
+Skins.ShirtStyleNames = { hoodie = "후드", plain = "기본", stripe = "줄무늬", vest = "조끼" }
+
+Skins.Default = {
+	skin = "EBBE96",
+	hair = "2B1E16",
+	eyes = "3A5BA0",
+	shirt = "C83C32",
+	pants = "3C3C46",
+	shoes = "2A2A2A",
+	hairStyle = "short",
+	shirtStyle = "hoodie",
+} :: Skin
+
+Skins.Presets = {
+	{ name = "기본", skin = Skins.Default },
+	{
+		name = "기사",
+		skin = { skin = "F5D0B0", hair = "C68A3A", eyes = "3D7A3A", shirt = "8A8F98", pants = "2E3F6E", shoes = "5A3A22", hairStyle = "short", shirtStyle = "vest" },
+	},
+	{
+		name = "해적",
+		skin = { skin = "D8A57C", hair = "1E1E1E", eyes = "5A3A22", shirt = "C83C32", pants = "5A4632", shoes = "2A2A2A", hairStyle = "cap", shirtStyle = "stripe" },
+	},
+	{
+		name = "요리사",
+		skin = { skin = "F5D0B0", hair = "4A2F1D", eyes = "3A5BA0", shirt = "ECECEC", pants = "1E1E1E", shoes = "2A2A2A", hairStyle = "cap", shirtStyle = "plain" },
+	},
+	{
+		name = "숲 탐험가",
+		skin = { skin = "B9825A", hair = "7A4A26", eyes = "3D7A3A", shirt = "3CA050", pants = "5A4632", shoes = "5A3A22", hairStyle = "long", shirtStyle = "vest" },
+	},
+}
+
+local function contains(list: { string }, value: any): boolean
+	return type(value) == "string" and table.find(list, value) ~= nil
+end
+
+-- 잘못된 값은 기본값으로 바꿔서 항상 올바른 스킨을 돌려줍니다.
+function Skins.sanitize(input: { [string]: any }?): Skin
+	local src = input or {}
+	local out = {}
+	for _, key in Skins.ColorOrder do
+		local value = src[key]
+		out[key] = if contains(Skins.Palettes[key], value) then value else (Skins.Default :: any)[key]
+	end
+	out.hairStyle = if contains(Skins.HairStyles, src.hairStyle) then src.hairStyle else Skins.Default.hairStyle
+	out.shirtStyle = if contains(Skins.ShirtStyles, src.shirtStyle) then src.shirtStyle else Skins.Default.shirtStyle
+	return out :: any
+end
+
+function Skins.encode(skin: Skin): string
+	local s = Skins.sanitize(skin :: any)
+	return table.concat({ "v1", s.skin, s.hair, s.eyes, s.shirt, s.pants, s.shoes, s.hairStyle, s.shirtStyle }, "|")
+end
+
+function Skins.decode(text: any): Skin
+	if type(text) ~= "string" then
+		return Skins.sanitize(nil)
+	end
+	local p = string.split(text, "|")
+	if p[1] ~= "v1" then
+		return Skins.sanitize(nil)
+	end
+	return Skins.sanitize({ skin = p[2], hair = p[3], eyes = p[4], shirt = p[5], pants = p[6], shoes = p[7], hairStyle = p[8], shirtStyle = p[9] })
+end
+
+Skins.DefaultCode = Skins.encode(Skins.Default)
+
+function Skins.isDefault(text: string): boolean
+	return Skins.encode(Skins.decode(text)) == Skins.DefaultCode
+end
+
+function Skins.color(hex: string): Color3
+	return Color3.fromHex(hex)
+end
+
+----------------------------------------------------------------------------
+-- 픽셀 그리기
+----------------------------------------------------------------------------
+
+-- 몸 부위 크기 (픽셀). 1픽셀 = 1/6 스터드
+Skins.PixelStuds = 1 / 6
+Skins.Parts = {
+	Head = { 8, 8, 8 },
+	Torso = { 8, 12, 4 },
+	["Left Arm"] = { 4, 12, 4 },
+	["Right Arm"] = { 4, 12, 4 },
+	["Left Leg"] = { 4, 12, 4 },
+	["Right Leg"] = { 4, 12, 4 },
+}
+
+type Pixels = { number }
+type RGB = { number }
+
+local function rgb(hex: string): RGB
+	local c = Color3.fromHex(hex)
+	return { c.R * 255, c.G * 255, c.B * 255 }
+end
+
+local function mul(c: RGB, f: number): RGB
+	return { c[1] * f, c[2] * f, c[3] * f }
+end
+
+local function canvas(w: number, h: number, c: RGB, seed: number): Pixels
+	local px = table.create(w * h * 4, 255)
+	for y = 0, h - 1 do
+		for x = 0, w - 1 do
+			local n = ((x * 7349 + y * 1597 + seed * 31) % 97) / 97 -- 0~1 고정된 얼룩
+			local f = 0.95 + n * 0.08
+			local i = (y * w + x) * 4
+			px[i + 1] = math.clamp(math.floor(c[1] * f + 0.5), 0, 255)
+			px[i + 2] = math.clamp(math.floor(c[2] * f + 0.5), 0, 255)
+			px[i + 3] = math.clamp(math.floor(c[3] * f + 0.5), 0, 255)
+		end
+	end
+	return px
+end
+
+local function put(px: Pixels, w: number, x: number, y: number, c: RGB)
+	local i = (y * w + x) * 4
+	px[i + 1] = math.clamp(math.floor(c[1] + 0.5), 0, 255)
+	px[i + 2] = math.clamp(math.floor(c[2] + 0.5), 0, 255)
+	px[i + 3] = math.clamp(math.floor(c[3] + 0.5), 0, 255)
+	px[i + 4] = 255
+end
+
+local function rows(px: Pixels, w: number, y1: number, y2: number, c: RGB)
+	for y = y1, y2 do
+		for x = 0, w - 1 do
+			put(px, w, x, y, mul(c, 0.96 + ((x * 3 + y * 5) % 4) * 0.025))
+		end
+	end
+end
+
+-- 면 크기: Front/Back = 가로 x 세로, Left/Right = 깊이 x 세로, Top/Bottom = 가로 x 깊이
+function Skins.faceSize(partName: string, face: string): (number, number)
+	local dims = Skins.Parts[partName]
+	local w, h, d = dims[1], dims[2], dims[3]
+	if face == "Front" or face == "Back" then
+		return w, h
+	elseif face == "Left" or face == "Right" then
+		return d, h
+	end
+	return w, d
+end
+
+local function head(s: Skin, face: string): Pixels
+	local w, h = Skins.faceSize("Head", face)
+	local skin, hair = rgb(s.skin), rgb(s.hair)
+	local hat = mul(rgb(s.shirt), 0.9)
+	local style = s.hairStyle
+	local px = canvas(w, h, skin, 1)
+	if face == "Top" then
+		return canvas(w, h, if style == "cap" then hat elseif style == "bald" then skin else hair, 2)
+	elseif face == "Bottom" then
+		return px
+	end
+	if style == "cap" then
+		rows(px, w, 0, 2, hat)
+		if face == "Front" then
+			rows(px, w, 3, 3, mul(hat, 0.75))
+		end
+	end
+	if face == "Front" then
+		if style == "short" then
+			rows(px, w, 0, 1, hair)
+			put(px, w, 0, 2, hair)
+			put(px, w, 7, 2, hair)
+		elseif style == "long" then
+			rows(px, w, 0, 1, hair)
+			for y = 2, 7 do
+				put(px, w, 0, y, hair)
+				put(px, w, 7, y, hair)
+			end
+		end
+		local eye = rgb(s.eyes)
+		local white = { 245, 245, 245 }
+		put(px, w, 1, 4, white)
+		put(px, w, 2, 4, eye)
+		put(px, w, 5, 4, eye)
+		put(px, w, 6, 4, white)
+		put(px, w, 3, 5, mul(skin, 0.9))
+		put(px, w, 4, 5, mul(skin, 0.9))
+		put(px, w, 3, 6, mul(skin, 0.72))
+		put(px, w, 4, 6, mul(skin, 0.72))
+	elseif face == "Back" then
+		local last = if style == "long" then 7 elseif style == "short" then 5 elseif style == "cap" then 4 else -1
+		if last >= 0 then
+			rows(px, w, if style == "cap" then 3 else 0, last, hair)
+		end
+	else
+		-- 옆면: 뒤쪽 절반에 머리카락, 앞쪽 아래는 귀
+		local backOnLeft = face == "Right"
+		for y = 0, h - 1 do
+			for x = 0, w - 1 do
+				local fromBack = if backOnLeft then x else w - 1 - x
+				local isHair = false
+				if style == "short" then
+					isHair = y <= 1 or (y <= 4 and fromBack <= 3)
+				elseif style == "long" then
+					isHair = y <= 1 or fromBack <= 4
+				elseif style == "cap" then
+					isHair = y == 3 and fromBack <= 4
+				end
+				if isHair then
+					put(px, w, x, y, mul(hair, 0.96 + ((x + y) % 3) * 0.03))
+				end
+			end
+		end
+		local earX = if backOnLeft then 4 else 3
+		if style ~= "long" then
+			put(px, w, earX, 4, mul(skin, 0.85))
+		end
+	end
+	return px
+end
+
+local function torso(s: Skin, face: string): Pixels
+	local w, h = Skins.faceSize("Torso", face)
+	local shirt, pants, skin = rgb(s.shirt), rgb(s.pants), rgb(s.skin)
+	local style = s.shirtStyle
+	local px = canvas(w, h, shirt, 3)
+	if face == "Top" then
+		if style == "vest" or style == "plain" then
+			put(px, w, 3, 1, skin)
+			put(px, w, 4, 1, skin)
+		end
+		return px
+	elseif face == "Bottom" then
+		return canvas(w, h, pants, 4)
+	end
+	if style == "stripe" then
+		for _, y in { 2, 5, 8 } do
+			rows(px, w, y, y, mul(shirt, 0.7))
+		end
+	end
+	if face == "Front" then
+		if style == "hoodie" then
+			for y = 1, 3 do
+				put(px, w, 3, y, { 236, 236, 236 })
+				put(px, w, 4, y, { 236, 236, 236 })
+			end
+			for y = 7, 9 do
+				for x = 2, 5 do
+					put(px, w, x, y, mul(shirt, 0.8))
+				end
+			end
+		elseif style == "vest" then
+			for y = 0, 9 do
+				put(px, w, 3, y, { 236, 236, 236 })
+				put(px, w, 4, y, { 236, 236, 236 })
+			end
+		elseif style == "plain" then
+			put(px, w, 3, 0, skin)
+			put(px, w, 4, 0, skin)
+		end
+	elseif face == "Back" and style == "hoodie" then
+		rows(px, w, 0, 2, mul(shirt, 0.82))
+	end
+	rows(px, w, h - 2, h - 1, pants)
+	rows(px, w, h - 2, h - 2, mul(pants, 0.75))
+	return px
+end
+
+local function arm(s: Skin, face: string): Pixels
+	local w, h = Skins.faceSize("Left Arm", face)
+	local shirt, skin = rgb(s.shirt), rgb(s.skin)
+	local style = s.shirtStyle
+	local sleeveEnd = if style == "hoodie" then 10 elseif style == "vest" then -1 else 3
+	if face == "Top" then
+		return canvas(w, h, if sleeveEnd >= 0 then shirt else skin, 5)
+	elseif face == "Bottom" then
+		return canvas(w, h, skin, 6)
+	end
+	local px = canvas(w, h, skin, 7)
+	if sleeveEnd >= 0 then
+		rows(px, w, 0, sleeveEnd, shirt)
+		if style == "stripe" then
+			rows(px, w, 2, 2, mul(shirt, 0.7))
+		end
+	end
+	return px
+end
+
+local function leg(s: Skin, face: string): Pixels
+	local w, h = Skins.faceSize("Left Leg", face)
+	local pants, shoes = rgb(s.pants), rgb(s.shoes)
+	if face == "Top" then
+		return canvas(w, h, pants, 8)
+	elseif face == "Bottom" then
+		return canvas(w, h, shoes, 9)
+	end
+	local px = canvas(w, h, pants, 10)
+	rows(px, w, h - 2, h - 1, shoes)
+	return px
+end
+
+-- 몸 부위 한 면의 픽셀
+function Skins.face(skin: Skin, partName: string, face: string): (Pixels, number, number)
+	local w, h = Skins.faceSize(partName, face)
+	local px
+	if partName == "Head" then
+		px = head(skin, face)
+	elseif partName == "Torso" then
+		px = torso(skin, face)
+	elseif string.find(partName, "Arm") then
+		px = arm(skin, face)
+	else
+		px = leg(skin, face)
+	end
+	return px, w, h
+end
+
+-- 텍스처가 없을 때 쓰는 부위별 대표 색
+function Skins.partColor(skin: Skin, partName: string): Color3
+	if partName == "Head" then
+		return Skins.color(skin.skin)
+	elseif partName == "Torso" then
+		return Skins.color(skin.shirt)
+	elseif string.find(partName, "Arm") then
+		return if skin.shirtStyle == "vest" then Skins.color(skin.skin) else Skins.color(skin.shirt)
+	end
+	return Skins.color(skin.pants)
+end
+
+return Skins
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="14">
         <Properties>
           <string name="Name">TextureIds</string>
           <string name="Source"><![CDATA[-- (선택) 직접 올린 텍스처 이미지 ID.
@@ -1379,7 +1952,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="12">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">Textures</string>
           <string name="Source"><![CDATA[-- 블록 픽셀 텍스처 (16x16). 이미지 파일 없이 코드로 직접 그린 이 게임만의 텍스처입니다.
@@ -2374,7 +2947,7 @@ return Textures
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">Util</string>
           <string name="Source"><![CDATA[-- 작은 도우미 함수들 (시간 표시, 고정 시드 난수)
@@ -2430,15 +3003,15 @@ return Util
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="14">
+  <Item class="ServerScriptService" referent="17">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="15">
+    <Item class="Folder" referent="18">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">Actions</string>
           <string name="Source"><![CDATA[-- 클라이언트 요청 처리: 블록 설치/부수기, 공격, 아이템 사용, 가방 정리, 상점, 투표
@@ -2459,6 +3032,10 @@ local Containers = require(script.Parent.Containers)
 local Projectiles = require(script.Parent.Projectiles)
 local Explosion = require(script.Parent.Explosion)
 local Drops = require(script.Parent.Drops)
+local Monetization = require(script.Parent.Monetization)
+local PlayerData = require(script.Parent.PlayerData)
+local Skins = require(Shared.Skins)
+local Preferences = require(Shared.Preferences)
 
 local B = Config.BlockSize
 
@@ -2600,6 +3177,7 @@ Net.on("place", function(player, x, y, z)
 		return
 	end
 	Inventory.consumeSlot(state.inv, index, 1)
+	Net.broadcast("swing", player)
 	local record = world:set(x, y, z, def.block, true)
 	local blockDef = Blocks.get(def.block)
 	if record and blockDef and blockDef.tnt then
@@ -2643,6 +3221,7 @@ Net.on("break", function(player, x, y, z)
 		return
 	end
 	state.breaking = nil
+	Net.broadcast("swing", player)
 	world:remove(x, y, z)
 	if match.mode.onBreak then
 		match.mode.onBreak(match, player, record)
@@ -2914,6 +3493,55 @@ Net.on("fall", function(player, blocks)
 	end
 end)
 
+-- 상점: 게임패스 구매 창
+Net.on("buyPass", function(player, key)
+	if type(key) == "string" and Config.Passes[key] then
+		Monetization.prompt(player, key)
+	end
+end)
+
+Net.on("passes", function(player)
+	Monetization.send(player)
+end)
+
+-- 스킨 저장 (기본 스킨이 아니면 커스텀 스킨 패스 필요)
+Net.on("setSkin", function(player, code)
+	local state = Session.get(player)
+	if not state or type(code) ~= "string" or #code > 120 then
+		return
+	end
+	local clean = Skins.encode(Skins.decode(code))
+	if clean ~= Skins.DefaultCode and not Monetization.owns(player, "skin") then
+		Net.send(player, "chat", '<font color="#FF5555">스킨을 바꾸려면 커스텀 스킨 패스가 필요해요.</font>')
+		Monetization.prompt(player, "skin")
+		return
+	end
+	Session.setSkin(player, clean)
+	state.savedSkin = clean
+	Net.send(player, "skinSaved", clean)
+	task.spawn(PlayerData.save, player)
+end)
+
+-- 설정 저장
+Net.on("settings", function(player, settings)
+	local state = Session.get(player)
+	if state and type(settings) == "table" then
+		state.settings = Preferences.sanitize(settings)
+		Net.send(player, "settings", state.settings)
+	end
+end)
+
+-- VIP 날기 중인지 (다른 사람에게 나는 자세로 보이게)
+Net.on("flying", function(player, flying)
+	local state = Session.get(player)
+	local character = player.Character
+	if not state or not character then
+		return
+	end
+	local allowed = flying == true and Monetization.owns(player, "vip") and state.location == "lobby"
+	character:SetAttribute("Flying", allowed)
+end)
+
 Net.on("doubleJump", function(player)
 	local state, match = playing(player)
 	if state and match and match.mode.doubleJump then
@@ -2925,7 +3553,7 @@ return Actions
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">Combat</string>
           <string name="Source"><![CDATA[-- 전투: 피해(갑옷/보호막 적용), 넉백, 근접 공격 판정, 자연 회복
@@ -3113,6 +3741,7 @@ function Combat.melee(attacker: Player, victim: Player)
 		damage *= Config.Combat.CritMultiplier
 		Net.send(attacker, "crit", victim)
 	end
+	Net.broadcast("swing", attacker)
 	local flat = Vector3.new(offset.X, 0, offset.Z)
 	local dir = if flat.Magnitude > 0.05 then flat.Unit else a.root.CFrame.LookVector
 	local knock = dir * Config.Combat.KnockbackH + Vector3.new(0, Config.Combat.KnockbackV, 0)
@@ -3154,7 +3783,7 @@ return Combat
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">Containers</string>
           <string name="Source"><![CDATA[-- 상자 같은 보관함. 여러 명이 동시에 열어도 내용이 같이 바뀝니다.
@@ -3239,7 +3868,7 @@ return Containers
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">Drops</string>
           <string name="Source"><![CDATA[-- 바닥에 떨어진 아이템 꾸러미. 닿으면 주워집니다(스카이워즈에서 죽은 사람 아이템).
@@ -3375,7 +4004,7 @@ return Drops
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">Explosion</string>
           <string name="Source"><![CDATA[-- 폭발 (TNT, 화염구): 주변 블록 파괴 + 피해 + 넉백
@@ -3456,7 +4085,7 @@ return Explosion
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">LobbyService</string>
           <string name="Source"><![CDATA[-- 로비 만들기: 블록 마을, 스폰, 게임 포털(들어가면 참가), NPC, 안내 홀로그램, 승리 순위, 파쿠르
@@ -3753,11 +4382,11 @@ return LobbyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="22">
+      <Item class="Folder" referent="25">
         <Properties>
           <string name="Name">Logic</string>
         </Properties>
-        <Item class="ModuleScript" referent="23">
+        <Item class="ModuleScript" referent="26">
           <Properties>
             <string name="Name">Inventory</string>
             <string name="Source"><![CDATA[-- 플레이어 가방 (마인크래프트처럼 핫바 9칸 + 가방 27칸, 갑옷 4칸, 마우스로 집은 아이템)
@@ -4127,7 +4756,7 @@ return Inventory
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="24">
+        <Item class="ModuleScript" referent="27">
           <Properties>
             <string name="Name">Loot</string>
             <string name="Source"><![CDATA[-- 스카이워즈 상자 아이템 표. weight 가 클수록 자주 나옵니다.
@@ -4272,7 +4901,7 @@ return Loot
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="25">
+        <Item class="ModuleScript" referent="28">
           <Properties>
             <string name="Name">Teams</string>
             <string name="Source"><![CDATA[-- 팀 나누기: 사람 수가 가장 적은 팀부터 채워서 인원을 고르게 맞춥니다.
@@ -4307,7 +4936,7 @@ return Teams
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="26">
+        <Item class="ModuleScript" referent="29">
           <Properties>
             <string name="Name">Vote</string>
             <string name="Source"><![CDATA[-- 맵 투표 집계. 가장 많은 표를 받은 맵, 동점이면 그중에서 무작위로 고릅니다.
@@ -4348,7 +4977,7 @@ return Vote
           </Properties>
         </Item>
       </Item>
-      <Item class="Script" referent="27">
+      <Item class="Script" referent="30">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -4356,18 +4985,47 @@ return Vote
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
+local StarterPlayer = game:GetService("StarterPlayer")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Skins = require(ReplicatedStorage.Shared.Skins)
+local CharacterRig = require(ReplicatedStorage.Shared.CharacterRig)
 local Session = require(script.Parent.Session)
 local Combat = require(script.Parent.Combat)
 local Matches = require(script.Parent.Matches)
 local PlayerData = require(script.Parent.PlayerData)
 local Projectiles = require(script.Parent.Projectiles)
 local LobbyService = require(script.Parent.LobbyService)
+local Monetization = require(script.Parent.Monetization)
+local Net = require(script.Parent.Net)
 require(script.Parent.Actions)
 
 workspace.Gravity = Config.Movement.Gravity
 Players.CharacterAutoLoads = false
+
+-- 모든 플레이어가 블록 캐릭터(머리 정육면체, 네모난 팔다리)로 태어나게
+do
+	local old = StarterPlayer:FindFirstChild("StarterCharacter")
+	if old then
+		old:Destroy()
+	end
+	local rig = CharacterRig.build()
+	rig.Name = "StarterCharacter"
+	rig.Parent = StarterPlayer
+end
+
+-- 패스를 받으면 바로 효과 적용
+Monetization.onGranted = function(player: Player, key: string)
+	local state = Session.get(player)
+	if not state then
+		return
+	end
+	if key == "vip" then
+		Session.refreshNametag(player)
+	elseif key == "skin" and state.savedSkin then
+		Session.setSkin(player, state.savedSkin)
+	end
+end
 
 -- 기본 템플릿(Baseplate)으로 연 경우 남아 있는 바닥/스폰 정리
 for _, name in { "Baseplate", "SpawnLocation" } do
@@ -4411,10 +5069,20 @@ local function onPlayerAdded(player: Player)
 	if Session.get(player) then
 		return
 	end
-	Session.create(player)
+	local state = Session.create(player)
 	Session.attach(player)
-	task.spawn(PlayerData.load, player)
 	Matches.toLobby(player)
+	task.spawn(function()
+		PlayerData.load(player)
+		Monetization.check(player)
+		-- 저장한 커스텀 스킨은 스킨 패스가 있을 때만 입음
+		local saved = state.savedSkin
+		if saved and (Skins.isDefault(saved) or Monetization.owns(player, "skin")) then
+			Session.setSkin(player, saved)
+		end
+		Net.send(player, "settings", state.settings)
+		Net.send(player, "skinSaved", state.savedSkin or state.skin)
+	end)
 	Session.chat({ player }, string.format('<font color="#FFFF55">%s</font>에 오신 걸 환영합니다!', Config.GameName))
 	Session.chat({ player }, "NPC 앞에서 F 키, 또는 나침반을 우클릭해서 미니게임을 고르세요.")
 end
@@ -4458,11 +5126,11 @@ end)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="28">
+      <Item class="Folder" referent="31">
         <Properties>
           <string name="Name">Maps</string>
         </Properties>
-        <Item class="ModuleScript" referent="29">
+        <Item class="ModuleScript" referent="32">
           <Properties>
             <string name="Name">BedWarsMaps</string>
             <string name="Source"><![CDATA[-- 베드워즈 맵 3종.
@@ -4980,7 +5648,7 @@ return {
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="30">
+        <Item class="ModuleScript" referent="33">
           <Properties>
             <string name="Name">Lobby</string>
             <string name="Source"><![CDATA[-- 로비: 큰 떠 있는 섬 위의 마을.
@@ -5226,7 +5894,7 @@ return Lobby
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="31">
+        <Item class="ModuleScript" referent="34">
           <Properties>
             <string name="Name">Rooms</string>
             <string name="Source"><![CDATA[-- 게임 시작 전 대기실과, 탈락한 사람이 구경하는 관전실
@@ -5297,7 +5965,7 @@ return Rooms
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="32">
+        <Item class="ModuleScript" referent="35">
           <Properties>
             <string name="Name">Shapes</string>
             <string name="Source"><![CDATA[-- 맵 그리기 도구: 떠 있는 섬, 나무 여러 종류, 집, 탑, 지붕, 문, 분수, 가판대, 울타리 등.
@@ -6129,7 +6797,7 @@ return Shapes
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="33">
+        <Item class="ModuleScript" referent="36">
           <Properties>
             <string name="Name">SkyWarsMaps</string>
             <string name="Source"><![CDATA[-- 스카이워즈 맵 3종: 시작 섬 8개(작은 집 + 상자 2개), 중간 섬 4개(폐허 + 상자), 큰 가운데 섬(좋은 상자 4개).
@@ -6494,7 +7162,7 @@ return {
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="34">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">TntRunMaps</string>
             <string name="Source"><![CDATA[-- TNT 런 맵 3종: 4층 바닥 + 둘레를 둘러싼 배경 건축물, 맨 아래는 용암.
@@ -6705,7 +7373,7 @@ return {
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">Matches</string>
           <string name="Source"><![CDATA[-- 경기 관리: 대기열 -> 대기실(맵 투표) -> 게임 -> 결과 -> 로비
@@ -6781,7 +7449,8 @@ end
 function Matches.coloredName(player: Player): string
 	local state = Session.get(player)
 	local hex = if state and state.team then Matches.teamHex(state.team) else "#AAAAAA"
-	return string.format('<font color="%s">%s</font>', hex, player.DisplayName)
+	local vip = if Session.isVip(player) then '<font color="#FFD24A">[VIP]</font> ' else ""
+	return string.format('%s<font color="%s">%s</font>', vip, hex, player.DisplayName)
 end
 
 function Matches.inGame(match): { Player }
@@ -6899,6 +7568,7 @@ function Matches.sendVote(match)
 			mine = match.votes[player],
 			locked = match.voteLocked,
 			chosen = if match.map then match.map.id else nil,
+			canVote = Session.isVip(player),
 		})
 	end
 end
@@ -6920,10 +7590,14 @@ local function lockVote(match)
 	end
 	match.map = match.map or match.maps[1]
 	local counts = Vote.counts(match.votes, ids)
-	Session.chat(
-		match.players,
-		string.format('맵 투표 결과: <font color="#FFFF55">%s</font> (%d표)', match.map.name, counts[match.map.id] or 0)
-	)
+	if next(match.votes) then
+		Session.chat(
+			match.players,
+			string.format('<font color="#FFD24A">VIP</font>가 고른 맵: <font color="#FFFF55">%s</font> (%d표)', match.map.name, counts[match.map.id] or 0)
+		)
+	else
+		Session.chat(match.players, string.format('무작위로 정해진 맵: <font color="#FFFF55">%s</font>', match.map.name))
+	end
 	Matches.sendVote(match)
 end
 
@@ -6933,10 +7607,16 @@ function Matches.vote(player: Player, mapId: string)
 	if not match or match.state ~= "waiting" or match.voteLocked then
 		return
 	end
+	-- 맵은 기본적으로 무작위, VIP 만 고를 수 있음 (VIP 가 여럿이면 VIP 끼리 투표)
+	if not Session.isVip(player) then
+		Session.chat({ player }, '<font color="#FFD24A">맵 고르기는 VIP 전용이에요.</font> 왼쪽 위 상점에서 VIP 패키지를 볼 수 있어요.')
+		Net.send(player, "needVip")
+		return
+	end
 	for _, map in match.maps do
 		if map.id == mapId then
 			match.votes[player] = mapId
-			Session.chat({ player }, string.format('<font color="#55FF55">%s</font>에 투표했습니다.', map.name))
+			Session.chat({ player }, string.format('<font color="#55FF55">%s</font>을(를) 골랐습니다.', map.name))
 			Matches.sendVote(match)
 			return
 		end
@@ -7015,7 +7695,11 @@ function Matches.join(player: Player, modeId: string)
 		string.format('<font color="#FFFF55">%s</font>님이 참가했습니다 (%d/%d)', player.DisplayName, #match.players, def.maxPlayers)
 	)
 	Matches.sendVote(match)
-	Net.send(player, "openVote")
+	if Session.isVip(player) then
+		Net.send(player, "openVote")
+	else
+		Session.chat({ player }, '<font color="#AAAAAA">맵은 무작위로 정해집니다. VIP는 원하는 맵을 고를 수 있어요.</font>')
+	end
 end
 
 function Matches.leave(player: Player)
@@ -7353,12 +8037,12 @@ local function sidebarFor(player: Player, state)
 			title = match.def.name,
 			lines = {
 				"",
-				"맵: " .. (if match.map then '<font color="#55FF55">' .. match.map.name .. "</font>" else "투표 중"),
+				"맵: " .. (if match.map then '<font color="#55FF55">' .. match.map.name .. "</font>" elseif next(match.votes) then "VIP 선택 중" else "무작위"),
 				string.format("인원: %d/%d", #match.players, match.def.maxPlayers),
 				"",
 				status,
 				"",
-				'<font color="#AAAAAA">종이 아이템으로 맵 투표</font>',
+				'<font color="#AAAAAA">종이 아이템: 맵 선택 (VIP)</font>',
 			},
 		}
 	elseif match and match.state ~= "waiting" then
@@ -7462,11 +8146,11 @@ return Matches
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="36">
+      <Item class="Folder" referent="39">
         <Properties>
           <string name="Name">Modes</string>
         </Properties>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">BedWars</string>
             <string name="Source"><![CDATA[-- 베드워즈: 4팀, 침대가 있으면 부활, 자원 생성기와 상점, 팀 강화, 시간 이벤트
@@ -8248,7 +8932,7 @@ return BedWars
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">SkyWars</string>
             <string name="Source"><![CDATA[-- 스카이워즈: 유리관에서 시작, 상자에서 장비 수집, 마지막 한 명이 승리
@@ -8581,7 +9265,7 @@ return SkyWars
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">TntRun</string>
             <string name="Source"><![CDATA[-- TNT 런: 밟은 바닥이 잠시 뒤 사라집니다. 더블 점프 3번, 마지막까지 버틴 사람이 승리.
@@ -8721,7 +9405,7 @@ function TntRun.tick(match, dt: number)
 		local root = state and state.root
 		local humanoid = state and state.humanoid
 		if not pd.eliminated and state and state.alive and root and humanoid then
-			local feet = root.Position - Vector3.new(0, humanoid.HipHeight + root.Size.Y / 2 + 0.3, 0)
+			local feet = root.Position - Vector3.new(0, Session.legLength(humanoid) + root.Size.Y / 2 + 0.3, 0)
 			for _, offset in FOOT_OFFSETS do
 				local x, y, z = world:toCell(feet + offset)
 				if data.floors[y] then
@@ -8845,7 +9529,137 @@ return TntRun
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="43">
+        <Properties>
+          <string name="Name">Monetization</string>
+          <string name="Source"><![CDATA[-- 게임패스 (VIP, 커스텀 스킨): 가지고 있는지 확인, 구매 창 띄우기, 산 뒤 바로 지급
+-- 패스 ID 는 Config.Passes 에 적습니다. 스튜디오에서 ID 가 0 이면 시험용으로 바로 지급합니다.
+local MarketplaceService = game:GetService("MarketplaceService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local Session = require(script.Parent.Session)
+local Net = require(script.Parent.Net)
+
+local Monetization = {}
+
+-- 지급되었을 때 할 일 (Main 에서 채움)
+Monetization.onGranted = function(_player: Player, _key: string) end
+
+local prices: { [string]: number } = {}
+
+local function attributeName(key: string): string
+	return "Pass_" .. key
+end
+
+function Monetization.owns(player: Player, key: string): boolean
+	local state = Session.get(player)
+	return state ~= nil and state.passes[key] == true
+end
+
+-- 클라이언트 상점 화면에 보낼 정보
+function Monetization.info(player: Player)
+	local out = {}
+	for _, key in Config.PassOrder do
+		local pass = Config.Passes[key]
+		local studioTest = RunService:IsStudio() and Config.StudioTestPurchases and pass.id == 0
+		out[key] = {
+			owned = Monetization.owns(player, key),
+			price = prices[key] or pass.price,
+			available = pass.id ~= 0 or studioTest,
+			studioTest = studioTest,
+		}
+	end
+	return out
+end
+
+function Monetization.send(player: Player)
+	Net.send(player, "passes", Monetization.info(player))
+end
+
+function Monetization.grant(player: Player, key: string)
+	local state = Session.get(player)
+	if not state or state.passes[key] then
+		return
+	end
+	state.passes[key] = true
+	player:SetAttribute(attributeName(key), true)
+	if key == "vip" then
+		player:SetAttribute("VIP", true)
+	end
+	Monetization.onGranted(player, key)
+	Monetization.send(player)
+end
+
+-- 들어올 때 한 번 확인
+function Monetization.check(player: Player)
+	for key, pass in Config.Passes do
+		if pass.id ~= 0 then
+			local ok, owned = pcall(function()
+				return MarketplaceService:UserOwnsGamePassAsync(player.UserId, pass.id)
+			end)
+			if ok and owned then
+				Monetization.grant(player, key)
+			elseif not ok then
+				warn("[블록 아레나] 패스 확인 실패:", key, owned)
+			end
+		end
+	end
+	Monetization.send(player)
+end
+
+function Monetization.prompt(player: Player, key: string)
+	local pass = Config.Passes[key]
+	if not pass or Monetization.owns(player, key) then
+		return
+	end
+	if pass.id ~= 0 then
+		local ok, err = pcall(function()
+			MarketplaceService:PromptGamePassPurchase(player, pass.id)
+		end)
+		if not ok then
+			warn("[블록 아레나] 구매 창을 열지 못했습니다:", err)
+		end
+	elseif RunService:IsStudio() and Config.StudioTestPurchases then
+		Monetization.grant(player, key)
+		Net.send(player, "chat", string.format('<font color="#FFAA00">(스튜디오 시험) %s을(를) 받은 것으로 처리했어요. 실제 판매는 Config.Passes 에 패스 ID 를 적어야 합니다.</font>', pass.name))
+	else
+		Net.send(player, "chat", '<font color="#FF5555">아직 판매 준비 중인 상품이에요.</font>')
+	end
+end
+
+MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player: Player, passId: number, purchased: boolean)
+	if not purchased then
+		return
+	end
+	for key, pass in Config.Passes do
+		if pass.id ~= 0 and pass.id == passId then
+			Monetization.grant(player, key)
+			Net.send(player, "chat", string.format('<font color="#55FF55">%s 구매 완료! 고마워요.</font>', pass.name))
+		end
+	end
+end)
+
+-- 대시보드에 적힌 실제 가격 가져오기
+task.spawn(function()
+	for key, pass in Config.Passes do
+		if pass.id ~= 0 then
+			local ok, info = pcall(function()
+				return MarketplaceService:GetProductInfoAsync(pass.id, Enum.InfoType.GamePass)
+			end)
+			if ok and type(info) == "table" and type(info.PriceInRobux) == "number" then
+				prices[key] = info.PriceInRobux
+			end
+		end
+	end
+end)
+
+return Monetization
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">Net</string>
           <string name="Source"><![CDATA[-- 서버 <-> 클라이언트 통신. RemoteEvent 두 개만 씁니다.
@@ -8941,7 +9755,7 @@ return Net
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">Npc</string>
           <string name="Source"><![CDATA[-- 블록으로 만든 NPC (상점 주인, 로비 미니게임 안내원)
@@ -9048,7 +9862,7 @@ return Npc
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">PlayerData</string>
           <string name="Source"><![CDATA[-- 승리/처치 기록 저장 (DataStore). 스튜디오에서 API 접근을 꺼 두었으면 저장 없이 그냥 진행합니다.
@@ -9056,6 +9870,8 @@ local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Skins = require(ReplicatedStorage.Shared.Skins)
+local Preferences = require(ReplicatedStorage.Shared.Preferences)
 local Session = require(script.Parent.Session)
 
 local PlayerData = {}
@@ -9136,6 +9952,9 @@ function PlayerData.load(player: Player)
 	if type(data) == "table" then
 		state.stats.wins = tonumber(data.wins) or 0
 		state.stats.kills = tonumber(data.kills) or 0
+		-- 스킨은 패스 확인 뒤에 적용 (savedSkin 에 잠시 보관)
+		state.savedSkin = if type(data.skin) == "string" then Skins.encode(Skins.decode(data.skin)) else nil
+		state.settings = Preferences.sanitize(data.settings)
 	end
 	refresh(player)
 end
@@ -9145,7 +9964,12 @@ function PlayerData.save(player: Player)
 	if not state or disabled or not store or loadFailed[player] then
 		return
 	end
-	local payload = { wins = state.stats.wins, kills = state.stats.kills }
+	local payload = {
+		wins = state.stats.wins,
+		kills = state.stats.kills,
+		skin = state.savedSkin or state.skin,
+		settings = state.settings,
+	}
 	local ok, err = pcall(function()
 		(store :: DataStore):SetAsync(key(player), payload)
 	end)
@@ -9179,7 +10003,7 @@ return PlayerData
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">Projectiles</string>
           <string name="Source"><![CDATA[-- 날아가는 물체 (화살, 눈덩이, 순간이동 진주, 화염구). 서버에서 직접 움직이며 레이캐스트로 맞았는지 확인합니다.
@@ -9341,7 +10165,7 @@ return Projectiles
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">Session</string>
           <string name="Source"><![CDATA[-- 플레이어별 상태(어디에 있는지, 가방, 팀, 마지막으로 때린 사람 등)와 캐릭터 생성/꾸미기
@@ -9351,6 +10175,9 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Items = require(Shared.Items)
+local Skins = require(Shared.Skins)
+local CharacterRig = require(Shared.CharacterRig)
+local Preferences = require(Shared.Preferences)
 local Inventory = require(script.Parent.Logic.Inventory)
 local Net = require(script.Parent.Net)
 
@@ -9384,6 +10211,11 @@ export type State = {
 	deathCause: string?,
 	respawnToken: any,
 	waitingRespawn: boolean,
+	skin: string, -- 스킨 코드 (Skins.encode)
+	savedSkin: string?, -- 저장해 둔 커스텀 스킨 (패스가 없으면 입지는 못하고 보관만)
+	settings: { [string]: any },
+	passes: { [string]: boolean },
+	armorKey: string,
 }
 
 local states: { [Player]: State } = {}
@@ -9392,9 +10224,7 @@ local states: { [Player]: State } = {}
 Session.onDied = function(_player: Player, _state: State) end
 Session.onSpawned = function(_player: Player, _state: State, _character: Model) end
 
-local SKIN = Color3.fromRGB(240, 198, 160)
-local DEFAULT_SHIRT = Color3.fromRGB(60, 150, 190)
-local DEFAULT_PANTS = Color3.fromRGB(52, 54, 120)
+local NEUTRAL = Color3.fromRGB(235, 235, 235)
 
 function Session.create(player: Player): State
 	local state: State = {
@@ -9425,8 +10255,14 @@ function Session.create(player: Player): State
 		deathCause = nil,
 		respawnToken = nil,
 		waitingRespawn = false,
+		skin = Skins.DefaultCode,
+		savedSkin = nil,
+		settings = Preferences.defaults(),
+		passes = {},
+		armorKey = "",
 	}
 	states[player] = state
+	player:SetAttribute("Skin", state.skin)
 	return state
 end
 
@@ -9450,25 +10286,35 @@ function Session.teamColor(state: State): Color3
 			end
 		end
 	end
-	return DEFAULT_SHIRT
+	return NEUTRAL
 end
 
-local function colorCharacter(character: Model, shirt: Color3)
-	for _, part in character:GetChildren() do
-		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-			local name = part.Name
-			if name == "Head" or string.find(name, "Hand") or string.find(name, "LowerArm") then
-				part.Color = SKIN
-			elseif string.find(name, "Leg") or string.find(name, "Foot") then
-				part.Color = DEFAULT_PANTS
-			else
-				part.Color = shirt
-			end
+function Session.isVip(player: Player): boolean
+	local state = states[player]
+	return state ~= nil and state.passes.vip == true
+end
+
+-- 다리 길이 (R6 블록 캐릭터는 HipHeight 가 0 이고 다리가 2스터드)
+function Session.legLength(humanoid: Humanoid): number
+	if humanoid.RigType == Enum.HumanoidRigType.R6 then
+		return 2
+	end
+	return humanoid.HipHeight
+end
+
+-- 텍스처가 없을 때도 보이는 기본 색 (클라이언트가 그 위에 픽셀 스킨을 입힘)
+local function colorCharacter(character: Model, skinCode: string)
+	local skin = Skins.decode(skinCode)
+	for _, name in CharacterRig.BodyParts do
+		local part = character:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			part.Color = Skins.partColor(skin, name)
 		end
 	end
 end
 
-local function nametag(character: Model, player: Player, color: Color3)
+-- 머리 위 이름표: 팀 색 이름, VIP 는 앞에 금색 [VIP]
+local function nametag(character: Model, player: Player, color: Color3, vip: boolean)
 	local head = character:FindFirstChild("Head")
 	if not head then
 		return
@@ -9479,8 +10325,8 @@ local function nametag(character: Model, player: Player, color: Color3)
 	end
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Nametag"
-	gui.Size = UDim2.new(6, 0, 1, 0)
-	gui.StudsOffset = Vector3.new(0, 2.4, 0)
+	gui.Size = UDim2.new(if vip then 8 else 6, 0, 1, 0)
+	gui.StudsOffset = Vector3.new(0, 2.2, 0)
 	gui.MaxDistance = 70
 	gui.LightInfluence = 0
 	local label = Instance.new("TextLabel")
@@ -9490,10 +10336,58 @@ local function nametag(character: Model, player: Player, color: Color3)
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.Font = Enum.Font.Arcade
 	label.TextScaled = true
+	label.RichText = true
 	label.TextColor3 = color
-	label.Text = player.DisplayName
+	label.Text = (if vip then '<font color="#FFD24A">[VIP]</font> ' else "") .. player.DisplayName
 	label.Parent = gui
 	gui.Parent = head
+end
+
+function Session.refreshNametag(player: Player)
+	local state = states[player]
+	if state and state.character then
+		nametag(state.character, player, if state.team then Session.teamColor(state) else Color3.new(1, 1, 1), state.passes.vip == true)
+	end
+end
+
+-- 스킨 바꾸기 (검사는 부르는 쪽에서)
+function Session.setSkin(player: Player, code: string)
+	local state = states[player]
+	if not state then
+		return
+	end
+	state.skin = Skins.encode(Skins.decode(code))
+	player:SetAttribute("Skin", state.skin)
+	if state.character then
+		colorCharacter(state.character, state.skin)
+	end
+end
+
+-- 입은 갑옷을 다른 사람에게도 보이게 캐릭터 속성으로 적어 둠 (예: "helmet=leather:FF5555;chestplate=iron")
+-- 베드워즈 가죽 갑옷은 팀 색으로 물들임
+function Session.refreshArmor(state: State)
+	local character = state.character
+	if not character then
+		return
+	end
+	local dye = if state.team then Session.teamColor(state):ToHex() else nil
+	local parts = {}
+	for _, slot in Items.ArmorSlots do
+		local id = state.inv.armor[slot]
+		local def = if id then Items.get(id) else nil
+		if def and def.armorTier then
+			local entry = slot .. "=" .. def.armorTier
+			if def.armorTier == "leather" and dye then
+				entry ..= ":" .. dye
+			end
+			table.insert(parts, entry)
+		end
+	end
+	local key = table.concat(parts, ";")
+	if key ~= state.armorKey or character:GetAttribute("Armor") ~= key then
+		state.armorKey = key
+		character:SetAttribute("Armor", key)
+	end
 end
 
 -- 들고 있는 아이템을 오른손에 보이게 붙입니다.
@@ -9617,9 +10511,11 @@ local function onCharacterAdded(player: Player, character: Model)
 		root.AssemblyLinearVelocity = Vector3.zero
 	end
 
-	colorCharacter(character, Session.teamColor(state))
-	nametag(character, player, if state.team then Session.teamColor(state) else Color3.new(1, 1, 1))
+	colorCharacter(character, state.skin)
+	nametag(character, player, if state.team then Session.teamColor(state) else Color3.new(1, 1, 1), state.passes.vip == true)
+	state.armorKey = ""
 	Session.refreshHeld(state)
+	Session.refreshArmor(state)
 
 	humanoid.Died:Connect(function()
 		if state.character ~= character then
@@ -9666,6 +10562,7 @@ RunService.Heartbeat:Connect(function()
 			state.inv.dirty = false
 			Net.send(player, "inv", Inventory.serialize(state.inv))
 			Session.refreshHeld(state)
+			Session.refreshArmor(state)
 		end
 	end
 end)
@@ -9674,7 +10571,7 @@ return Session
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">World</string>
           <string name="Source"><![CDATA[-- 블록 월드: 격자 좌표(x, y, z)마다 블록 하나.
@@ -10101,12 +10998,12 @@ return World
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="46">
+  <Item class="SoundService" referent="50">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="47">
+  <Item class="StarterPlayer" referent="51">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">12</float>
@@ -10117,11 +11014,19 @@ return World
       <bool name="EnableMouseLockOption">false</bool>
       <bool name="LoadCharacterAppearance">false</bool>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="48">
+    <Item class="StarterCharacterScripts" referent="52">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="Script" referent="49">
+      <Item class="LocalScript" referent="53">
+        <Properties>
+          <string name="Name">Animate</string>
+          <string name="Source"><![CDATA[-- 로블록스 기본 걷기 애니메이션 스크립트를 대신합니다(비워 두면 기본 애니메이션이 꺼짐).
+-- 마인크래프트처럼 팔다리를 흔드는 움직임은 클라이언트의 CharacterVisuals 모듈이 직접 만듭니다.
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="Script" referent="54">
         <Properties>
           <string name="Name">Health</string>
           <token name="RunContext">0</token>
@@ -10131,15 +11036,15 @@ return World
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="50">
+    <Item class="StarterPlayerScripts" referent="55">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="51">
+      <Item class="Folder" referent="56">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">BlockTextures</string>
             <string name="Source"><![CDATA[-- 블록에 픽셀 텍스처 붙이기 (클라이언트)
@@ -10161,7 +11066,7 @@ local TextureIds = require(Shared:WaitForChild("TextureIds"))
 local B = Config.BlockSize
 local SCALE = 4 -- 16픽셀을 64픽셀로 키워서 덜 흐리게
 local CHUNK = 8 * B
-local RADIUS = 130
+local radius = 130
 local BUDGET = 260 -- 한 프레임에 처리할 블록 수
 
 local BlockTextures = {}
@@ -10375,6 +11280,11 @@ function BlockTextures.load()
 	end
 end
 
+-- 설정: 텍스처 거리 (끄려면 음수)
+function BlockTextures.setRadius(r: number)
+	radius = r
+end
+
 function BlockTextures.source(name: string): Source?
 	return sources[name]
 end
@@ -10398,12 +11308,12 @@ function BlockTextures.init()
 			local focus = if camera then camera.CFrame.Position else Vector3.zero
 			for _, chunk in chunks do
 				local distance = (chunk.center - focus).Magnitude
-				if not chunk.active and distance < RADIUS then
+				if not chunk.active and distance < radius then
 					chunk.active = true
 					for part in chunk.parts do
 						table.insert(queue, { part, true })
 					end
-				elseif chunk.active and distance > RADIUS + 48 then
+				elseif chunk.active and distance > radius + 48 then
 					chunk.active = false
 					for part in chunk.parts do
 						table.insert(queue, { part, false })
@@ -10432,7 +11342,407 @@ return BlockTextures
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="58">
+          <Properties>
+            <string name="Name">CharacterVisuals</string>
+            <string name="Source"><![CDATA[-- 캐릭터 꾸미기 (클라이언트): 픽셀 스킨 입히기, 입은 갑옷 보여 주기, 마인크래프트식 팔다리 흔들기
+local AssetService = game:GetService("AssetService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Skins = require(Shared:WaitForChild("Skins"))
+local CharacterRig = require(Shared:WaitForChild("CharacterRig"))
+local Net = require(script.Parent.Net)
+
+local localPlayer = Players.LocalPlayer
+
+local CharacterVisuals = {}
+
+local SCALE = 4
+local FACES = { "Front", "Back", "Left", "Right", "Top", "Bottom" }
+local NORMALS = {
+	Front = Enum.NormalId.Front,
+	Back = Enum.NormalId.Back,
+	Left = Enum.NormalId.Left,
+	Right = Enum.NormalId.Right,
+	Top = Enum.NormalId.Top,
+	Bottom = Enum.NormalId.Bottom,
+}
+local ARMOR_COLORS = {
+	leather = Color3.fromRGB(150, 96, 56),
+	chain = Color3.fromRGB(150, 154, 166),
+	iron = Color3.fromRGB(214, 214, 220),
+	diamond = Color3.fromRGB(90, 220, 214),
+}
+
+local imageCache: { [string]: any } = {}
+local imagesBroken = false
+local nametagsVisible = true
+
+type Rig = {
+	model: Model,
+	root: BasePart,
+	motors: { [string]: Motor6D },
+	phase: number,
+	seed: number,
+	swingStart: number?,
+}
+local rigs: { [Model]: Rig } = {}
+
+local function pixelKey(px: { number }, w: number, h: number): string
+	local hash = 7
+	for i = 1, #px do
+		hash = (hash * 31 + px[i]) % 2147483647
+	end
+	return w .. "x" .. h .. ":" .. hash
+end
+
+-- 픽셀 배열 -> 텍스처 내용 (같은 그림은 한 번만 만듦)
+local function makeImage(px: { number }, w: number, h: number): any
+	if imagesBroken then
+		return nil
+	end
+	local key = pixelKey(px, w, h)
+	local cached = imageCache[key]
+	if cached ~= nil then
+		return cached
+	end
+	local ok, result = pcall(function()
+		local iw, ih = w * SCALE, h * SCALE
+		local image = AssetService:CreateEditableImage({ Size = Vector2.new(iw, ih) })
+		if not image then
+			return nil
+		end
+		local buf = buffer.create(iw * ih * 4)
+		for y = 0, ih - 1 do
+			local row = (y // SCALE) * w
+			for x = 0, iw - 1 do
+				local src = (row + x // SCALE) * 4
+				local dst = (y * iw + x) * 4
+				buffer.writeu8(buf, dst, px[src + 1])
+				buffer.writeu8(buf, dst + 1, px[src + 2])
+				buffer.writeu8(buf, dst + 2, px[src + 3])
+				buffer.writeu8(buf, dst + 3, px[src + 4])
+			end
+		end
+		image:WritePixelsBuffer(Vector2.zero, Vector2.new(iw, ih), buf)
+		return Content.fromObject(image)
+	end)
+	if not ok or result == nil then
+		imagesBroken = true
+		return nil
+	end
+	imageCache[key] = result
+	return result
+end
+
+local function faceStuds(size: Vector3, face: string): (number, number)
+	if face == "Front" or face == "Back" then
+		return size.X, size.Y
+	elseif face == "Left" or face == "Right" then
+		return size.Z, size.Y
+	end
+	return size.X, size.Z
+end
+
+local function smallPart(parent: Instance, name: string, size: Vector3, color: Color3, attach: BasePart, offset: CFrame)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.Color = color
+	p.Material = Enum.Material.SmoothPlastic
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	p.CastShadow = false
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.CFrame = attach.CFrame * offset
+	local weld = Instance.new("Weld")
+	weld.Part0 = attach
+	weld.Part1 = p
+	weld.C0 = offset
+	weld.Parent = p
+	p.Parent = parent
+	return p
+end
+
+-- 스킨 입히기: 픽셀 텍스처가 되면 면마다 붙이고, 안 되면 색 + 눈/머리카락 조각으로 대신함
+function CharacterVisuals.applySkin(model: Model, code: string)
+	local skin = Skins.decode(code)
+	local textured = true
+	for _, name in CharacterRig.BodyParts do
+		local part = model:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			part.Color = Skins.partColor(skin, name)
+			for _, child in part:GetChildren() do
+				if child.Name == "SK" then
+					child:Destroy()
+				end
+			end
+			for _, face in FACES do
+				local px, w, h = Skins.face(skin, name, face)
+				local content = makeImage(px, w, h)
+				if not content then
+					textured = false
+					break
+				end
+				local t = Instance.new("Texture")
+				t.Name = "SK"
+				t.Face = NORMALS[face]
+				local u, v = faceStuds(part.Size, face)
+				t.StudsPerTileU = u
+				t.StudsPerTileV = v
+				t.TextureContent = content
+				t.Parent = part
+			end
+		end
+	end
+	if not textured then
+		-- 도중에 실패했으면 붙인 텍스처를 모두 떼고 색 방식으로
+		for _, name in CharacterRig.BodyParts do
+			local part = model:FindFirstChild(name)
+			if part then
+				for _, child in part:GetChildren() do
+					if child.Name == "SK" then
+						child:Destroy()
+					end
+				end
+			end
+		end
+	end
+	local old = model:FindFirstChild("SkinDetail")
+	if old then
+		old:Destroy()
+	end
+	local head = model:FindFirstChild("Head")
+	if not textured and head and head:IsA("BasePart") then
+		-- 텍스처를 못 쓰면 작은 조각으로 눈과 머리카락을 표시
+		local folder = Instance.new("Folder")
+		folder.Name = "SkinDetail"
+		local s = head.Size
+		local eye = Skins.color(skin.eyes)
+		local white = Color3.fromRGB(245, 245, 245)
+		local px = s.X / 8
+		for _, e in { { -2.5, white }, { -1.5, eye }, { 1.5, eye }, { 2.5, white } } do
+			smallPart(folder, "Eye", Vector3.new(px, px, 0.05), e[2], head, CFrame.new(e[1] * px, -0.5 * px, -s.Z / 2 - 0.02))
+		end
+		if skin.hairStyle ~= "bald" then
+			local hairColor = if skin.hairStyle == "cap" then Skins.color(skin.shirt) else Skins.color(skin.hair)
+			smallPart(folder, "Hair", Vector3.new(s.X + 0.06, px * 2 + 0.03, s.Z + 0.06), hairColor, head, CFrame.new(0, s.Y / 2 - px, 0))
+			if skin.hairStyle ~= "cap" then
+				local length = if skin.hairStyle == "long" then 8 else 5
+				smallPart(folder, "HairBack", Vector3.new(s.X + 0.06, px * length, 0.08), hairColor, head, CFrame.new(0, s.Y / 2 - px * length / 2, s.Z / 2 + 0.02))
+			end
+		end
+		folder.Parent = model
+	end
+end
+
+-- 갑옷 겉모습 (캐릭터 속성 "Armor": "helmet=leather:ff5555;chestplate=iron")
+local function overlay(folder: Instance, part: BasePart, fromTop: number, toTop: number, color: Color3, tier: string)
+	local s = part.Size
+	local height = s.Y * (toTop - fromTop)
+	local offsetY = s.Y / 2 - (fromTop + toTop) / 2 * s.Y
+	local piece = smallPart(folder, "ArmorPiece", Vector3.new(s.X + 0.14, height + 0.08, s.Z + 0.14), color, part, CFrame.new(0, offsetY, 0))
+	if tier == "iron" or tier == "chain" then
+		piece.Material = Enum.Material.Metal
+	end
+	if tier == "chain" then
+		piece.Transparency = 0.25
+	end
+end
+
+function CharacterVisuals.applyArmor(model: Model, key: string)
+	local old = model:FindFirstChild("ArmorVisual")
+	if old then
+		old:Destroy()
+	end
+	if key == "" then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "ArmorVisual"
+	local function bodyPart(name: string): BasePart?
+		local p = model:FindFirstChild(name)
+		return if p and p:IsA("BasePart") then p else nil
+	end
+	for entry in string.gmatch(key, "[^;]+") do
+		local slot, tier, dye = string.match(entry, "^(%a+)=(%a+):?(%x*)$")
+		if slot and tier then
+			local color = if dye and #dye == 6 then Color3.fromHex(dye) else (ARMOR_COLORS[tier] or ARMOR_COLORS.iron)
+			local function cover(name: string, a: number, b: number)
+				local p = bodyPart(name)
+				if p then
+					overlay(folder, p, a, b, color, tier)
+				end
+			end
+			if slot == "helmet" then
+				cover("Head", 0, 0.55)
+			elseif slot == "chestplate" then
+				cover("Torso", 0, 0.8)
+				cover("Left Arm", 0, 0.4)
+				cover("Right Arm", 0, 0.4)
+			elseif slot == "leggings" then
+				cover("Torso", 0.8, 1)
+				cover("Left Leg", 0, 0.7)
+				cover("Right Leg", 0, 0.7)
+			elseif slot == "boots" then
+				cover("Left Leg", 0.7, 1)
+				cover("Right Leg", 0.7, 1)
+			end
+		end
+	end
+	folder.Parent = model
+end
+
+local function setNametag(model: Model)
+	local head = model:FindFirstChild("Head")
+	local tag = head and head:FindFirstChild("Nametag")
+	if tag and tag:IsA("BillboardGui") then
+		tag.Enabled = nametagsVisible
+	end
+end
+
+function CharacterVisuals.setNametagsVisible(visible: boolean)
+	nametagsVisible = visible
+	for model in rigs do
+		if model ~= localPlayer.Character then
+			setNametag(model)
+		end
+	end
+end
+
+-- 공격/설치할 때 오른팔 휘두르기
+function CharacterVisuals.swing(player: Player)
+	local model = player.Character
+	local rig = if model then rigs[model] else nil
+	if rig then
+		rig.swingStart = os.clock()
+	end
+end
+
+local function setup(player: Player, model: Model)
+	local root = model:WaitForChild("HumanoidRootPart", 10)
+	local torso = model:WaitForChild("Torso", 10)
+	if not root or not torso or not root:IsA("BasePart") then
+		return
+	end
+	local motors = {}
+	for _, name in { "Right Shoulder", "Left Shoulder", "Right Hip", "Left Hip", "Neck" } do
+		local m = torso:WaitForChild(name, 5)
+		if m and m:IsA("Motor6D") then
+			motors[name] = m
+		end
+	end
+	rigs[model] = { model = model, root = root, motors = motors, phase = 0, seed = player.UserId % 100 }
+	model.Destroying:Connect(function()
+		rigs[model] = nil
+	end)
+
+	for _, name in CharacterRig.BodyParts do
+		model:WaitForChild(name, 5)
+	end
+	local function skin()
+		local code = player:GetAttribute("Skin")
+		CharacterVisuals.applySkin(model, if type(code) == "string" then code else Skins.DefaultCode)
+	end
+	local function armor()
+		local key = model:GetAttribute("Armor")
+		CharacterVisuals.applyArmor(model, if type(key) == "string" then key else "")
+	end
+	skin()
+	armor()
+	local skinConn = player:GetAttributeChangedSignal("Skin"):Connect(skin)
+	model.AncestryChanged:Connect(function()
+		if not model.Parent then
+			skinConn:Disconnect()
+		end
+	end)
+	model:GetAttributeChangedSignal("Armor"):Connect(armor)
+	-- 이름표는 서버가 조금 늦게 붙일 수 있어서 몇 번 확인
+	if player ~= localPlayer then
+		task.delay(1, function()
+			setNametag(model)
+		end)
+		task.delay(3, function()
+			setNametag(model)
+		end)
+	end
+end
+
+local function watchPlayer(player: Player)
+	if player.Character then
+		task.spawn(setup, player, player.Character)
+	end
+	player.CharacterAdded:Connect(function(model)
+		setup(player, model)
+	end)
+end
+
+function CharacterVisuals.init()
+	for _, player in Players:GetPlayers() do
+		watchPlayer(player)
+	end
+	Players.PlayerAdded:Connect(watchPlayer)
+
+	Net.on("swing", function(player)
+		if typeof(player) == "Instance" and player:IsA("Player") and player ~= localPlayer then
+			CharacterVisuals.swing(player)
+		end
+	end)
+
+	-- 마인크래프트처럼 걸을 때 팔다리를 앞뒤로 흔듦
+	RunService.Stepped:Connect(function(_, dt)
+		local now = os.clock()
+		for model, rig in rigs do
+			if not model.Parent or not rig.root.Parent then
+				continue
+			end
+			local v = rig.root.AssemblyLinearVelocity
+			local speed = Vector3.new(v.X, 0, v.Z).Magnitude
+			local amount = math.clamp(speed / 16, 0, 1)
+			rig.phase += dt * (5 + speed * 0.35)
+			local swing = math.sin(rig.phase) * 0.85 * amount
+			local idle = math.sin(now * 1.7 + rig.seed) * 0.05
+			local attack = 0
+			if rig.swingStart then
+				local t = (now - rig.swingStart) / 0.3
+				if t < 1 then
+					attack = math.sin(t * math.pi) * 1.4
+				else
+					rig.swingStart = nil
+				end
+			end
+			local flying = model:GetAttribute("Flying") == true
+			local m = rig.motors
+			if flying then
+				swing = math.sin(now * 3 + rig.seed) * 0.12
+			end
+			if m["Right Shoulder"] then
+				m["Right Shoulder"].Transform = CFrame.Angles(swing + attack, 0, idle * 0.5)
+			end
+			if m["Left Shoulder"] then
+				m["Left Shoulder"].Transform = CFrame.Angles(-swing, 0, -idle * 0.5)
+			end
+			if m["Right Hip"] then
+				m["Right Hip"].Transform = CFrame.Angles(if flying then 0.15 else -swing, 0, 0)
+			end
+			if m["Left Hip"] then
+				m["Left Hip"].Transform = CFrame.Angles(if flying then 0.15 else swing, 0, 0)
+			end
+		end
+	end)
+end
+
+return CharacterVisuals
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">Controls</string>
             <string name="Source"><![CDATA[-- 조작: 조준(블록/사람), 왼쪽 클릭 공격·부수기, 오른쪽 클릭 설치·사용, 숫자키 핫바, 단축키, 모바일 버튼
@@ -10450,10 +11760,12 @@ local State = require(script.Parent.State)
 local Hud = require(script.Parent.UI.Hud)
 local Windows = require(script.Parent.UI.Windows)
 local Theme = require(script.Parent.UI.Theme)
+local CharacterVisuals = require(script.Parent.CharacterVisuals)
 
 local player = Players.LocalPlayer
 
 local Controls = {}
+Controls.onCameraChanged = function(_thirdPerson: boolean) end
 
 local thirdPerson = false
 local attackHeld = false
@@ -10589,6 +11901,7 @@ end
 local function tryAttack()
 	if target and target.kind == "player" and target.player and State.context.pvp then
 		lastAttack = os.clock()
+		CharacterVisuals.swing(player)
 		Net.send("attack", target.player)
 		return true
 	end
@@ -10602,6 +11915,7 @@ local function tryPlace()
 	end
 	if target and target.kind == "block" and target.place then
 		local p = target.place
+		CharacterVisuals.swing(player)
 		Net.send("place", p[1], p[2], p[3])
 		lastPlace = os.clock()
 		return true
@@ -10650,6 +11964,13 @@ local function toggleCamera()
 		player.CameraMinZoomDistance = 0.5
 		player.CameraMaxZoomDistance = 0.5
 		player.CameraMode = Enum.CameraMode.LockFirstPerson
+	end
+	Controls.onCameraChanged(thirdPerson)
+end
+
+function Controls.setThirdPerson(third: boolean)
+	if third ~= thirdPerson then
+		toggleCamera()
 	end
 end
 
@@ -10869,7 +12190,7 @@ return Controls
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[-- 꾸밈 효과: 생성기 블록 회전, 효과음
@@ -10883,6 +12204,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local Net = require(script.Parent.Net)
 
 local Effects = {}
+Effects.enabled = true
 
 -- 효과음 이름 -> (소리, 속도)
 local SOUNDS: { [string]: { string | number } } = {
@@ -10901,7 +12223,7 @@ local pool: { [string]: Sound } = {}
 
 function Effects.play(name: string)
 	local entry = SOUNDS[name]
-	if not entry then
+	if not entry or not Effects.enabled then
 		return
 	end
 	local sound = pool[name]
@@ -10941,12 +12263,207 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="55">
+        <Item class="ModuleScript" referent="61">
+          <Properties>
+            <string name="Name">Flight</string>
+            <string name="Source"><![CDATA[-- VIP 로비 날기: 스페이스를 빠르게 두 번 누르면 날기 켜기/끄기.
+-- 날 때: WASD 로 이동, 스페이스로 위, Shift(또는 Ctrl)로 아래. 모바일은 설정 탭의 날기 버튼과 점프 버튼.
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Net = require(script.Parent.Net)
+local State = require(script.Parent.State)
+
+local player = Players.LocalPlayer
+
+local Flight = {}
+
+local flying = false
+local lastSpace = 0
+local attachment: Attachment? = nil
+local velocity: LinearVelocity? = nil
+local align: AlignOrientation? = nil
+local controls: any = nil
+
+Flight.onChanged = function(_flying: boolean) end
+
+local function parts(): (Humanoid?, BasePart?)
+	local char = player.Character
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	if humanoid and root and root:IsA("BasePart") then
+		return humanoid, root
+	end
+	return nil, nil
+end
+
+function Flight.allowed(): boolean
+	return player:GetAttribute("VIP") == true and State.context.location == "lobby" and State.settings.fly ~= false
+end
+
+function Flight.isFlying(): boolean
+	return flying
+end
+
+function Flight.stop()
+	if not flying then
+		return
+	end
+	flying = false
+	for _, thing in { velocity, align, attachment } do
+		if thing then
+			thing:Destroy()
+		end
+	end
+	velocity, align, attachment = nil, nil, nil
+	local humanoid = parts()
+	if humanoid then
+		humanoid.PlatformStand = false
+	end
+	Net.send("flying", false)
+	Flight.onChanged(false)
+end
+
+function Flight.start()
+	if flying or not Flight.allowed() then
+		return
+	end
+	local humanoid, root = parts()
+	if not humanoid or not root or humanoid.Health <= 0 then
+		return
+	end
+	flying = true
+	local a = Instance.new("Attachment")
+	a.Name = "FlyAttachment"
+	a.Parent = root
+	local v = Instance.new("LinearVelocity")
+	v.Name = "FlyVelocity"
+	v.Attachment0 = a
+	v.MaxForce = 1e7
+	v.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+	v.RelativeTo = Enum.ActuatorRelativeTo.World
+	v.VectorVelocity = Vector3.zero
+	v.Parent = root
+	local o = Instance.new("AlignOrientation")
+	o.Name = "FlyAlign"
+	o.Mode = Enum.OrientationAlignmentMode.OneAttachment
+	o.Attachment0 = a
+	o.MaxTorque = 1e7
+	o.Responsiveness = 30
+	o.CFrame = CFrame.Angles(0, select(2, root.CFrame:ToEulerAnglesYXZ()), 0)
+	o.Parent = root
+	attachment, velocity, align = a, v, o
+	humanoid.PlatformStand = true
+	Net.send("flying", true)
+	Flight.onChanged(true)
+end
+
+function Flight.toggle()
+	if flying then
+		Flight.stop()
+	else
+		Flight.start()
+	end
+end
+
+-- 카메라 기준 이동 방향 (키보드, 패드, 모바일 조이스틱 모두)
+local function moveDirection(humanoid: Humanoid): Vector3
+	if controls == nil then
+		local ok, result = pcall(function()
+			local module = player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule", 5)
+			return if module then (require(module :: any) :: any):GetControls() else false
+		end)
+		controls = if ok and result then result else false
+	end
+	if controls then
+		local ok, mv = pcall(function()
+			return controls:GetMoveVector()
+		end)
+		if ok and typeof(mv) == "Vector3" and mv.Magnitude > 0.01 then
+			local cam = workspace.CurrentCamera.CFrame
+			local look = Vector3.new(cam.LookVector.X, 0, cam.LookVector.Z)
+			local right = Vector3.new(cam.RightVector.X, 0, cam.RightVector.Z)
+			if look.Magnitude > 0.01 then
+				look = look.Unit
+			end
+			if right.Magnitude > 0.01 then
+				right = right.Unit
+			end
+			local dir = right * mv.X - look * mv.Z
+			return if dir.Magnitude > 1 then dir.Unit else dir
+		end
+	end
+	return humanoid.MoveDirection
+end
+
+function Flight.init()
+	UserInputService.InputBegan:Connect(function(input, processed)
+		if processed or input.KeyCode ~= Enum.KeyCode.Space then
+			return
+		end
+		local now = os.clock()
+		if now - lastSpace < 0.32 then
+			lastSpace = 0
+			if Flight.allowed() or flying then
+				Flight.toggle()
+			end
+		else
+			lastSpace = now
+		end
+	end)
+
+	player.CharacterAdded:Connect(function()
+		flying = false
+		velocity, align, attachment = nil, nil, nil
+		Flight.onChanged(false)
+	end)
+
+	RunService.Heartbeat:Connect(function()
+		if not flying then
+			return
+		end
+		local humanoid, root = parts()
+		if not humanoid or not root or not velocity or not align or humanoid.Health <= 0 or not Flight.allowed() then
+			Flight.stop()
+			return
+		end
+		local horizontal = moveDirection(humanoid) * Config.Fly.Speed
+		local up = 0
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) or humanoid.Jump then
+			up += Config.Fly.Vertical
+		end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+			up -= Config.Fly.Vertical
+		end
+		local ceiling = Config.LobbyOrigin.Y + Config.Fly.MaxHeight
+		if root.Position.Y > ceiling and up > 0 then
+			up = 0
+		end
+		velocity.VectorVelocity = horizontal + Vector3.new(0, up, 0)
+		local cam = workspace.CurrentCamera.CFrame
+		local yaw = math.atan2(-cam.LookVector.X, -cam.LookVector.Z)
+		align.CFrame = CFrame.Angles(0, yaw, 0)
+	end)
+end
+
+return Flight
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="LocalScript" referent="62">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- 클라이언트 시작점: 화면을 만들고 서버 메시지를 화면에 연결합니다.
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local StarterGui = game:GetService("StarterGui")
+local TextChatService = game:GetService("TextChatService")
+
+local Preferences = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Preferences"))
 
 local Net = require(script.Parent.Net)
 local State = require(script.Parent.State)
@@ -10956,6 +12473,8 @@ local Controls = require(script.Parent.Controls)
 local Movement = require(script.Parent.Movement)
 local Effects = require(script.Parent.Effects)
 local BlockTextures = require(script.Parent.BlockTextures)
+local CharacterVisuals = require(script.Parent.CharacterVisuals)
+local Flight = require(script.Parent.Flight)
 
 local player = Players.LocalPlayer
 
@@ -10980,6 +12499,68 @@ Controls.init()
 Movement.init()
 Effects.init()
 task.spawn(BlockTextures.init)
+CharacterVisuals.init()
+Flight.init()
+
+-- 설정: 서버에서 받은 값을 화면/조작에 적용
+State.settings = Preferences.defaults()
+local function applySettings()
+	local s = State.settings
+	Controls.setThirdPerson(s.camera == "third")
+	BlockTextures.setRadius(if s.textures then Preferences.TextureRadius[s.textureDistance] or 130 else -1000)
+	Effects.enabled = s.sounds ~= false
+	CharacterVisuals.setNametagsVisible(s.nametags ~= false)
+	Hud.setChatVisible(s.chatFeed ~= false)
+	if s.fly == false then
+		Flight.stop()
+	end
+end
+applySettings()
+
+Windows.onSetting = function(key: string, value: any)
+	State.settings[key] = value
+	applySettings()
+	Net.send("settings", State.settings)
+end
+Windows.onFlyToggle = function()
+	Flight.toggle()
+end
+Controls.onCameraChanged = function(third: boolean)
+	local mode = if third then "third" else "first"
+	if State.settings.camera ~= mode then
+		State.settings.camera = mode
+		Net.send("settings", State.settings)
+		Windows.refresh()
+	end
+end
+
+-- 왼쪽 위 상점/스킨/설정 버튼
+Hud.onMenu = function(name: string)
+	if Windows.kind() == name then
+		Windows.close()
+	elseif name == "store" then
+		Windows.openStore()
+	elseif name == "skins" then
+		Windows.openSkins()
+	else
+		Windows.openSettings()
+	end
+end
+
+-- 채팅창에서 VIP 이름 앞에 [VIP]
+pcall(function()
+	TextChatService.OnIncomingMessage = function(message: TextChatMessage)
+		local props = Instance.new("TextChatMessageProperties")
+		local source = message.TextSource
+		if source then
+			local speaker = Players:GetPlayerByUserId(source.UserId)
+			if speaker and speaker:GetAttribute("VIP") == true then
+				props.PrefixText = '<font color="#FFD24A">[VIP]</font> ' .. message.PrefixText
+			end
+		end
+		return props
+	end
+end)
 
 local HINTS = {
 	lobby = "F: NPC  ·  우클릭: 아이템 사용  ·  V: 시점  ·  1~9: 핫바",
@@ -11084,6 +12665,28 @@ Net.on("closeChest", function()
 	end
 end)
 
+Net.on("settings", function(data)
+	State.settings = Preferences.sanitize(data)
+	applySettings()
+	Windows.refresh()
+end)
+
+Net.on("passes", function(info)
+	State.passes = if type(info) == "table" then info else {}
+	Windows.refresh()
+end)
+
+Net.on("skinSaved", function(code)
+	if type(code) == "string" then
+		State.skinCode = code
+		Windows.refresh()
+	end
+end)
+
+Net.on("needVip", function()
+	Windows.openStore()
+end)
+
 Net.on("crit", function()
 	Hud.actionbar('<font color="#FFAA00">치명타!</font>', 0.8)
 end)
@@ -11093,7 +12696,7 @@ Hud.setStatusVisible(false)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">Movement</string>
             <string name="Source"><![CDATA[-- 움직임: 달리기(Ctrl), 웅크리기(Shift, 가장자리에서 안 떨어짐), 더블 점프(TNT 런), 낙하 피해, 넉백
@@ -11249,7 +12852,8 @@ function Movement.init()
 		local char = player.Character :: Model
 		local grounded = humanoid.FloorMaterial ~= Enum.Material.Air
 		if sneak and State.context.location == "match" then
-			local depth = humanoid.HipHeight + root.Size.Y / 2 + 1.2
+			local leg = if humanoid.RigType == Enum.HumanoidRigType.R6 then 2 else humanoid.HipHeight
+			local depth = leg + root.Size.Y / 2 + 1.2
 			if grounded and groundBelow(root.Position, char, depth) then
 				lastSafe = root.CFrame
 			elseif lastSafe and not grounded and root.AssemblyLinearVelocity.Y <= 0 then
@@ -11270,7 +12874,7 @@ return Movement
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[-- 클라이언트 통신: 서버 메시지를 종류별로 나눠 전달하고, 요청을 보냅니다.
@@ -11310,7 +12914,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">State</string>
             <string name="Source"><![CDATA[-- 클라이언트가 알고 있는 현재 상태 (가방, 어디에 있는지, 투표 정보 등)
@@ -11328,6 +12932,9 @@ State.vote = nil :: any
 State.lobbyInfo = {} :: { [string]: { waiting: number, playing: number } }
 State.shop = nil :: any
 State.chest = nil :: { id: number, title: string, slots: { [number]: Stack? } }?
+State.passes = {} :: { [string]: { owned: boolean, price: number, available: boolean, studioTest: boolean } }
+State.settings = {} :: { [string]: any } -- Main 에서 기본값으로 채움
+State.skinCode = "" -- 저장된 내 스킨
 
 local listeners: { [string]: { () -> () } } = {}
 
@@ -11374,11 +12981,11 @@ return State
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="59">
+        <Item class="Folder" referent="66">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="60">
+          <Item class="ModuleScript" referent="67">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- 게임 화면: 조준점, 핫바, 하트, 갑옷, 오른쪽 점수판, 가운데 큰 글씨, 채팅 알림, 액션바
@@ -11422,6 +13029,7 @@ local actionToken = 0
 local itemNameToken = 0
 
 Hud.onSlotClicked = function(_index: number) end
+Hud.onMenu = function(_name: string) end
 
 local function heartWidget(parent: Instance, x: number, color: Color3, emptyColor: Color3?)
 	local holder = create("Frame", {
@@ -11663,9 +13271,40 @@ function Hud.init(playerGui: Instance)
 	})
 
 	-- 왼쪽 위 키 안내
+	-- 왼쪽 위 메뉴 버튼 (로블록스 기본 버튼 줄 바로 아래)
+	local menu = create("Frame", {
+		Name = "Menu",
+		Position = UDim2.fromOffset(12, 64),
+		Size = UDim2.fromOffset(300, 34),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	})
+	create("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		Padding = UDim.new(0, 8),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Parent = menu,
+	})
+	for i, entry in { { "store", "상점", Color3.fromRGB(200, 150, 30) }, { "skins", "스킨", Color3.fromRGB(60, 130, 190) }, { "settings", "설정", C.Button } } do
+		local button = Theme.button(entry[2], {
+			Name = entry[1],
+			Size = UDim2.fromOffset(84, 32),
+			LayoutOrder = i,
+			BackgroundColor3 = entry[3],
+			Parent = menu,
+		})
+		local base = entry[3]
+		button.MouseLeave:Connect(function()
+			button.BackgroundColor3 = base
+		end)
+		button.MouseButton1Click:Connect(function()
+			Hud.onMenu(entry[1])
+		end)
+	end
+
 	hintLabel = create("TextLabel", {
 		Name = "Hint",
-		Position = UDim2.fromOffset(10, 62),
+		Position = UDim2.fromOffset(12, 104),
 		Size = UDim2.fromOffset(520, 18),
 		BackgroundTransparency = 1,
 		Font = Theme.Font,
@@ -11848,6 +13487,10 @@ function Hud.actionbar(text: string, duration: number?)
 	end
 end
 
+function Hud.setChatVisible(visible: boolean)
+	chatFrame.Visible = visible
+end
+
 function Hud.setHint(text: string)
 	hintLabel.Text = text
 end
@@ -11860,7 +13503,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="61">
+          <Item class="ModuleScript" referent="68">
             <Properties>
               <string name="Name">IconRender</string>
               <string name="Source"><![CDATA[-- 픽셀 아이콘 그리기: 같은 색이 이어지는 칸은 한 프레임으로 합쳐서 프레임 수를 줄입니다.
@@ -11990,7 +13633,7 @@ return IconRender
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="62">
+          <Item class="ModuleScript" referent="69">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[-- 마인크래프트 느낌의 화면 부품: 회색 입체 창, 움푹 들어간 칸, 그림자 글씨, 버튼
@@ -12218,7 +13861,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="63">
+          <Item class="ModuleScript" referent="70">
             <Properties>
               <string name="Name">Windows</string>
               <string name="Source"><![CDATA[-- 마인크래프트식 창: 가방(E), 상자, 상점, 팀 강화, 맵 투표, 게임 선택
@@ -12230,10 +13873,14 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Items = require(Shared:WaitForChild("Items"))
 local Shop = require(Shared:WaitForChild("Shop"))
+local Skins = require(Shared:WaitForChild("Skins"))
+local CharacterRig = require(Shared:WaitForChild("CharacterRig"))
+local Preferences = require(Shared:WaitForChild("Preferences"))
 local Theme = require(script.Parent.Theme)
 local IconRender = require(script.Parent.IconRender)
 local State = require(script.Parent.Parent.State)
 local Net = require(script.Parent.Parent.Net)
+local CharacterVisuals = require(script.Parent.Parent.CharacterVisuals)
 
 local create = Theme.create
 local C = Theme.Colors
@@ -12254,6 +13901,9 @@ local cursorIcon: Frame
 local shopCategory = 1
 
 Windows.onChanged = function(_open: boolean) end
+-- 설정 버튼을 눌렀을 때 (Main 에서 채움: 적용 + 서버에 저장)
+Windows.onSetting = function(_key: string, _value: any) end
+Windows.onFlyToggle = function() end
 
 local function hex(color: Color3): string
 	return "#" .. color:ToHex()
@@ -12722,7 +14372,7 @@ function Windows.openVote()
 	end
 	local count = #vote.maps
 	local width = 420
-	local frame = window("맵 투표", width, 70 + count * 58 + 30)
+	local frame = window("맵 선택 (VIP)", width, 70 + count * 58 + 70)
 	local buttons = {}
 	for i, map in vote.maps do
 		local button = Theme.button("", {
@@ -12736,11 +14386,21 @@ function Windows.openVote()
 		end)
 	end
 	local footer = heading(frame, "", 44 + count * 58, width)
+	local vipButton = Theme.button("VIP 패키지 보기", {
+		Position = UDim2.fromOffset(16, 70 + count * 58),
+		Size = UDim2.fromOffset(width - 32, 36),
+		BackgroundColor3 = Color3.fromRGB(200, 150, 30),
+		Parent = frame,
+	})
+	vipButton.MouseButton1Click:Connect(function()
+		Windows.openStore()
+	end)
 	table.insert(refreshers, function()
 		local v = State.vote
 		if not v then
 			return
 		end
+		vipButton.Visible = not v.canVote and not v.locked
 		for i, map in v.maps do
 			local button = buttons[i]
 			if button then
@@ -12752,7 +14412,13 @@ function Windows.openVote()
 				end
 			end
 		end
-		footer.Text = if v.locked then '<font color="#AA0000">투표가 끝났습니다</font>' else '<font color="#555555">가장 많은 표를 받은 맵에서 게임을 합니다</font>'
+		if v.locked then
+			footer.Text = '<font color="#AA0000">맵이 정해졌습니다</font>'
+		elseif v.canVote then
+			footer.Text = '<font color="#555555">VIP 가 고른 맵에서 게임을 합니다 (아무도 안 고르면 무작위)</font>'
+		else
+			footer.Text = '<font color="#AA6600">맵은 무작위로 정해집니다. VIP 는 원하는 맵을 고를 수 있어요.</font>'
+		end
 	end)
 	open("vote", frame)
 	Windows.refresh()
@@ -12814,6 +14480,327 @@ function Windows.openGames()
 		end
 	end)
 	open("games", frame)
+	Windows.refresh()
+end
+
+----------------------------------------------------------------------------
+-- 상점 (게임패스)
+----------------------------------------------------------------------------
+local function card(parent: Instance, x: number, y: number, w: number, h: number): Frame
+	local f = create("Frame", {
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(w, h),
+		BackgroundColor3 = Color3.fromRGB(170, 170, 170),
+		BorderSizePixel = 0,
+		Parent = parent,
+	})
+	create("UIStroke", { Color = Color3.fromRGB(85, 85, 85), Thickness = 2, Parent = f })
+	return f
+end
+
+local function text(parent: Instance, value: string, x: number, y: number, w: number, h: number, size: number, color: Color3?)
+	return create("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(w, h),
+		Font = Theme.Font,
+		TextSize = size,
+		TextWrapped = true,
+		RichText = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextColor3 = color or C.Text,
+		Text = value,
+		Parent = parent,
+	})
+end
+
+function Windows.openStore()
+	local width = 16 + #Config.PassOrder * 272
+	local frame = window("상점", width, 340)
+	local buttons = {}
+	local prices = {}
+	for i, key in Config.PassOrder do
+		local pass = Config.Passes[key]
+		local c = card(frame, 16 + (i - 1) * 272, 40, 256, 284)
+		local slot = Theme.slot(56)
+		slot.Position = UDim2.fromOffset(10, 10)
+		slot.Parent = c
+		local icon = IconRender.draw(pass.icon, pass.color)
+		icon.Parent = slot:FindFirstChild("Icon")
+		text(c, pass.name, 76, 12, 170, 24, 20, C.Text)
+		prices[key] = text(c, "", 76, 38, 170, 22, 18, Color3.fromRGB(30, 120, 30))
+		for j, perk in pass.perks do
+			text(c, "· " .. perk, 12, 76 + (j - 1) * 40, 236, 38, 16, C.Text)
+		end
+		local button = Theme.button("", {
+			Position = UDim2.fromOffset(12, 232),
+			Size = UDim2.fromOffset(232, 40),
+			BackgroundColor3 = Color3.fromRGB(60, 140, 60),
+			Parent = c,
+		})
+		buttons[key] = button
+		button.MouseButton1Click:Connect(function()
+			local info = State.passes[key]
+			if info and info.owned then
+				if key == "skin" then
+					Windows.openSkins()
+				end
+			else
+				Net.send("buyPass", key)
+			end
+		end)
+	end
+	table.insert(refreshers, function()
+		for _, key in Config.PassOrder do
+			local info = State.passes[key]
+			local pass = Config.Passes[key]
+			local price = if info then info.price else pass.price
+			prices[key].Text = string.format("R$ %d", price)
+			local label = buttons[key]:FindFirstChild("Label") :: TextLabel?
+			local value
+			if info and info.owned then
+				value = if key == "skin" then "스킨 꾸미기" else '<font color="#FFFF55">보유 중</font>'
+			elseif info and not info.available then
+				value = "준비 중"
+			elseif info and info.studioTest then
+				value = "구매 (스튜디오 시험)"
+			else
+				value = string.format("구매  R$ %d", price)
+			end
+			if label then
+				label.Text = value
+			end
+		end
+	end)
+	open("store", frame)
+	Net.send("passes")
+	Windows.refresh()
+end
+
+----------------------------------------------------------------------------
+-- 스킨 꾸미기
+----------------------------------------------------------------------------
+function Windows.openSkins()
+	local width, height = 640, 430
+	local frame = window("스킨 꾸미기", width, height)
+	local draft = Skins.decode(if State.skinCode ~= "" then State.skinCode else Skins.DefaultCode)
+
+	-- 미리보기 인형 (천천히 돌아감)
+	local viewport = create("ViewportFrame", {
+		Position = UDim2.fromOffset(16, 40),
+		Size = UDim2.fromOffset(200, 300),
+		BackgroundColor3 = Color3.fromRGB(130, 178, 230),
+		Ambient = Color3.fromRGB(170, 170, 170),
+		LightColor = Color3.new(1, 1, 1),
+		LightDirection = Vector3.new(-1, -1, 1),
+		Parent = frame,
+	})
+	create("UIStroke", { Color = C.SlotDark, Thickness = 2, Parent = viewport })
+	local camera = Instance.new("Camera")
+	camera.FieldOfView = 30
+	camera.CFrame = CFrame.lookAt(Vector3.new(0, 3.2, -12), Vector3.new(0, 2.6, 0))
+	camera.Parent = viewport
+	viewport.CurrentCamera = camera
+	local doll = CharacterRig.build(CFrame.new(0, 3, 0), false)
+	doll.Parent = viewport
+	local angle = 0
+	local spin
+	spin = RunService.RenderStepped:Connect(function(dt)
+		if not frame.Parent then
+			spin:Disconnect()
+			return
+		end
+		angle += dt * 0.8
+		doll:PivotTo(CFrame.new(0, 3, 0) * CFrame.Angles(0, math.sin(angle) * 0.9, 0))
+	end)
+
+	local swatches: { [string]: { [string]: GuiObject } } = {}
+	local styleButtons: { [string]: { [string]: TextButton } } = {}
+	local status = text(frame, "", 232, 350, 392, 22, 16, C.Text)
+	local save = Theme.button("", {
+		Position = UDim2.fromOffset(232, 380),
+		Size = UDim2.fromOffset(250, 36),
+		BackgroundColor3 = Color3.fromRGB(60, 140, 60),
+		Parent = frame,
+	})
+	local reset = Theme.button("기본으로", {
+		Position = UDim2.fromOffset(492, 380),
+		Size = UDim2.fromOffset(132, 36),
+		Parent = frame,
+	})
+
+	local function owned(): boolean
+		local info = State.passes.skin
+		return info ~= nil and info.owned
+	end
+
+	local function render()
+		local code = Skins.encode(draft)
+		CharacterVisuals.applySkin(doll, code)
+		for key, list in swatches do
+			for hex, swatch in list do
+				local stroke = swatch:FindFirstChildOfClass("UIStroke")
+				if stroke then
+					local selected = (draft :: any)[key] == hex
+					stroke.Color = if selected then Color3.new(1, 1, 1) else Color3.fromRGB(40, 40, 40)
+					stroke.Thickness = if selected then 3 else 1
+				end
+			end
+		end
+		for key, list in styleButtons do
+			for value, button in list do
+				button.BackgroundColor3 = if (draft :: any)[key] == value then Color3.fromRGB(60, 120, 60) else C.Button
+			end
+		end
+		local saveLabel = save:FindFirstChild("Label") :: TextLabel?
+		local isDefault = code == Skins.DefaultCode
+		if saveLabel then
+			if owned() or isDefault then
+				saveLabel.Text = if code == State.skinCode then "저장됨" else "저장하기"
+			else
+				local info = State.passes.skin
+				saveLabel.Text = string.format("구매하고 저장 (R$ %d)", if info then info.price else Config.Passes.skin.price)
+			end
+		end
+		status.Text = if owned()
+			then '<font color="#1E7A1E">커스텀 스킨 패스 보유 중</font>'
+			else '<font color="#8A5A00">입어 보기는 무료! 저장하려면 커스텀 스킨 패스가 필요해요.</font>'
+	end
+
+	-- 색 고르기 줄
+	for row, key in Skins.ColorOrder do
+		local y = 40 + (row - 1) * 30
+		text(frame, Skins.ColorNames[key], 232, y + 3, 64, 22, 16, C.Text)
+		swatches[key] = {}
+		for i, hex in Skins.Palettes[key] do
+			local swatch = create("TextButton", {
+				AutoButtonColor = false,
+				Text = "",
+				BackgroundColor3 = Color3.fromHex(hex),
+				BorderSizePixel = 0,
+				Position = UDim2.fromOffset(300 + (i - 1) * 27, y),
+				Size = UDim2.fromOffset(24, 24),
+				Parent = frame,
+			})
+			create("UIStroke", { Color = Color3.fromRGB(40, 40, 40), Thickness = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = swatch })
+			swatches[key][hex] = swatch
+			swatch.MouseButton1Click:Connect(function()
+				(draft :: any)[key] = hex
+				render()
+			end)
+		end
+	end
+	-- 모양 고르기 줄
+	local styleRows = {
+		{ key = "hairStyle", label = "머리", values = Skins.HairStyles, names = Skins.HairStyleNames },
+		{ key = "shirtStyle", label = "옷 모양", values = Skins.ShirtStyles, names = Skins.ShirtStyleNames },
+	}
+	for row, info in styleRows do
+		local y = 222 + (row - 1) * 36
+		text(frame, info.label, 232, y + 6, 64, 22, 16, C.Text)
+		styleButtons[info.key] = {}
+		for i, value in info.values do
+			local button = Theme.button(info.names[value], {
+				Position = UDim2.fromOffset(300 + (i - 1) * 82, y),
+				Size = UDim2.fromOffset(78, 30),
+				Parent = frame,
+			})
+			styleButtons[info.key][value] = button
+			button.MouseLeave:Connect(function()
+				render()
+			end)
+			button.MouseButton1Click:Connect(function()
+				(draft :: any)[info.key] = value
+				render()
+			end)
+		end
+	end
+	-- 프리셋
+	text(frame, "프리셋", 232, 300, 64, 22, 16, C.Text)
+	for i, preset in Skins.Presets do
+		local button = Theme.button(preset.name, {
+			Position = UDim2.fromOffset(300 + (i - 1) * 66, 296),
+			Size = UDim2.fromOffset(62, 30),
+			Parent = frame,
+		})
+		button.MouseButton1Click:Connect(function()
+			draft = Skins.sanitize(preset.skin :: any)
+			render()
+		end)
+	end
+
+	save.MouseButton1Click:Connect(function()
+		local code = Skins.encode(draft)
+		if owned() or code == Skins.DefaultCode then
+			Net.send("setSkin", code)
+		else
+			Net.send("buyPass", "skin")
+		end
+	end)
+	reset.MouseButton1Click:Connect(function()
+		draft = Skins.decode(Skins.DefaultCode)
+		render()
+	end)
+
+	table.insert(refreshers, render)
+	open("skins", frame)
+	Net.send("passes")
+	render()
+end
+
+----------------------------------------------------------------------------
+-- 설정
+----------------------------------------------------------------------------
+function Windows.openSettings()
+	local items = Preferences.Items
+	local width = 460
+	local frame = window("설정", width, 50 + #items * 40 + 56)
+	local buttons = {}
+	for i, item in items do
+		local y = 40 + (i - 1) * 40
+		text(frame, item.name, 18, y + 6, 220, 24, 18, C.Text)
+		local button = Theme.button("", {
+			Position = UDim2.fromOffset(240, y),
+			Size = UDim2.fromOffset(200, 34),
+			Parent = frame,
+		})
+		buttons[item.key] = button
+		button.MouseButton1Click:Connect(function()
+			if item.vip and not (State.passes.vip and State.passes.vip.owned) then
+				Windows.openStore()
+				return
+			end
+			local current = State.settings[item.key]
+			local index = table.find(item.choices, current) or 1
+			local nextValue = item.choices[index % #item.choices + 1]
+			Windows.onSetting(item.key, nextValue)
+			Windows.refresh()
+		end)
+	end
+	local flyButton = Theme.button("지금 날기 / 내려오기", {
+		Position = UDim2.fromOffset(18, 50 + #items * 40),
+		Size = UDim2.fromOffset(width - 36, 36),
+		BackgroundColor3 = Color3.fromRGB(200, 150, 30),
+		Parent = frame,
+	})
+	flyButton.MouseButton1Click:Connect(function()
+		Windows.onFlyToggle()
+	end)
+	table.insert(refreshers, function()
+		local vip = State.passes.vip and State.passes.vip.owned
+		for _, item in items do
+			local label = buttons[item.key]:FindFirstChild("Label") :: TextLabel?
+			if label then
+				if item.vip and not vip then
+					label.Text = '<font color="#FFD24A">VIP 전용</font>'
+				else
+					label.Text = tostring(item.labels[State.settings[item.key]] or State.settings[item.key])
+				end
+			end
+		end
+		flyButton.Visible = vip == true and State.context.location == "lobby" and State.settings.fly ~= false
+	end)
+	open("settings", frame)
 	Windows.refresh()
 end
 
@@ -12900,7 +14887,7 @@ return Windows
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="64">
+  <Item class="Workspace" referent="71">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">130</float>

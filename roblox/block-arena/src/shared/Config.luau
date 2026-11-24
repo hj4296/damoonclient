@@ -128,6 +128,36 @@ Config.TntRun = {
 	TimeLimit = 600,
 }
 
+-- 게임패스: 크리에이터 대시보드(create.roblox.com) → 내 게임 → 수익 창출 → 패스 에서 만들고,
+-- 받은 숫자 ID 를 id 에 적으세요. 실제 가격은 대시보드에서 정한 값이 쓰이고, price 는 ID 가 없을 때 보여 줄 값입니다.
+Config.Passes = {
+	vip = {
+		id = 0,
+		name = "VIP 패키지",
+		price = 199,
+		icon = "crown",
+		color = Color3.fromRGB(255, 200, 40),
+		perks = { "로비에서 날기 (스페이스 두 번)", "이름 옆 [VIP] 칭호", "게임 전에 원하는 맵 고르기" },
+	},
+	skin = {
+		id = 0,
+		name = "커스텀 스킨",
+		price = 67,
+		icon = "shirt",
+		color = Color3.fromRGB(90, 200, 255),
+		perks = { "피부·머리카락·눈·옷·바지·신발 색", "머리 모양과 옷 모양 바꾸기", "스킨 프리셋 5가지" },
+	},
+}
+Config.PassOrder = { "vip", "skin" }
+-- 스튜디오에서 패스 ID 가 0 이면 "구매" 버튼으로 바로 받아서 기능을 시험해 볼 수 있습니다(실제 게임에서는 안 됨).
+Config.StudioTestPurchases = true
+
+Config.Fly = {
+	Speed = 34,
+	Vertical = 26,
+	MaxHeight = 140, -- 로비 바닥에서 이 높이(스터드) 위로는 못 올라감
+}
+
 Config.Sounds = {
 	Hit = "rbxasset://sounds/swordslash.wav",
 	Click = "rbxasset://sounds/electronicpingshort.wav",

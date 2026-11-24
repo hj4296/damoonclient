@@ -17,7 +17,7 @@ local TextureIds = require(Shared:WaitForChild("TextureIds"))
 local B = Config.BlockSize
 local SCALE = 4 -- 16픽셀을 64픽셀로 키워서 덜 흐리게
 local CHUNK = 8 * B
-local RADIUS = 130
+local radius = 130
 local BUDGET = 260 -- 한 프레임에 처리할 블록 수
 
 local BlockTextures = {}
@@ -231,6 +231,11 @@ function BlockTextures.load()
 	end
 end
 
+-- 설정: 텍스처 거리 (끄려면 음수)
+function BlockTextures.setRadius(r: number)
+	radius = r
+end
+
 function BlockTextures.source(name: string): Source?
 	return sources[name]
 end
@@ -254,12 +259,12 @@ function BlockTextures.init()
 			local focus = if camera then camera.CFrame.Position else Vector3.zero
 			for _, chunk in chunks do
 				local distance = (chunk.center - focus).Magnitude
-				if not chunk.active and distance < RADIUS then
+				if not chunk.active and distance < radius then
 					chunk.active = true
 					for part in chunk.parts do
 						table.insert(queue, { part, true })
 					end
-				elseif chunk.active and distance > RADIUS + 48 then
+				elseif chunk.active and distance > radius + 48 then
 					chunk.active = false
 					for part in chunk.parts do
 						table.insert(queue, { part, false })

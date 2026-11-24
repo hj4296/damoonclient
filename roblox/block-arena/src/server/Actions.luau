@@ -16,6 +16,10 @@ local Containers = require(script.Parent.Containers)
 local Projectiles = require(script.Parent.Projectiles)
 local Explosion = require(script.Parent.Explosion)
 local Drops = require(script.Parent.Drops)
+local Monetization = require(script.Parent.Monetization)
+local PlayerData = require(script.Parent.PlayerData)
+local Skins = require(Shared.Skins)
+local Preferences = require(Shared.Preferences)
 
 local B = Config.BlockSize
 
@@ -157,6 +161,7 @@ Net.on("place", function(player, x, y, z)
 		return
 	end
 	Inventory.consumeSlot(state.inv, index, 1)
+	Net.broadcast("swing", player)
 	local record = world:set(x, y, z, def.block, true)
 	local blockDef = Blocks.get(def.block)
 	if record and blockDef and blockDef.tnt then
@@ -200,6 +205,7 @@ Net.on("break", function(player, x, y, z)
 		return
 	end
 	state.breaking = nil
+	Net.broadcast("swing", player)
 	world:remove(x, y, z)
 	if match.mode.onBreak then
 		match.mode.onBreak(match, player, record)
@@ -469,6 +475,55 @@ Net.on("fall", function(player, blocks)
 	if damage > 0 then
 		Combat.damage(player, damage, { cause = "fall", ignoreArmor = true })
 	end
+end)
+
+-- 상점: 게임패스 구매 창
+Net.on("buyPass", function(player, key)
+	if type(key) == "string" and Config.Passes[key] then
+		Monetization.prompt(player, key)
+	end
+end)
+
+Net.on("passes", function(player)
+	Monetization.send(player)
+end)
+
+-- 스킨 저장 (기본 스킨이 아니면 커스텀 스킨 패스 필요)
+Net.on("setSkin", function(player, code)
+	local state = Session.get(player)
+	if not state or type(code) ~= "string" or #code > 120 then
+		return
+	end
+	local clean = Skins.encode(Skins.decode(code))
+	if clean ~= Skins.DefaultCode and not Monetization.owns(player, "skin") then
+		Net.send(player, "chat", '<font color="#FF5555">스킨을 바꾸려면 커스텀 스킨 패스가 필요해요.</font>')
+		Monetization.prompt(player, "skin")
+		return
+	end
+	Session.setSkin(player, clean)
+	state.savedSkin = clean
+	Net.send(player, "skinSaved", clean)
+	task.spawn(PlayerData.save, player)
+end)
+
+-- 설정 저장
+Net.on("settings", function(player, settings)
+	local state = Session.get(player)
+	if state and type(settings) == "table" then
+		state.settings = Preferences.sanitize(settings)
+		Net.send(player, "settings", state.settings)
+	end
+end)
+
+-- VIP 날기 중인지 (다른 사람에게 나는 자세로 보이게)
+Net.on("flying", function(player, flying)
+	local state = Session.get(player)
+	local character = player.Character
+	if not state or not character then
+		return
+	end
+	local allowed = flying == true and Monetization.owns(player, "vip") and state.location == "lobby"
+	character:SetAttribute("Flying", allowed)
 end)
 
 Net.on("doubleJump", function(player)

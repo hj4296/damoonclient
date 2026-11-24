@@ -3,6 +3,8 @@ local DataStoreService = game:GetService("DataStoreService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Skins = require(ReplicatedStorage.Shared.Skins)
+local Preferences = require(ReplicatedStorage.Shared.Preferences)
 local Session = require(script.Parent.Session)
 
 local PlayerData = {}
@@ -83,6 +85,9 @@ function PlayerData.load(player: Player)
 	if type(data) == "table" then
 		state.stats.wins = tonumber(data.wins) or 0
 		state.stats.kills = tonumber(data.kills) or 0
+		-- 스킨은 패스 확인 뒤에 적용 (savedSkin 에 잠시 보관)
+		state.savedSkin = if type(data.skin) == "string" then Skins.encode(Skins.decode(data.skin)) else nil
+		state.settings = Preferences.sanitize(data.settings)
 	end
 	refresh(player)
 end
@@ -92,7 +97,12 @@ function PlayerData.save(player: Player)
 	if not state or disabled or not store or loadFailed[player] then
 		return
 	end
-	local payload = { wins = state.stats.wins, kills = state.stats.kills }
+	local payload = {
+		wins = state.stats.wins,
+		kills = state.stats.kills,
+		skin = state.savedSkin or state.skin,
+		settings = state.settings,
+	}
 	local ok, err = pcall(function()
 		(store :: DataStore):SetAsync(key(player), payload)
 	end)

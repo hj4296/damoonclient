@@ -157,12 +157,12 @@ add("compass", {
 	lore = { "우클릭으로 미니게임 고르기" },
 })
 add("vote_paper", {
-	name = "맵 투표",
+	name = "맵 선택 (VIP)",
 	kind = "menu",
 	action = "vote",
 	icon = "paper",
 	color = rgb(240, 240, 230),
-	lore = { "우클릭으로 맵 투표" },
+	lore = { "우클릭으로 맵 고르기", "VIP 가 없으면 맵은 무작위" },
 })
 add("leave_bed", {
 	name = "로비로 돌아가기",
