@@ -41,6 +41,8 @@ type Rig = {
 	phase: number,
 	seed: number,
 	swingStart: number?,
+	invisible: boolean,
+	local_: boolean,
 }
 local rigs: { [Model]: Rig } = {}
 
@@ -252,12 +254,29 @@ function CharacterVisuals.applyArmor(model: Model, key: string)
 	folder.Parent = model
 end
 
+local function isInvisible(model: Model): boolean
+	local player = Players:GetPlayerFromCharacter(model)
+	local ends = player and player:GetAttribute("FX_invis")
+	return type(ends) == "number" and ends > workspace:GetServerTimeNow()
+end
+
 local function setNametag(model: Model)
 	local head = model:FindFirstChild("Head")
 	local tag = head and head:FindFirstChild("Nametag")
 	if tag and tag:IsA("BillboardGui") then
-		tag.Enabled = nametagsVisible
+		tag.Enabled = nametagsVisible and not isInvisible(model)
 	end
+end
+
+-- 투명화 물약: 다른 사람 눈에는 몸, 갑옷, 손에 든 것, 이름표가 모두 안 보임
+local function applyInvisible(model: Model, invisible: boolean)
+	local value = if invisible then 1 else 0
+	for _, d in model:GetDescendants() do
+		if (d:IsA("BasePart") and d.Name ~= "HumanoidRootPart") or d:IsA("Decal") then
+			(d :: any).LocalTransparencyModifier = value
+		end
+	end
+	setNametag(model)
 end
 
 function CharacterVisuals.setNametagsVisible(visible: boolean)
@@ -291,7 +310,7 @@ local function setup(player: Player, model: Model)
 			motors[name] = m
 		end
 	end
-	rigs[model] = { model = model, root = root, motors = motors, phase = 0, seed = player.UserId % 100 }
+	rigs[model] = { model = model, root = root, motors = motors, phase = 0, seed = player.UserId % 100, invisible = false, local_ = player == localPlayer }
 	model.Destroying:Connect(function()
 		rigs[model] = nil
 	end)
@@ -345,6 +364,25 @@ function CharacterVisuals.init()
 	Net.on("swing", function(player)
 		if typeof(player) == "Instance" and player:IsA("Player") and player ~= localPlayer then
 			CharacterVisuals.swing(player)
+		end
+	end)
+
+	-- 투명화 확인 (0.25초마다, 새로 붙은 갑옷도 다시 숨김)
+	local invisTimer = 0
+	RunService.Heartbeat:Connect(function(dt)
+		invisTimer += dt
+		if invisTimer < 0.25 then
+			return
+		end
+		invisTimer = 0
+		for model, rig in rigs do
+			if model.Parent and not rig.local_ then
+				local invisible = isInvisible(model)
+				if invisible or invisible ~= rig.invisible then
+					rig.invisible = invisible
+					applyInvisible(model, invisible)
+				end
+			end
 		end
 	end)
 

@@ -40,6 +40,10 @@ globals:
     any: true
   NumberSequence:
     any: true
+  NumberSequenceKeypoint:
+    any: true
+  OverlapParams:
+    any: true
   ColorSequence:
     any: true
   Content:

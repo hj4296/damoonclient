@@ -1,4 +1,4 @@
--- 조작: 조준(블록/사람), 왼쪽 클릭 공격·부수기, 오른쪽 클릭 설치·사용, 숫자키 핫바, 단축키, 모바일 버튼
+-- 조작: 조준(블록/사람/몹), 왼쪽 클릭 공격·부수기, 오른쪽 클릭 설치·사용(물약/양동이/낚싯대), 숫자키 핫바, 단축키, 모바일 버튼
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -34,9 +34,11 @@ local selection: SelectionBox
 export type Target = {
 	kind: string,
 	player: Player?,
+	mobId: number?,
 	part: BasePart?,
 	cell: { number }?,
 	place: { number }?,
+	normal: { number }?,
 }
 local target: Target? = nil
 
@@ -80,6 +82,14 @@ local function playerFromPart(part: BasePart): Player?
 	return nil
 end
 
+-- 물/용암처럼 통과하는 블록은 조준할 때 건너뜀 (그 너머 블록에 놓거나 부술 수 있게)
+local FLUIDS = { water = true, water_source = true, lava = true, lava_flow = true }
+
+local function mobFromPart(part: BasePart): number?
+	local id = part:GetAttribute("MobId")
+	return if type(id) == "number" then id else nil
+end
+
 local function aimRay(): Ray
 	local camera = workspace.CurrentCamera
 	local size = camera.ViewportSize
@@ -102,10 +112,26 @@ local function updateTarget()
 	end
 	params.FilterDescendantsInstances = exclude
 	local result = workspace:Raycast(ray.Origin, ray.Direction * 60, params)
+	for _ = 1, 4 do
+		if result and (FLUIDS[result.Instance.Name] or FLUIDS[result.Instance:GetAttribute("BlockId") or ""]) then
+			params:AddToFilter(result.Instance)
+			result = workspace:Raycast(ray.Origin, ray.Direction * 60, params)
+		else
+			break
+		end
+	end
 	if not result then
 		return
 	end
 	local head = root.Position + Vector3.new(0, 1.5, 0)
+	local mobId = mobFromPart(result.Instance)
+	if mobId then
+		local reach = Config.Reach.Attack + (if result.Instance.Parent and result.Instance.Parent:GetAttribute("MobKind") == "dragon" then 5 else 1)
+		if (result.Position - head).Magnitude <= reach then
+			target = { kind = "mob", mobId = mobId }
+		end
+		return
+	end
 	local other = playerFromPart(result.Instance)
 	if other and other ~= player then
 		local otherRoot = other.Character and other.Character:FindFirstChild("HumanoidRootPart")
@@ -127,6 +153,7 @@ local function updateTarget()
 		part = block,
 		cell = { x, y, z },
 		place = { x + math.round(n.X), y + math.round(n.Y), z + math.round(n.Z) },
+		normal = { math.round(n.X), math.round(n.Y), math.round(n.Z) },
 	}
 end
 
@@ -157,23 +184,40 @@ local function tryAttack()
 		CharacterVisuals.swing(player)
 		Net.send("attack", target.player)
 		return true
+	elseif target and target.kind == "mob" and target.mobId and State.context.pvp then
+		lastAttack = os.clock()
+		CharacterVisuals.swing(player)
+		Net.send("attackMob", target.mobId)
+		return true
 	end
 	return false
 end
 
+-- 블록처럼 조준한 칸에 놓는 아이템 (블록, 양동이, 팝업 타워, 골렘 알)
+local PLACEABLE = { block = true, bucket = true, deploy = true }
+
 local function tryPlace()
 	local def = selectedDef()
-	if not def or def.kind ~= "block" or not State.context.build then
+	if not def or not PLACEABLE[def.kind] or not State.context.build then
 		return false
 	end
 	if target and target.kind == "block" and target.place then
 		local p = target.place
+		local n = target.normal or { 0, 1, 0 }
 		CharacterVisuals.swing(player)
-		Net.send("place", p[1], p[2], p[3])
+		Net.send("place", p[1], p[2], p[3], n[1], n[2], n[3])
 		lastPlace = os.clock()
 		return true
 	end
 	return false
+end
+
+-- 광부의 손 강화와 피로 함정을 반영한 부수기 속도
+local function breakSpeed(): number
+	local haste = player:GetAttribute("Haste")
+	local fatigue = player:GetAttribute("FX_fatigue")
+	local fatigued = type(fatigue) == "number" and fatigue > workspace:GetServerTimeNow()
+	return Rules.breakSpeed(if type(haste) == "number" then haste else 0, fatigued)
 end
 
 local function useStart()
@@ -181,11 +225,14 @@ local function useStart()
 	if not def then
 		return
 	end
-	if def.kind == "block" then
+	if PLACEABLE[def.kind] then
 		tryPlace()
 	elseif def.kind == "bow" then
 		bowStart = os.clock()
-	elseif def.kind == "menu" or def.kind == "food" or def.kind == "armor" or def.kind == "throwable" then
+	elseif def.kind == "menu" or def.kind == "food" or def.kind == "armor" or def.kind == "throwable" or def.kind == "potion" or def.kind == "rod" then
+		if def.kind == "rod" or def.kind == "throwable" then
+			CharacterVisuals.swing(player)
+		end
 		Net.send("use", workspace.CurrentCamera.CFrame.LookVector)
 	end
 end
@@ -393,7 +440,7 @@ function Controls.init()
 
 		local now = os.clock()
 		-- 꾹 누르고 있으면 반복 동작 (모바일 공격, 블록 연속 설치)
-		if attackHeld and target and target.kind == "player" and now - lastAttack > 0.18 and not UserInputService.KeyboardEnabled then
+		if attackHeld and target and (target.kind == "player" or target.kind == "mob") and now - lastAttack > 0.18 and not UserInputService.KeyboardEnabled then
 			tryAttack()
 		end
 		if useHeld and now - lastPlace > 0.22 then
@@ -422,7 +469,7 @@ function Controls.init()
 				Net.send("breakStart", c[1], c[2], c[3])
 			end
 			local stack = State.selectedStack()
-			local need = Rules.breakTime(target.part.Name, if stack then stack.id else nil)
+			local need = Rules.breakTime(target.part.Name, if stack then stack.id else nil, breakSpeed())
 			if need and breaking then
 				breaking.progress += dt / need
 				if breaking.progress >= 1 then

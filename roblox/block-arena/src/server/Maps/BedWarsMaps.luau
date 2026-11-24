@@ -121,7 +121,14 @@ local function teamIsland(api, theme: Theme, dir, rng)
 		local x, z = at(s, f)
 		return { x, y, z }
 	end
+	-- 팀 상자(팀원끼리 같이 씀)와 개인 상자(어느 개인 상자에서 열어도 내 것)
+	local chestCell = cell(-2, 1, 3)
+	local enderCell = cell(2, 1, 3)
+	api.set(chestCell[1], chestCell[2], chestCell[3], "chest")
+	api.set(enderCell[1], enderCell[2], enderCell[3], "ender_chest")
 	api.marker("team", {
+		chest = chestCell,
+		ender = enderCell,
 		team = dir.id,
 		spawn = cell(0, 1, 1),
 		lookAt = { 0, 1, 0 },

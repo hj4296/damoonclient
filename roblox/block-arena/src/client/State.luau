@@ -16,6 +16,7 @@ State.chest = nil :: { id: number, title: string, slots: { [number]: Stack? } }?
 State.passes = {} :: { [string]: { owned: boolean, price: number, available: boolean, studioTest: boolean } }
 State.settings = {} :: { [string]: any } -- Main 에서 기본값으로 채움
 State.skinCode = "" -- 저장된 내 스킨
+State.kit = { kit = "explorer", perk = "lifesteal" } :: { kit: string?, perk: string? } -- 스카이워즈 키트/능력
 
 local listeners: { [string]: { () -> () } } = {}
 

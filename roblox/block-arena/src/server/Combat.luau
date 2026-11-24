@@ -4,8 +4,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Rules = require(Shared.Rules)
+local Blocks = require(Shared.Blocks)
 local Session = require(script.Parent.Session)
 local Net = require(script.Parent.Net)
+local Status = require(script.Parent.Status)
 
 local Combat = {}
 
@@ -21,6 +23,10 @@ Combat.getSharpness = function(_player: Player): number
 end
 Combat.getRegenInterval = function(_player: Player): number
 	return Config.Combat.RegenInterval
+end
+-- 넉백을 얼마나 받는지 (스카이워즈 '단단한 몸' 능력은 0.65)
+Combat.getKnockbackScale = function(_player: Player): number
+	return 1
 end
 
 local function setAbsorptionAttribute(player: Player, amount: number)
@@ -67,7 +73,7 @@ local function hitSound(root: BasePart)
 end
 
 function Combat.knockback(player: Player, velocity: Vector3)
-	Net.send(player, "kb", velocity)
+	Net.send(player, "kb", velocity * Combat.getKnockbackScale(player))
 end
 
 export type DamageOptions = {
@@ -175,7 +181,12 @@ function Combat.melee(attacker: Player, victim: Player)
 	v.hurtUntil = now + Config.Combat.HurtTime
 
 	local stack = a.inv.slots[a.inv.selected]
-	local damage = Rules.meleeDamage(if stack then stack.id else nil, Combat.getSharpness(attacker))
+	local held = if stack then stack.id else nil
+	local damage = Rules.meleeDamage(held, Combat.getSharpness(attacker))
+	-- 공격하면 투명화가 풀림
+	if Status.has(attacker, "invis") then
+		Status.remove(attacker, "invis")
+	end
 	local falling = a.root.AssemblyLinearVelocity.Y < -3
 		and a.humanoid ~= nil
 		and a.humanoid.FloorMaterial == Enum.Material.Air
@@ -186,18 +197,62 @@ function Combat.melee(attacker: Player, victim: Player)
 	Net.broadcast("swing", attacker)
 	local flat = Vector3.new(offset.X, 0, offset.Z)
 	local dir = if flat.Magnitude > 0.05 then flat.Unit else a.root.CFrame.LookVector
-	local knock = dir * Config.Combat.KnockbackH + Vector3.new(0, Config.Combat.KnockbackV, 0)
+	local scale = Rules.knockbackMultiplier(held)
+	local knock = dir * Config.Combat.KnockbackH * scale + Vector3.new(0, Config.Combat.KnockbackV * math.min(scale, 1.4), 0)
 	Combat.damage(victim, damage, { attacker = attacker, cause = "melee", knockback = knock })
 end
 
--- 자연 회복: 마지막으로 맞고 몇 초 지나면 조금씩 찹니다.
+-- 용암에 닿으면 불이 붙고, 물에 들어가면 꺼짐
+local function liquidAt(state): (boolean, boolean)
+	local match = state.match
+	local world = match and match.world
+	local root = state.root
+	if not world or not root or state.location ~= "match" then
+		return false, false
+	end
+	local inLava, inWater = false, false
+	for _, dy in { -2.4, 0 } do
+		local x, y, z = world:toCell(root.Position + Vector3.new(0, dy, 0))
+		local record = world:get(x, y, z)
+		local def = if record then Blocks.get(record.id) else nil
+		if def and def.burn then
+			inLava = true
+		elseif def and def.water then
+			inWater = true
+		end
+	end
+	return inLava, inWater
+end
+
+-- 자연 회복: 마지막으로 맞고 몇 초 지나면 조금씩 찹니다. 재생 물약, 불, 용암도 여기서 처리
 task.spawn(function()
 	local progress: { [Player]: number } = {}
+	local effectTick: { [Player]: number } = {}
 	while true do
 		local dt = task.wait(0.5)
 		local now = os.clock()
+		Status.sweep()
 		for player, state in Session.all() do
 			local humanoid = state.humanoid
+			if state.alive and humanoid and humanoid.Health > 0 then
+				local inLava, inWater = liquidAt(state)
+				if inLava then
+					Status.add(player, "fire", 4)
+					Combat.damage(player, 2, { cause = "lava", ignoreArmor = true })
+				elseif inWater and Status.has(player, "fire") then
+					Status.remove(player, "fire")
+				end
+				effectTick[player] = (effectTick[player] or 0) + dt
+				if effectTick[player] >= 1 then
+					effectTick[player] = 0
+					if Status.has(player, "regen") then
+						humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + 1)
+					end
+					if not inLava and Status.has(player, "fire") then
+						Combat.damage(player, 1, { cause = "lava", ignoreArmor = true })
+					end
+				end
+			end
 			if state.alive and humanoid and humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth then
 				if now - state.lastDamaged >= Config.Combat.RegenDelay then
 					progress[player] = (progress[player] or 0) + dt
@@ -216,6 +271,11 @@ task.spawn(function()
 		for player in progress do
 			if not player.Parent then
 				progress[player] = nil
+			end
+		end
+		for player in effectTick do
+			if not player.Parent then
+				effectTick[player] = nil
 			end
 		end
 	end

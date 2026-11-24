@@ -14,6 +14,8 @@ local Inventory = require(script.Parent.Logic.Inventory)
 local Vote = require(script.Parent.Logic.Vote)
 local PlayerData = require(script.Parent.PlayerData)
 local Rooms = require(script.Parent.Maps.Rooms)
+local Status = require(script.Parent.Status)
+local Mobs = require(script.Parent.Mobs)
 
 local B = Config.BlockSize
 
@@ -95,6 +97,9 @@ end
 local function giveWaitingItems(state)
 	Inventory.clear(state.inv)
 	state.inv.slots[1] = { id = "vote_paper", count = 1 }
+	if state.match and state.match.modeId == "skywars" then
+		state.inv.slots[2] = { id = "kit_selector", count = 1 }
+	end
 	state.inv.slots[9] = { id = "leave_bed", count = 1 }
 	state.inv.dirty = true
 end
@@ -113,6 +118,7 @@ local function destroyMatch(match)
 		return
 	end
 	match.destroyed = true
+	Mobs.clearMatch(match)
 	if match.mode.cleanup and match.state ~= "waiting" then
 		local ok, err = pcall(match.mode.cleanup, match)
 		if not ok then
@@ -282,7 +288,9 @@ function Matches.toLobby(player: Player)
 	state.container = nil
 	state.respawnToken = nil
 	giveLobbyItems(state)
+	Status.clear(player)
 	player:SetAttribute("DoubleJumps", nil)
+	player:SetAttribute("Haste", nil)
 	Session.setContext(player, { location = "lobby" })
 	Session.spawn(player, lobbySpawn)
 end
@@ -384,7 +392,14 @@ end
 function Matches.deathMessage(match, victim: Player, killer: Player?, cause: string, final: boolean)
 	local v = Matches.coloredName(victim)
 	local text
-	if killer then
+	local mobDef = if string.sub(cause, 1, 4) == "mob_" then Config.Mobs[string.sub(cause, 5)] else nil
+	if mobDef then
+		if killer then
+			text = string.format("%s님이 %s님의 %s에게 당했습니다.", v, Matches.coloredName(killer), mobDef.name)
+		else
+			text = string.format("%s님이 %s에게 당했습니다.", v, mobDef.name)
+		end
+	elseif killer then
 		local k = Matches.coloredName(killer)
 		if cause == "void" then
 			text = string.format("%s님이 %s님에게 밀려 공허로 떨어졌습니다.", v, k)
@@ -394,6 +409,8 @@ function Matches.deathMessage(match, victim: Player, killer: Player?, cause: str
 			text = string.format("%s님이 %s님의 폭발에 휘말렸습니다.", v, k)
 		elseif cause == "fall" then
 			text = string.format("%s님이 %s님에게 밀려 떨어졌습니다.", v, k)
+		elseif cause == "lava" then
+			text = string.format("%s님이 %s님을 피하다 불에 탔습니다.", v, k)
 		else
 			text = string.format("%s님이 %s님에게 처치당했습니다.", v, k)
 		end
@@ -531,6 +548,7 @@ end
 -- 죽었을 때
 Session.onDied = function(player: Player, state)
 	local match = state.match
+	Status.clear(player)
 	if state.location == "lobby" then
 		task.delay(1, function()
 			if state.location == "lobby" and player.Parent then
@@ -603,6 +621,14 @@ Combat.getSharpness = function(player: Player): number
 		return match.mode.sharpness(match, player)
 	end
 	return 0
+end
+Combat.getKnockbackScale = function(player: Player): number
+	local state = Session.get(player)
+	local match = state and state.match
+	if match and match.mode.knockbackScale and state.location == "match" then
+		return match.mode.knockbackScale(match, player)
+	end
+	return 1
 end
 Combat.getRegenInterval = function(player: Player): number
 	local state = Session.get(player)

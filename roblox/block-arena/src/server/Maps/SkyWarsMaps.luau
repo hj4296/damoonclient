@@ -61,6 +61,11 @@ local function startIsland(api, theme: Theme, index: number, rng)
 	chest(api, sx, 1, sz, "island")
 	local tx, tz = at(-4, -2)
 	theme.tree(api, tx, 0, tz, rng)
+	-- 럭키 블록 자리 (경기 시작 때 확률로 놓임)
+	for _, spot in { { -3, 1 }, { 3, -3 } } do
+		local lx, lz = at(spot[1], spot[2])
+		api.marker("lucky", { x = lx, y = 1, z = lz })
+	end
 	Shapes.flora(api, rng, cx - 7, cz - 7, cx + 7, cz + 7, 3, -2, GROUND, theme.flora, theme.floraChance)
 	-- 유리관 자리(스폰 주변 3x3, 높이 3)는 비워 둠
 	for dx = -1, 1 do
@@ -83,6 +88,7 @@ local function midIsland(api, theme: Theme, index: number, rng)
 	Shapes.island(api, cx, 1, cz, { rx = 4, rz = 4, top = theme.top, fill = theme.fill, deep = theme.deep, depth = 5, edge = 0.2, ores = true, drips = 0.1, rng = rng })
 	theme.ruin(api, cx, 1, cz, rng)
 	chest(api, cx, 2, cz, "island")
+	api.marker("lucky", { x = cx + 2, y = 2, z = cz - 2 })
 end
 
 local function build(theme: Theme)
@@ -97,6 +103,9 @@ local function build(theme: Theme)
 		theme.center(api, rng)
 		for _, p in Shapes.ring(4, theme.centerChestRadius, math.pi / 4) do
 			chest(api, p.x, 3, p.z, "center")
+		end
+		for _, p in Shapes.ring(4, theme.centerChestRadius + 2, 0) do
+			api.marker("lucky", { x = p.x, y = 3, z = p.z })
 		end
 		Shapes.flora(api, rng, -13, -13, 13, 13, 6, 0, GROUND, theme.flora, theme.floraChance)
 		theme.sky(api, rng)

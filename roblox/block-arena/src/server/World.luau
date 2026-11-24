@@ -160,15 +160,28 @@ end
 
 local SMALL = { plant = true, grass = true, carpet = true, torch = true, lantern = true }
 
-local function buildPart(def: Blocks.BlockDef, x: number, y: number, z: number, center: Vector3): BasePart
+-- 사다리처럼 붙은 벽 쪽으로 돌아가는 블록: data.face = { dx, dz } (벽이 있는 방향)
+function World.faceRotation(data: { [string]: any }?): CFrame
+	local face = data and data.face
+	if type(face) == "table" and type(face[1]) == "number" and type(face[2]) == "number" then
+		return CFrame.Angles(0, math.atan2(face[1], face[2]), 0)
+	end
+	return CFrame.identity
+end
+
+local function buildPart(def: Blocks.BlockDef, x: number, y: number, z: number, center: Vector3, data: { [string]: any }?): BasePart
 	local shape = if def.shape then Blocks.Shapes[def.shape] else nil
 	local part = Instance.new("Part")
 	part.Name = def.id
 	part.Anchored = true
 	part.Size = (if shape then shape.size else Vector3.one) * B
 	local h = (x * 7919 + y * 104729 + z * 1299709) % 360
-	local rotation = if def.shape == "grass" then CFrame.Angles(0, math.rad(h), 0) else CFrame.identity
-	part.CFrame = CFrame.new(center + (if shape then shape.offset else Vector3.zero) * B) * rotation
+	if def.shape == "ladder" then
+		part.CFrame = CFrame.new(center) * World.faceRotation(data) * CFrame.new((if shape then shape.offset else Vector3.zero) * B)
+	else
+		local rotation = if def.shape == "grass" then CFrame.Angles(0, math.rad(h), 0) else CFrame.identity
+		part.CFrame = CFrame.new(center + (if shape then shape.offset else Vector3.zero) * B) * rotation
+	end
 	part.Color = Blocks.shade(def, x, y, z)
 	part.Material = def.material
 	part.Transparency = def.transparency or 0
@@ -230,7 +243,7 @@ function World.spawnPart(self: World, record: Record, mask: number?)
 	if not def or record.part then
 		return
 	end
-	local part = buildPart(def, record.x, record.y, record.z, self:cellCenter(record.x, record.y, record.z))
+	local part = buildPart(def, record.x, record.y, record.z, self:cellCenter(record.x, record.y, record.z), record.data)
 	if def.shape == nil then
 		part:SetAttribute("Occ", mask or self:mask(record.x, record.y, record.z))
 	end

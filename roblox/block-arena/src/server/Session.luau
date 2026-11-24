@@ -8,6 +8,7 @@ local Items = require(Shared.Items)
 local Skins = require(Shared.Skins)
 local CharacterRig = require(Shared.CharacterRig)
 local Preferences = require(Shared.Preferences)
+local Kits = require(Shared.Kits)
 local Inventory = require(script.Parent.Logic.Inventory)
 local Net = require(script.Parent.Net)
 
@@ -46,6 +47,9 @@ export type State = {
 	settings: { [string]: any },
 	passes: { [string]: boolean },
 	armorKey: string,
+	kit: string, -- 스카이워즈 키트
+	perk: string, -- 스카이워즈 능력
+	lastRod: number,
 }
 
 local states: { [Player]: State } = {}
@@ -90,6 +94,9 @@ function Session.create(player: Player): State
 		settings = Preferences.defaults(),
 		passes = {},
 		armorKey = "",
+		kit = Kits.DefaultKit,
+		perk = Kits.DefaultPerk,
+		lastRod = 0,
 	}
 	states[player] = state
 	player:SetAttribute("Skin", state.skin)
@@ -259,7 +266,7 @@ function Session.refreshHeld(state: State)
 		part.Size = Vector3.new(0.9, 0.9, 0.9)
 		part.Material = Enum.Material.SmoothPlastic
 		offset *= CFrame.new(0, -0.2, -0.3)
-	elseif def.kind == "sword" or def.kind == "pickaxe" or def.kind == "axe" or def.kind == "bow" then
+	elseif def.kind == "sword" or def.kind == "pickaxe" or def.kind == "axe" or def.kind == "bow" or def.kind == "stick" or def.kind == "rod" then
 		part.Size = Vector3.new(0.25, 0.35, 3)
 		part.Material = if def.kind == "bow" then Enum.Material.Wood else Enum.Material.Metal
 		offset *= CFrame.new(0, 0, -1.2)

@@ -1,4 +1,4 @@
--- 베드워즈: 4팀, 침대가 있으면 부활, 자원 생성기와 상점, 팀 강화, 시간 이벤트
+-- 베드워즈: 4팀, 침대가 있으면 부활, 자원 생성기와 상점, 팀 강화·함정, 팀 상자/개인 상자, 시간 이벤트(서든데스 용)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage.Shared
@@ -13,6 +13,9 @@ local Net = require(Server.Net)
 local Inventory = require(Server.Logic.Inventory)
 local Teams = require(Server.Logic.Teams)
 local Npc = require(Server.Npc)
+local Status = require(Server.Status)
+local Mobs = require(Server.Mobs)
+local Containers = require(Server.Containers)
 
 local B = Config.BlockSize
 local BW = Config.BedWars
@@ -23,6 +26,8 @@ local Matches: any = nil
 local ARMOR_ORDER = { leather = 1, chain = 2, iron = 3, diamond = 4 }
 local CURRENCY_NAMES = { iron = "철", gold = "금", diamond = "다이아몬드", emerald = "에메랄드" }
 local CURRENCY_HEX = { iron = "#FFFFFF", gold = "#FFAA00", diamond = "#55FFFF", emerald = "#55FF55" }
+-- 강화 용광로 단계별 철·금 생성 배율 (3단계는 에메랄드가 추가로 나옴)
+local FORGE_MULT = { [0] = 1, [1] = 1.5, [2] = 2, [3] = 2, [4] = 3 }
 
 function BedWars.init(matches)
 	Matches = matches
@@ -71,6 +76,8 @@ local function giveLoadout(match, player: Player)
 	}
 	inv.armorLocked = true
 	inv.dirty = true
+	local team = match.data.teams[pd.team]
+	player:SetAttribute("Haste", if team then team.upgrades.haste else 0)
 end
 
 local function contextFor(match, player: Player)
@@ -130,6 +137,47 @@ end
 local function teamOf(match, player: Player)
 	local pd = match.data.players[player]
 	return if pd then match.data.teams[pd.team] else nil
+end
+
+local function membersOf(team): { Player }
+	local out = {}
+	for member in team.members do
+		table.insert(out, member)
+	end
+	return out
+end
+
+-- 상자 블록에 F 키 열기
+local function chestPrompt(match, x: number, y: number, z: number, label: string, onOpen: (Player) -> ())
+	local record = match.world:get(x, y, z)
+	if not record or not record.part then
+		return
+	end
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "열기"
+	prompt.ObjectText = label
+	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = record.part
+	prompt.Triggered:Connect(function(player)
+		local state = Session.get(player)
+		if state and state.match == match and state.location == "match" and state.alive and not state.waitingRespawn then
+			onOpen(player)
+		end
+	end)
+end
+
+-- 개인 상자: 경기 동안 그 사람만의 보관함 (어느 섬의 개인 상자에서 열어도 같음)
+local function enderOf(match, player: Player)
+	local data = match.data
+	local container = data.ender[player]
+	if not container then
+		container = Containers.new("개인 상자", BW.EnderChestSize)
+		data.ender[player] = container
+	end
+	return container
 end
 
 local function aliveTeams(match)
@@ -228,6 +276,8 @@ function BedWars.start(match, markers)
 		emeraldTier = 1,
 		protected = {},
 		displayTimer = 0,
+		ender = {},
+		sudden = false,
 	}
 	match.data = data
 	match.voidY = match.origin.Y - 30 * B
@@ -250,7 +300,10 @@ function BedWars.start(match, markers)
 			alive = 0,
 			started = #members > 0,
 			announcedOut = false,
-			upgrades = { sharpness = 0, protection = 0, forge = 0, healpool = 0 },
+			upgrades = { sharpness = 0, protection = 0, haste = 0, forge = 0, healpool = 0, dragon = 0 },
+			traps = {},
+			trapReady = 0,
+			chest = Containers.new(def.name .. " 팀 상자", BW.TeamChestSize),
 		}
 		data.teams[def.id] = team
 		table.insert(data.teamOrder, team)
@@ -284,6 +337,8 @@ function BedWars.start(match, markers)
 				gold = 0,
 				ironTimer = 0,
 				goldTimer = 0,
+				emerald = 0,
+				emeraldTimer = 0,
 				display = makeDisplay(match, genPos + Vector3.new(0, 1, 0), Items.TierColors.iron, 0.9, "자원 생성기"),
 			})
 			table.insert(data.protected, { gx, gy, gz, 1 })
@@ -315,6 +370,29 @@ function BedWars.start(match, markers)
 				BedWars.openShop(match, player, "upgrades")
 			end)
 			table.insert(data.protected, { upX, upY, upZ, 0 })
+
+			-- 팀 상자 (같은 팀만 열 수 있음) / 개인 상자
+			if marker.chest then
+				local cx, cy, cz = cell(marker.chest)
+				chestPrompt(match, cx, cy, cz, def.name .. " 팀 상자", function(player)
+					local pd = data.players[player]
+					if pd and pd.team == def.id then
+						Containers.open(player, team.chest)
+					else
+						Session.chat({ player }, '<font color="#FF5555">다른 팀의 상자는 열 수 없습니다.</font>')
+					end
+				end)
+				table.insert(data.protected, { cx, cy, cz, 0 })
+			end
+			if marker.ender then
+				local ex, ey, ez = cell(marker.ender)
+				chestPrompt(match, ex, ey, ez, "개인 상자", function(player)
+					if data.players[player] then
+						Containers.open(player, enderOf(match, player))
+					end
+				end)
+				table.insert(data.protected, { ex, ey, ez, 0 })
+			end
 		end
 		for _, player in members do
 			team.members[player] = true
@@ -399,6 +477,22 @@ local function applyEvent(match, event)
 			end
 		end
 		Session.title(match.players, '<font color="#FF5555">모든 침대 파괴!</font>', "이제 아무도 부활할 수 없습니다", 3)
+	elseif event.kind == "sudden" then
+		data.sudden = true
+		aliveTeams(match)
+		for _, team in data.teamOrder do
+			if team.alive > 0 and team.marker then
+				local count = 1 + team.upgrades.dragon
+				local x, y, z = cell(team.marker.center)
+				local base = match.world:cellCenter(x, y + 14, z)
+				for i = 1, count do
+					Mobs.spawn(match, "dragon", base + Vector3.new((i - 1) * 9, 0, 0), { team = team.id })
+				end
+			end
+		end
+		Session.title(match.players, '<font color="#AA55FF">서든데스!</font>', "용이 나타나 상대를 공격합니다", 3)
+		Session.chat(match.players, '<font color="#AA55FF"><b>서든데스</b></font> > 팀마다 용이 나타났습니다! "용의 가호" 강화를 산 팀은 용이 한 마리 더 있어요.')
+		Net.sendMany(match.players, "sound", "bed")
 	elseif event.kind == "end" then
 		local alive = aliveTeams(match)
 		table.sort(alive, function(a, b)
@@ -432,9 +526,17 @@ function BedWars.tick(match, dt: number)
 	for _, gen in data.gens do
 		if gen.kind == "island" then
 			local team = data.teams[gen.team]
-			local mult = 1 + 0.5 * (if team then team.upgrades.forge else 0)
+			local forge = if team then team.upgrades.forge else 0
+			local mult = FORGE_MULT[forge] or 1
 			gen.ironTimer += dt * mult
 			gen.goldTimer += dt * mult
+			if forge >= 3 then
+				gen.emeraldTimer += dt
+				if gen.emeraldTimer >= BW.ForgeEmeraldInterval then
+					gen.emeraldTimer = 0
+					gen.emerald = math.min(BW.ForgeEmeraldCap, gen.emerald + 1)
+				end
+			end
 			if gen.ironTimer >= BW.IronInterval then
 				gen.ironTimer -= BW.IronInterval
 				gen.iron = math.min(BW.IronCap, gen.iron + 1)
@@ -455,6 +557,8 @@ function BedWars.tick(match, dt: number)
 		end
 	end
 
+	BedWars.checkTraps(match)
+
 	-- 생성기 근처에 있으면 자동으로 줍기
 	for player, pd in data.players do
 		local state = Session.get(player)
@@ -467,6 +571,7 @@ function BedWars.tick(match, dt: number)
 					if gen.kind == "island" then
 						gen.iron = giveResource(player, "iron", gen.iron)
 						gen.gold = giveResource(player, "gold", gen.gold)
+						gen.emerald = giveResource(player, "emerald", gen.emerald)
 					else
 						gen.count = giveResource(player, gen.kind, gen.count)
 					end
@@ -480,7 +585,11 @@ function BedWars.tick(match, dt: number)
 		data.displayTimer = 0
 		for _, gen in data.gens do
 			if gen.kind == "island" then
-				gen.display.info.Text = string.format('<font color="#FFFFFF">철 %d</font>  <font color="#FFAA00">금 %d</font>', gen.iron, gen.gold)
+				local text = string.format('<font color="#FFFFFF">철 %d</font>  <font color="#FFAA00">금 %d</font>', gen.iron, gen.gold)
+				if gen.emerald > 0 then
+					text ..= string.format('  <font color="#55FF55">에메랄드 %d</font>', gen.emerald)
+				end
+				gen.display.info.Text = text
 			else
 				local intervals = if gen.kind == "diamond" then BW.DiamondIntervals else BW.EmeraldIntervals
 				local tier = if gen.kind == "diamond" then data.diamondTier else data.emeraldTier
@@ -599,6 +708,86 @@ function BedWars.sharpness(match, player: Player): number
 	return if team then team.upgrades.sharpness else 0
 end
 
+function BedWars.haste(match, player: Player): number
+	local team = teamOf(match, player)
+	return if team then team.upgrades.haste else 0
+end
+
+local function setHasteAttribute(team)
+	for member in team.members do
+		member:SetAttribute("Haste", team.upgrades.haste)
+	end
+end
+
+-- 함정: 적이 기지에 들어오면 줄의 맨 앞 함정이 발동
+local TRAP_TEXT = {
+	alarm = "경보 함정",
+	fatigue = "피로 함정",
+	blind = "어둠 함정",
+	counter = "반격 함정",
+}
+
+local function triggerTrap(match, team, intruder: Player)
+	local key = table.remove(team.traps, 1)
+	if not key then
+		return
+	end
+	team.trapReady = os.clock() + BW.TrapCooldown
+	local members = membersOf(team)
+	if key == "alarm" then
+		Status.remove(intruder, "invis")
+	elseif key == "fatigue" then
+		Status.add(intruder, "fatigue", 10)
+	elseif key == "blind" then
+		Status.add(intruder, "blind", 8)
+		Status.add(intruder, "slow", 8)
+	elseif key == "counter" then
+		local x, y, z = cell(team.marker.center)
+		local center = match.world:cellCenter(x, y, z)
+		for _, member in members do
+			local state = Session.get(member)
+			if state and state.alive and state.root and (state.root.Position - center).Magnitude < (BW.TrapRadius + 6) * B then
+				Status.add(member, "speed", 15)
+				Status.add(member, "jump", 15)
+			end
+		end
+	end
+	Session.title(members, '<font color="#FF5555">함정 발동!</font>', string.format("%s님이 %s에 걸렸습니다", intruder.DisplayName, TRAP_TEXT[key] or key), 2.5)
+	Session.chat(members, string.format('<font color="#FF5555">함정</font> > %s님이 기지에 들어와 <font color="#FFFF55">%s</font>이(가) 발동했습니다!', Matches.coloredName(intruder), TRAP_TEXT[key] or key))
+	Net.sendMany(members, "sound", "deny")
+	Session.title({ intruder }, "", '<font color="#FF5555">함정에 걸렸습니다!</font>', 2)
+	for _, member in members do
+		Net.send(member, "shopState", BedWars.shopState(match, member))
+	end
+end
+
+function BedWars.checkTraps(match)
+	local data = match.data
+	local now = os.clock()
+	for _, team in data.teamOrder do
+		if #team.traps > 0 and team.marker and now >= team.trapReady then
+			local x, y, z = cell(team.marker.center)
+			local center = match.world:cellCenter(x, y, z)
+			for player, pd in data.players do
+				if pd.team ~= team.id and not pd.eliminated then
+					local state = Session.get(player)
+					local root = state and state.root
+					if state and root and state.alive and not state.waitingRespawn and state.location == "match" then
+						local offset = root.Position - center
+						if math.abs(offset.Y) < 10 * B and Vector3.new(offset.X, 0, offset.Z).Magnitude < BW.TrapRadius * B then
+							if Status.has(player, "milk") then
+								continue
+							end
+							triggerTrap(match, team, player)
+							break
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 function BedWars.regenInterval(match, player: Player): number
 	local team = teamOf(match, player)
 	local state = Session.get(player)
@@ -623,7 +812,7 @@ local function pay(player: Player, inv, cost): boolean
 	return true
 end
 
-local function shopState(match, player: Player)
+function BedWars.shopState(match, player: Player)
 	local pd = match.data.players[player]
 	local team = teamOf(match, player)
 	return {
@@ -633,8 +822,10 @@ local function shopState(match, player: Player)
 		axe = if pd then pd.axe else 0,
 		shears = if pd then pd.shears else false,
 		upgrades = if team then team.upgrades else {},
+		traps = if team then table.clone(team.traps) else {},
 	}
 end
+local shopState = BedWars.shopState
 
 function BedWars.openShop(match, player: Player, kind: string)
 	local state = Session.get(player)
@@ -725,11 +916,35 @@ function BedWars.upgrade(match, player: Player, key: string)
 		return
 	end
 	team.upgrades[key] = level + 1
-	local members = {}
-	for member in team.members do
-		table.insert(members, member)
+	if key == "haste" then
+		setHasteAttribute(team)
 	end
+	local members = membersOf(team)
 	Session.chat(members, string.format('%s님이 <font color="#55FFFF">%s %d단계</font>를 구매했습니다!', Matches.coloredName(player), def.name, level + 1))
+	Net.sendMany(members, "sound", "buy")
+	for _, member in members do
+		Net.send(member, "shopState", shopState(match, member))
+	end
+end
+
+function BedWars.buyTrap(match, player: Player, key: string)
+	local state = Session.get(player)
+	local team = teamOf(match, player)
+	local def = Shop.getTrap(key)
+	if not state or not team or not def or state.location ~= "match" then
+		return
+	end
+	local cost = Shop.trapCost(#team.traps)
+	if not cost or #team.traps >= Shop.MaxTraps then
+		Session.chat({ player }, string.format('<font color="#FF5555">함정은 %d개까지 줄 세울 수 있습니다.</font>', Shop.MaxTraps))
+		return
+	end
+	if not pay(player, state.inv, { item = "diamond", amount = cost }) then
+		return
+	end
+	table.insert(team.traps, key)
+	local members = membersOf(team)
+	Session.chat(members, string.format('%s님이 <font color="#55FFFF">%s</font>을(를) 설치했습니다! (%d/%d)', Matches.coloredName(player), def.name, #team.traps, Shop.MaxTraps))
 	Net.sendMany(members, "sound", "buy")
 	for _, member in members do
 		Net.send(member, "shopState", shopState(match, member))
@@ -770,6 +985,16 @@ function BedWars.sidebar(match, player: Player)
 end
 
 function BedWars.cleanup(match)
+	local data = match.data
+	for _, team in data.teamOrder or {} do
+		Containers.closeAll(team.chest)
+	end
+	for _, container in data.ender or {} do
+		Containers.closeAll(container)
+	end
+	for player in data.players or {} do
+		player:SetAttribute("Haste", nil)
+	end
 	match.data = {}
 end
 

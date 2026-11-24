@@ -105,8 +105,8 @@ end)
 
 local HINTS = {
 	lobby = "F: NPC  ·  우클릭: 아이템 사용  ·  V: 시점  ·  1~9: 핫바",
-	waiting = "우클릭: 맵 투표 / 나가기  ·  L 두 번: 로비로  ·  V: 시점",
-	match = "E: 가방  ·  Q: 버리기  ·  Shift: 웅크리기  ·  Ctrl: 달리기  ·  V: 시점  ·  L 두 번: 로비로",
+	waiting = "우클릭: 맵 선택 / 키트 고르기(스카이워즈) / 나가기  ·  L 두 번: 로비로  ·  V: 시점",
+	match = "E: 가방  ·  Q: 버리기  ·  Shift: 웅크리기  ·  Ctrl: 달리기  ·  F: 상점/상자  ·  V: 시점  ·  L 두 번: 로비로",
 	respawn = "곧 부활합니다...",
 	spectate = "관전 중  ·  L 두 번: 로비로",
 }
@@ -226,6 +226,20 @@ end)
 
 Net.on("needVip", function()
 	Windows.openStore()
+end)
+
+Net.on("openKits", function(data)
+	if type(data) == "table" then
+		State.kit = { kit = data.kit, perk = data.perk }
+	end
+	Windows.openKits()
+end)
+
+Net.on("kitState", function(data)
+	if type(data) == "table" then
+		State.kit = { kit = data.kit, perk = data.perk }
+		Windows.updateKits()
+	end
 end)
 
 Net.on("crit", function()

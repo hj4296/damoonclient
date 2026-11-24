@@ -1,4 +1,4 @@
--- 스카이워즈: 유리관에서 시작, 상자에서 장비 수집, 마지막 한 명이 승리
+-- 스카이워즈: 유리관에서 시작, 키트와 능력, 상자에서 장비 수집, 럭키 블록, 마지막 한 명이 승리
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage.Shared
@@ -13,6 +13,9 @@ local Inventory = require(Server.Logic.Inventory)
 local Loot = require(Server.Logic.Loot)
 local Containers = require(Server.Containers)
 local Drops = require(Server.Drops)
+local Combat = require(Server.Combat)
+local Lucky = require(Server.Lucky)
+local Kits = require(Shared.Kits)
 
 local B = Config.BlockSize
 local SW = Config.SkyWars
@@ -53,6 +56,34 @@ local function fillChest(chest, starter: boolean)
 		chest.container.slots[index] = stack
 	end
 	Containers.refresh(chest.container)
+end
+
+-- 키트 아이템 주기 (갑옷은 비어 있는 자리에 바로 입힘)
+local function giveKit(player: Player)
+	local state = Session.get(player)
+	if not state then
+		return
+	end
+	local kit = Kits.get(state.kit) or Kits.get(Kits.DefaultKit)
+	if not kit then
+		return
+	end
+	for _, stack in kit.items do
+		local def = Items.get(stack.id)
+		if def and def.kind == "armor" and def.armorSlot and not state.inv.armor[def.armorSlot] then
+			state.inv.armor[def.armorSlot] = stack.id
+			state.inv.dirty = true
+		else
+			Inventory.add(state.inv, stack.id, stack.count)
+		end
+	end
+	local perk = Kits.getPerk(state.perk)
+	Session.chat({ player }, string.format('키트 <font color="#55FF55">%s</font>와(과) 능력 <font color="#55FFFF">%s</font>을(를) 받았습니다.', kit.name, if perk then perk.name else "없음"))
+end
+
+local function perkOf(player: Player): string?
+	local state = Session.get(player)
+	return if state then state.perk else nil
 end
 
 local function aliveList(match): { Player }
@@ -99,6 +130,7 @@ function SkyWars.start(match, markers)
 		fightStart = 0,
 		refillIndex = 1,
 		cages = {},
+		lucky = 0,
 	}
 	match.data = data
 	match.voidY = match.origin.Y - 30 * B
@@ -157,6 +189,17 @@ function SkyWars.start(match, markers)
 		fillChest(chest, chest.starter)
 	end
 
+	-- 럭키 블록: 표시된 자리 중 바닥이 있고 비어 있는 곳에 확률로
+	for _, spot in markers.lucky or {} do
+		local record = world:get(spot.x, spot.y, spot.z)
+		local def = if record then Blocks.get(record.id) else nil
+		local free = record == nil or (def ~= nil and def.canCollide == false and not def.water and not def.burn)
+		if free and world:isSolid(spot.x, spot.y - 1, spot.z) and rand() < SW.LuckyChance then
+			world:set(spot.x, spot.y, spot.z, "lucky_block")
+			data.lucky += 1
+		end
+	end
+
 	for index, player in match.players do
 		local spawn = spawns[index]
 		if spawn then
@@ -183,6 +226,9 @@ function SkyWars.start(match, markers)
 	Session.chat(match.players, '<font color="#55FFFF">━━━━━━━━ 스카이워즈 ━━━━━━━━</font>')
 	Session.chat(match.players, "유리관이 열리면 상자(F)에서 장비를 챙기세요. 가운데 섬에 좋은 장비가 있습니다.")
 	Session.chat(match.players, "블록을 부수면 그 블록을 얻습니다. 마지막까지 살아남은 사람이 승리!")
+	if data.lucky > 0 then
+		Session.chat(match.players, string.format('<font color="#FFD24A">럭키 블록 %d개</font>가 섬 곳곳에 있어요. 부숴 보면 좋은 일이… 아니면 나쁜 일이!', data.lucky))
+	end
 end
 
 function SkyWars.tick(match, dt: number)
@@ -209,6 +255,14 @@ function SkyWars.tick(match, dt: number)
 			end
 			Session.title(match.players, '<font color="#FF5555">싸워라!</font>', "", 1.5)
 			Net.sendMany(match.players, "sound", "start")
+			for player, pd in data.players do
+				if not pd.eliminated then
+					giveKit(player)
+					if perkOf(player) == "bulwark" then
+						Combat.setAbsorption(player, 4, 90)
+					end
+				end
+			end
 		end
 		return
 	end
@@ -237,6 +291,12 @@ function SkyWars.onDeath(match, player: Player, killer: Player?, cause: string)
 		pd.eliminated = true
 		if killer and data.players[killer] then
 			data.players[killer].kills += 1
+			local perk = perkOf(killer)
+			if perk == "lifesteal" then
+				Combat.heal(killer, 8)
+			elseif perk == "bulwark" then
+				Combat.setAbsorption(killer, 4, 60)
+			end
 		end
 		-- 아이템 떨구기 (공허에 떨어진 경우는 없어짐)
 		if state and state.root and cause ~= "void" then
@@ -279,10 +339,32 @@ function SkyWars.canBreak(match, _player: Player, record): boolean
 	return match.data.phase == "fight" and def ~= nil and not def.unbreakable and not def.chest
 end
 
-function SkyWars.onBreak(_match, player: Player, record)
+function SkyWars.onBreak(match, player: Player, record)
+	local def = Blocks.get(record.id)
+	if def and def.lucky then
+		Lucky.open(match, player, record.x, record.y, record.z)
+		return
+	end
 	local state = Session.get(player)
 	if state and Items.get(record.id) then
-		Inventory.add(state.inv, record.id, 1)
+		local count = if perkOf(player) == "lucky_miner" and rand() < 0.25 then 2 else 1
+		Inventory.add(state.inv, record.id, count)
+	end
+end
+
+-- 능력: 깃털 낙하, 단단한 몸, 화살 회수
+function SkyWars.fallScale(_match, player: Player): number
+	return if perkOf(player) == "feather" then 0.5 else 1
+end
+
+function SkyWars.knockbackScale(_match, player: Player): number
+	return if perkOf(player) == "sturdy" then 0.65 else 1
+end
+
+function SkyWars.onArrowHit(_match, player: Player)
+	local state = Session.get(player)
+	if state and perkOf(player) == "arrow_return" and rand() < 0.3 then
+		Inventory.add(state.inv, "arrow", 1)
 	end
 end
 

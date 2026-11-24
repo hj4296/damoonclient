@@ -25,6 +25,9 @@ export type BlockDef = {
 	lightColor: Color3?,
 	team: string?,
 	bed: boolean?,
+	water: boolean?,
+	burn: boolean?,
+	lucky: boolean?,
 	tnt: boolean?,
 	chest: boolean?,
 	noItem: boolean?,
@@ -53,6 +56,7 @@ Blocks.Shapes = {
 	lantern = { size = Vector3.new(0.34, 0.42, 0.34), offset = Vector3.new(0, -0.29, 0) },
 	torch = { size = Vector3.new(0.12, 0.55, 0.12), offset = Vector3.new(0, -0.225, 0) },
 	chest = { size = Vector3.new(0.86, 0.86, 0.86), offset = Vector3.new(0, -0.07, 0) },
+	ladder = { size = Vector3.new(1, 1, 0.12), offset = Vector3.new(0, 0, 0.44) }, -- 실제 방향은 붙은 벽에 따라 돌림
 	bed = { size = Vector3.new(1, 0.56, 1), offset = Vector3.new(0, -0.22, 0) },
 }
 
@@ -160,8 +164,27 @@ for name, color in STAINED do
 end
 
 -- 액체 (통과, 부서지지 않음)
-add("water", { name = "물", color = rgb(56, 108, 214), material = M.Glass, transparency = 0.4, canCollide = false, unbreakable = true, blastProof = true, noItem = true })
+add("water", { name = "물", color = rgb(56, 108, 214), material = M.Glass, transparency = 0.4, canCollide = false, unbreakable = true, blastProof = true, noItem = true, water = true })
+-- 양동이로 부은 물/용암 (잠시 뒤 사라짐)
+add("water_source", { name = "물", color = rgb(56, 108, 214), material = M.Glass, transparency = 0.4, canCollide = false, unbreakable = true, blastProof = true, noItem = true, water = true, tex = "water" })
+add("lava_flow", { name = "용암", color = rgb(255, 120, 24), material = M.Neon, transparency = 0.1, canCollide = false, unbreakable = true, blastProof = true, noItem = true, burn = true, tex = false })
 add("lava", { name = "용암", color = rgb(255, 110, 20), material = M.Neon, transparency = 0.02, canCollide = false, unbreakable = true, blastProof = true, kill = true, noItem = true, tex = false })
+
+-- 베드워즈/스카이워즈 추가 블록
+add("ladder", { name = "사다리", color = rgb(150, 116, 64), hardness = 0.4, tool = "axe", shape = "ladder", canCollide = false, tex = "ladder" })
+add("hardstone", { name = "강화 석재", color = rgb(224, 222, 172), hardness = 3, tool = "pickaxe", tex = "hardstone" })
+add("sponge", { name = "스펀지", color = rgb(204, 194, 72), hardness = 0.6, tex = "sponge" })
+add("lucky_block", { name = "럭키 블록", color = rgb(250, 206, 46), hardness = 0.3, lucky = true, noItem = true, tex = "lucky_block" })
+add("ender_chest", {
+	name = "개인 상자",
+	color = rgb(40, 30, 64),
+	shape = "chest",
+	unbreakable = true,
+	blastProof = true,
+	chest = true,
+	noItem = true,
+	tex = { top = "ender_chest_top", side = "ender_chest_side", front = "ender_chest_front", bottom = "ender_chest_top" },
+})
 
 -- 특수
 add("tnt", { name = "TNT", color = rgb(204, 56, 44), hardness = 0.05, tnt = true, tex = { top = "tnt_top", side = "tnt_side", bottom = "tnt_bottom" } })

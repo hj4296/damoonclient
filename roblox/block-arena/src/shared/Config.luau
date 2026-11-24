@@ -2,7 +2,7 @@
 local Config = {}
 
 Config.GameName = "블록 아레나"
-Config.Version = "1.0.0"
+Config.Version = "1.1.0"
 
 -- 블록 한 칸의 크기(스터드). 캐릭터 키(약 5스터드)와 비교해 마인크래프트 비율에 맞춘 값입니다.
 Config.BlockSize = 3
@@ -110,14 +110,45 @@ Config.BedWars = {
 		{ time = 900, name = "다이아몬드 III", kind = "diamond", tier = 3 },
 		{ time = 1200, name = "에메랄드 III", kind = "emerald", tier = 3 },
 		{ time = 1500, name = "침대 파괴", kind = "beds" },
-		{ time = 2100, name = "게임 종료", kind = "end" },
+		{ time = 1800, name = "서든데스", kind = "sudden" },
+		{ time = 2400, name = "게임 종료", kind = "end" },
 	},
+	ForgeEmeraldInterval = 50, -- 강화 용광로 3단계부터 섬에서 에메랄드가 나오는 간격
+	ForgeEmeraldCap = 2,
+	TrapRadius = 9, -- 기지 가운데에서 이 칸 수 안으로 적이 들어오면 함정 발동
+	TrapCooldown = 3,
+	TeamChestSize = 27,
+	EnderChestSize = 27,
+	GolemLife = 240,
+	BugLife = 15,
+	DragonSpeed = 22, -- 서든데스 용이 나는 속도(스터드/초)
+}
+
+-- 몹: 체력, 공격력, 이동 속도(스터드/초), 공격 간격, 눈치채는 거리(스터드)
+Config.Mobs = {
+	golem = { name = "수호 골렘", health = 60, damage = 4, speed = 9, attackInterval = 1.2, range = 36, reach = 5, knockback = 1.4 },
+	silverfish = { name = "좀벌레", health = 8, damage = 1.5, speed = 13, attackInterval = 0.7, range = 30, reach = 3.5, knockback = 0.5 },
+	dragon = { name = "용", health = 200, damage = 6, speed = 22, attackInterval = 1.4, range = 400, reach = 7, knockback = 1.6 },
+}
+
+-- 물약/함정 효과 (배율은 기본값에 곱함)
+Config.Effects = {
+	speed = { name = "신속", color = "#7CC8FF", walk = 1.4 },
+	jump = { name = "도약", color = "#7CFF7C", jump = 2.3 },
+	slow = { name = "느림", color = "#8888AA", walk = 0.6 },
+	invis = { name = "투명", color = "#CCCCDD" },
+	regen = { name = "재생", color = "#FF88DD" },
+	blind = { name = "어둠", color = "#555555" },
+	fatigue = { name = "피로", color = "#AA8844" },
+	milk = { name = "함정 면역", color = "#FFFFFF" },
+	fire = { name = "불", color = "#FF7722" },
 }
 
 Config.SkyWars = {
 	CageTime = 10,
 	Refills = { 180, 360 },
 	TimeLimit = 600,
+	LuckyChance = 0.6, -- 섬마다 럭키 블록이 놓일 확률(맵 표시 자리마다)
 }
 
 Config.TntRun = {

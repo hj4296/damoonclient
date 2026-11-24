@@ -83,6 +83,9 @@ export type BlockDef = {
 	lightColor: Color3?,
 	team: string?,
 	bed: boolean?,
+	water: boolean?,
+	burn: boolean?,
+	lucky: boolean?,
 	tnt: boolean?,
 	chest: boolean?,
 	noItem: boolean?,
@@ -111,6 +114,7 @@ Blocks.Shapes = {
 	lantern = { size = Vector3.new(0.34, 0.42, 0.34), offset = Vector3.new(0, -0.29, 0) },
 	torch = { size = Vector3.new(0.12, 0.55, 0.12), offset = Vector3.new(0, -0.225, 0) },
 	chest = { size = Vector3.new(0.86, 0.86, 0.86), offset = Vector3.new(0, -0.07, 0) },
+	ladder = { size = Vector3.new(1, 1, 0.12), offset = Vector3.new(0, 0, 0.44) }, -- 실제 방향은 붙은 벽에 따라 돌림
 	bed = { size = Vector3.new(1, 0.56, 1), offset = Vector3.new(0, -0.22, 0) },
 }
 
@@ -218,8 +222,27 @@ for name, color in STAINED do
 end
 
 -- 액체 (통과, 부서지지 않음)
-add("water", { name = "물", color = rgb(56, 108, 214), material = M.Glass, transparency = 0.4, canCollide = false, unbreakable = true, blastProof = true, noItem = true })
+add("water", { name = "물", color = rgb(56, 108, 214), material = M.Glass, transparency = 0.4, canCollide = false, unbreakable = true, blastProof = true, noItem = true, water = true })
+-- 양동이로 부은 물/용암 (잠시 뒤 사라짐)
+add("water_source", { name = "물", color = rgb(56, 108, 214), material = M.Glass, transparency = 0.4, canCollide = false, unbreakable = true, blastProof = true, noItem = true, water = true, tex = "water" })
+add("lava_flow", { name = "용암", color = rgb(255, 120, 24), material = M.Neon, transparency = 0.1, canCollide = false, unbreakable = true, blastProof = true, noItem = true, burn = true, tex = false })
 add("lava", { name = "용암", color = rgb(255, 110, 20), material = M.Neon, transparency = 0.02, canCollide = false, unbreakable = true, blastProof = true, kill = true, noItem = true, tex = false })
+
+-- 베드워즈/스카이워즈 추가 블록
+add("ladder", { name = "사다리", color = rgb(150, 116, 64), hardness = 0.4, tool = "axe", shape = "ladder", canCollide = false, tex = "ladder" })
+add("hardstone", { name = "강화 석재", color = rgb(224, 222, 172), hardness = 3, tool = "pickaxe", tex = "hardstone" })
+add("sponge", { name = "스펀지", color = rgb(204, 194, 72), hardness = 0.6, tex = "sponge" })
+add("lucky_block", { name = "럭키 블록", color = rgb(250, 206, 46), hardness = 0.3, lucky = true, noItem = true, tex = "lucky_block" })
+add("ender_chest", {
+	name = "개인 상자",
+	color = rgb(40, 30, 64),
+	shape = "chest",
+	unbreakable = true,
+	blastProof = true,
+	chest = true,
+	noItem = true,
+	tex = { top = "ender_chest_top", side = "ender_chest_side", front = "ender_chest_front", bottom = "ender_chest_top" },
+})
 
 -- 특수
 add("tnt", { name = "TNT", color = rgb(204, 56, 44), hardness = 0.05, tnt = true, tex = { top = "tnt_top", side = "tnt_side", bottom = "tnt_bottom" } })
@@ -501,7 +524,7 @@ return CharacterRig
 local Config = {}
 
 Config.GameName = "블록 아레나"
-Config.Version = "1.0.0"
+Config.Version = "1.1.0"
 
 -- 블록 한 칸의 크기(스터드). 캐릭터 키(약 5스터드)와 비교해 마인크래프트 비율에 맞춘 값입니다.
 Config.BlockSize = 3
@@ -609,14 +632,45 @@ Config.BedWars = {
 		{ time = 900, name = "다이아몬드 III", kind = "diamond", tier = 3 },
 		{ time = 1200, name = "에메랄드 III", kind = "emerald", tier = 3 },
 		{ time = 1500, name = "침대 파괴", kind = "beds" },
-		{ time = 2100, name = "게임 종료", kind = "end" },
+		{ time = 1800, name = "서든데스", kind = "sudden" },
+		{ time = 2400, name = "게임 종료", kind = "end" },
 	},
+	ForgeEmeraldInterval = 50, -- 강화 용광로 3단계부터 섬에서 에메랄드가 나오는 간격
+	ForgeEmeraldCap = 2,
+	TrapRadius = 9, -- 기지 가운데에서 이 칸 수 안으로 적이 들어오면 함정 발동
+	TrapCooldown = 3,
+	TeamChestSize = 27,
+	EnderChestSize = 27,
+	GolemLife = 240,
+	BugLife = 15,
+	DragonSpeed = 22, -- 서든데스 용이 나는 속도(스터드/초)
+}
+
+-- 몹: 체력, 공격력, 이동 속도(스터드/초), 공격 간격, 눈치채는 거리(스터드)
+Config.Mobs = {
+	golem = { name = "수호 골렘", health = 60, damage = 4, speed = 9, attackInterval = 1.2, range = 36, reach = 5, knockback = 1.4 },
+	silverfish = { name = "좀벌레", health = 8, damage = 1.5, speed = 13, attackInterval = 0.7, range = 30, reach = 3.5, knockback = 0.5 },
+	dragon = { name = "용", health = 200, damage = 6, speed = 22, attackInterval = 1.4, range = 400, reach = 7, knockback = 1.6 },
+}
+
+-- 물약/함정 효과 (배율은 기본값에 곱함)
+Config.Effects = {
+	speed = { name = "신속", color = "#7CC8FF", walk = 1.4 },
+	jump = { name = "도약", color = "#7CFF7C", jump = 2.3 },
+	slow = { name = "느림", color = "#8888AA", walk = 0.6 },
+	invis = { name = "투명", color = "#CCCCDD" },
+	regen = { name = "재생", color = "#FF88DD" },
+	blind = { name = "어둠", color = "#555555" },
+	fatigue = { name = "피로", color = "#AA8844" },
+	milk = { name = "함정 면역", color = "#FFFFFF" },
+	fire = { name = "불", color = "#FF7722" },
 }
 
 Config.SkyWars = {
 	CageTime = 10,
 	Refills = { 180, 360 },
 	TimeLimit = 600,
+	LuckyChance = 0.6, -- 섬마다 럭키 블록이 놓일 확률(맵 표시 자리마다)
 }
 
 Config.TntRun = {
@@ -1002,6 +1056,114 @@ Icons.Art = {
 		"..KSKKSK..",
 		"...K..K...",
 	},
+	stick = {
+		"........K.",
+		".......KBK",
+		"......KBK.",
+		".....KBK..",
+		"....KBK...",
+		"...KBK....",
+		"..KBK.....",
+		".KBK......",
+		"KBK.......",
+		".K........",
+	},
+	rod = {
+		"........KK",
+		".......KBK",
+		"......KBK.",
+		".....KBK.S",
+		"....KBK..S",
+		"...KBK...S",
+		"..KBK....S",
+		".KBK.....S",
+		"KBK.....KK",
+		"KK......K.",
+	},
+	potion = {
+		"...KKKK...",
+		"....KK....",
+		"...KWWK...",
+		"..KWWWWK..",
+		".KMMMMMMK.",
+		".KMLMMMMK.",
+		".KMMMMMMK.",
+		".KMMMMMDK.",
+		"..KMMMDK..",
+		"...KKKK...",
+	},
+	bucket = {
+		"..........",
+		".KKKKKKKK.",
+		"KSMMMMMMSK",
+		".KSMMMMSK.",
+		".KSSSSSSK.",
+		".KSSSSSSK.",
+		"..KSSSSK..",
+		"..KSSSSK..",
+		"..KKKKKK..",
+		"..........",
+	},
+	egg = {
+		"....KK....",
+		"...KMMK...",
+		"..KMLMMK..",
+		"..KMMMMK..",
+		".KMMMMMMK.",
+		".KMMMMMMK.",
+		".KMMMMMDK.",
+		"..KMMMDK..",
+		"...KKKK...",
+		"..........",
+	},
+	tower = {
+		"..K.KK.K..",
+		"..KMKKMK..",
+		"..KMMMMK..",
+		"..KMBBMK..",
+		"..KMMMMK..",
+		"..KMBBMK..",
+		"..KMMMMK..",
+		"..KMBBMK..",
+		"..KMMMMK..",
+		"..KKKKKK..",
+	},
+	golem = {
+		"...KKKK...",
+		"...KMMK...",
+		"...KRRK...",
+		"..KKMMKK..",
+		".KMMMMMMK.",
+		".KMKMMKMK.",
+		".KMKMMKMK.",
+		"..KKMMKK..",
+		"...KMMK...",
+		"...KKKK...",
+	},
+	bug = {
+		"..........",
+		"..........",
+		"..........",
+		".KKKKKKKK.",
+		"KMMDMMDMMK",
+		"KMMDMMDMMK",
+		".KKKKKKKK.",
+		"..........",
+		"..........",
+		"..........",
+	},
+	kit = {
+		"..........",
+		"KKKKKKKKKK",
+		"KMMMMMMMMK",
+		"KMMMYYMMMK",
+		"KKKKYYKKKK",
+		"KMMMMMMMMK",
+		"KMMMMMMMMK",
+		"KDDDDDDDDK",
+		"KKKKKKKKKK",
+		"..........",
+	},
 	question = {
 		"..KKKKKK..",
 		".KWWWWWWK.",
@@ -1051,6 +1213,14 @@ export type ItemDef = {
 	damage: number?,
 	speed: number?, -- 도구 채굴 속도 배율
 	tier: number?,
+	knockback: number?,
+	power: number?,
+	punch: number?,
+	effect: string?,
+	duration: number?,
+	liquid: string?,
+	deploy: string?,
+	enchanted: boolean?,
 	armorSlot: string?,
 	armorPoints: number?,
 	armorTier: string?,
@@ -1179,6 +1349,58 @@ add("snowball", {
 	lore = { "맞은 사람을 밀어냄" },
 })
 
+-- 마법이 붙은 무기와 갑옷 (스카이워즈 상자)
+add("iron_sword_sharp", { name = "철 검 (날카로움 I)", kind = "sword", damage = 7, tier = 3, icon = "sword", color = TIER.iron:Lerp(rgb(190, 120, 255), 0.25), enchanted = true, lore = { "날카로움 I" } })
+add("diamond_sword_sharp", { name = "다이아몬드 검 (날카로움 I)", kind = "sword", damage = 8, tier = 4, icon = "sword", color = TIER.diamond:Lerp(rgb(190, 120, 255), 0.25), enchanted = true, lore = { "날카로움 I" } })
+for _, tier in { "iron", "diamond" } do
+	for piece, value in ARMOR_POINTS[tier] do
+		add(tier .. "_" .. piece .. "_prot", {
+			name = ARMOR_NAMES[tier] .. " " .. PIECE_NAMES[piece] .. " (보호 I)",
+			kind = "armor",
+			armorSlot = piece,
+			armorPoints = value + 1,
+			armorTier = tier,
+			enchanted = true,
+			icon = piece,
+			color = TIER[tier]:Lerp(rgb(190, 120, 255), 0.25),
+			lore = { "보호 I" },
+		})
+	end
+end
+
+-- 특수 무기
+add("kb_stick", { name = "넉백 막대기", kind = "stick", damage = 1, knockback = 1.8, icon = "stick", color = rgb(150, 110, 60), enchanted = true, lore = { "밀치기: 맞은 사람을 멀리 날림" } })
+add("bow_power", { name = "활 (힘 I)", kind = "bow", power = 1.5, icon = "bow", color = TIER.wood:Lerp(rgb(190, 120, 255), 0.3), enchanted = true, lore = { "화살 피해 1.5배" } })
+add("bow_punch", {
+	name = "활 (힘 I, 밀치기 I)",
+	kind = "bow",
+	power = 1.5,
+	punch = 2.2,
+	icon = "bow",
+	color = TIER.wood:Lerp(rgb(190, 120, 255), 0.5),
+	enchanted = true,
+	lore = { "화살 피해 1.5배", "맞은 사람을 멀리 밀어냄" },
+})
+add("fishing_rod", { name = "낚싯대", kind = "rod", icon = "rod", color = TIER.wood, lore = { "맞힌 사람을 끌어당김" } })
+
+-- 물약 (마시면 효과)
+add("speed_potion", { name = "신속 물약", kind = "potion", effect = "speed", duration = 45, stack = 16, icon = "potion", color = rgb(110, 190, 255), lore = { "45초 동안 빨라짐" } })
+add("jump_potion", { name = "도약 물약", kind = "potion", effect = "jump", duration = 45, stack = 16, icon = "potion", color = rgb(110, 240, 110), lore = { "45초 동안 높이 뜀" } })
+add("invis_potion", { name = "투명화 물약", kind = "potion", effect = "invis", duration = 30, stack = 16, icon = "potion", color = rgb(190, 190, 215), lore = { "30초 동안 투명 (공격하면 풀림)" } })
+add("heal_potion", { name = "치유 물약", kind = "potion", effect = "heal", duration = 0, stack = 16, icon = "potion", color = rgb(250, 70, 90), lore = { "체력 4칸 회복" } })
+add("regen_potion", { name = "재생 물약", kind = "potion", effect = "regen", duration = 20, stack = 16, icon = "potion", color = rgb(240, 120, 210), lore = { "20초 동안 체력 회복" } })
+add("magic_milk", { name = "마법 우유", kind = "potion", effect = "milk", duration = 30, stack = 16, icon = "potion", color = rgb(245, 245, 240), lore = { "30초 동안 함정에 안 걸림" } })
+
+-- 양동이 (블록 놓듯이 우클릭)
+add("water_bucket", { name = "물 양동이", kind = "bucket", liquid = "water_source", icon = "bucket", color = rgb(60, 110, 220), lore = { "물: 떨어져도 안 다치고 TNT 를 막음" } })
+add("lava_bucket", { name = "용암 양동이", kind = "bucket", liquid = "lava_flow", icon = "bucket", color = rgb(255, 120, 24), lore = { "닿으면 불에 탐" } })
+
+-- 설치/소환 (블록 놓듯이 우클릭)
+add("bridge_egg", { name = "다리 알", kind = "throwable", projectile = "bridge_egg", stack = 16, icon = "egg", color = rgb(236, 226, 196), lore = { "날아간 길에 양털 다리가 생김" } })
+add("popup_tower", { name = "팝업 타워", kind = "deploy", deploy = "tower", stack = 16, icon = "tower", color = rgb(200, 60, 50), lore = { "그 자리에 사다리 달린 탑이 세워짐" } })
+add("golem_egg", { name = "드림 디펜더", kind = "deploy", deploy = "golem", stack = 16, icon = "golem", color = rgb(214, 214, 204), lore = { "우리 팀을 지키는 철 골렘 (4분)" } })
+add("bed_bug", { name = "베드 버그", kind = "throwable", projectile = "bed_bug", stack = 16, icon = "bug", color = rgb(150, 150, 156), lore = { "떨어진 곳에 좀벌레가 나타남 (15초)" } })
+
 -- 자원
 add("iron", { name = "철 주괴", kind = "currency", stack = 64, icon = "ingot", color = TIER.iron })
 add("gold", { name = "금 주괴", kind = "currency", stack = 64, icon = "ingot", color = TIER.gold })
@@ -1201,6 +1423,14 @@ add("vote_paper", {
 	icon = "paper",
 	color = rgb(240, 240, 230),
 	lore = { "우클릭으로 맵 고르기", "VIP 가 없으면 맵은 무작위" },
+})
+add("kit_selector", {
+	name = "키트 고르기",
+	kind = "menu",
+	action = "kits",
+	icon = "kit",
+	color = rgb(160, 112, 54),
+	lore = { "우클릭으로 키트와 능력 고르기" },
 })
 add("leave_bed", {
 	name = "로비로 돌아가기",
@@ -1244,6 +1474,137 @@ return Items
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="10">
+        <Properties>
+          <string name="Name">Kits</string>
+          <string name="Source"><![CDATA[-- 스카이워즈 키트(시작 장비)와 능력(경기 내내 붙는 효과). 대기실에서 고르고, 유리관이 열릴 때 받습니다.
+local Kits = {}
+
+export type Kit = {
+	id: string,
+	name: string,
+	icon: string, -- 아이콘으로 보여 줄 아이템 id
+	items: { { id: string, count: number } },
+	lore: { string },
+}
+
+export type Perk = {
+	id: string,
+	name: string,
+	icon: string,
+	lore: { string },
+}
+
+local function stack(id: string, count: number?)
+	return { id = id, count = count or 1 }
+end
+
+Kits.List = {
+	{
+		id = "explorer",
+		name = "탐험가",
+		icon = "wood_pickaxe",
+		items = { stack("wood_pickaxe"), stack("wood_axe"), stack("planks", 16) },
+		lore = { "나무 곡괭이, 나무 도끼", "판자 16개" },
+	},
+	{
+		id = "knight",
+		name = "기사",
+		icon = "stone_sword",
+		items = { stack("stone_sword"), stack("chain_chestplate") },
+		lore = { "돌 검, 사슬 흉갑" },
+	},
+	{
+		id = "archer",
+		name = "궁수",
+		icon = "bow",
+		items = { stack("bow"), stack("arrow", 10), stack("leather_helmet") },
+		lore = { "활, 화살 10개", "가죽 투구" },
+	},
+	{
+		id = "builder",
+		name = "건축가",
+		icon = "planks",
+		items = { stack("planks", 48), stack("stone", 24), stack("wood_axe") },
+		lore = { "판자 48개, 돌 24개", "나무 도끼" },
+	},
+	{
+		id = "miner",
+		name = "광부",
+		icon = "iron_pickaxe",
+		items = { stack("iron_pickaxe"), stack("cobble", 32) },
+		lore = { "철 곡괭이, 조약돌 32개" },
+	},
+	{
+		id = "healer",
+		name = "치유사",
+		icon = "regen_potion",
+		items = { stack("regen_potion"), stack("heal_potion", 2), stack("golden_apple") },
+		lore = { "재생 물약, 치유 물약 2개", "황금 사과" },
+	},
+	{
+		id = "fisher",
+		name = "낚시꾼",
+		icon = "fishing_rod",
+		items = { stack("fishing_rod"), stack("snowball", 8) },
+		lore = { "낚싯대, 눈덩이 8개" },
+	},
+	{
+		id = "demolisher",
+		name = "폭파병",
+		icon = "tnt",
+		items = { stack("tnt", 3), stack("fireball", 1) },
+		lore = { "TNT 3개, 화염구 1개" },
+	},
+	{
+		id = "lavaman",
+		name = "용암술사",
+		icon = "lava_bucket",
+		items = { stack("lava_bucket"), stack("water_bucket") },
+		lore = { "용암 양동이, 물 양동이" },
+	},
+	{
+		id = "jumper",
+		name = "점프왕",
+		icon = "jump_potion",
+		items = { stack("jump_potion", 2), stack("pearl") },
+		lore = { "도약 물약 2개", "순간이동 진주" },
+	},
+} :: { Kit }
+
+Kits.Perks = {
+	{ id = "lifesteal", name = "처치 회복", icon = "golden_apple", lore = { "상대를 처치하면", "체력 4칸 회복" } },
+	{ id = "arrow_return", name = "화살 회수", icon = "arrow", lore = { "화살을 맞히면 30% 확률로", "화살을 돌려받음" } },
+	{ id = "feather", name = "깃털 낙하", icon = "snowball", lore = { "떨어질 때 받는 피해 절반" } },
+	{ id = "sturdy", name = "단단한 몸", icon = "iron_chestplate", lore = { "밀려나는 거리 35% 감소" } },
+	{ id = "lucky_miner", name = "행운의 곡괭이", icon = "iron_pickaxe", lore = { "블록을 부수면 25% 확률로", "하나 더 얻음" } },
+	{ id = "bulwark", name = "보호막", icon = "golden_apple", lore = { "시작할 때와 처치할 때", "보호막 2칸" } },
+} :: { Perk }
+
+Kits.DefaultKit = "explorer"
+Kits.DefaultPerk = "lifesteal"
+
+local kitIndex: { [string]: Kit } = {}
+for _, kit in Kits.List do
+	kitIndex[kit.id] = kit
+end
+local perkIndex: { [string]: Perk } = {}
+for _, perk in Kits.Perks do
+	perkIndex[perk.id] = perk
+end
+
+function Kits.get(id: string?): Kit?
+	return if id then kitIndex[id] else nil
+end
+
+function Kits.getPerk(id: string?): Perk?
+	return if id then perkIndex[id] else nil
+end
+
+return Kits
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="11">
         <Properties>
           <string name="Name">Preferences</string>
           <string name="Source"><![CDATA[-- 설정 탭 항목 (서버 저장과 클라이언트 적용이 같이 씀)
@@ -1294,7 +1655,7 @@ return Preferences
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="11">
+      <Item class="ModuleScript" referent="12">
         <Properties>
           <string name="Name">Rules</string>
           <string name="Source"><![CDATA[-- 서버와 클라이언트가 같이 쓰는 계산식 (채굴 시간, 공격력, 방어력)
@@ -1319,7 +1680,8 @@ function Rules.toolMultiplier(blockId: string, itemId: string?): number
 end
 
 -- 블록을 부수는 데 걸리는 시간(초). 부술 수 없으면 nil.
-function Rules.breakTime(blockId: string, itemId: string?): number?
+-- speed 는 효과 배율 (광부의 손 강화 1.25/1.5, 피로 함정 0.3)
+function Rules.breakTime(blockId: string, itemId: string?, speed: number?): number?
 	local block = Blocks.get(blockId)
 	if not block or block.unbreakable then
 		return nil
@@ -1330,7 +1692,35 @@ function Rules.breakTime(blockId: string, itemId: string?): number?
 		-- 돌 같은 블록은 맨손이면 훨씬 오래 걸림
 		t *= 2.5
 	end
-	return math.max(0.05, t)
+	return math.max(0.05, t / math.max(0.05, speed or 1))
+end
+
+-- 광부의 손 단계와 피로 효과로 정해지는 부수기 속도 배율
+function Rules.breakSpeed(haste: number, fatigued: boolean): number
+	local speed = 1 + 0.25 * haste
+	if fatigued then
+		speed *= 0.3
+	end
+	return speed
+end
+
+-- 근접 공격 넉백 배율 (넉백 막대기는 훨씬 멀리)
+function Rules.knockbackMultiplier(itemId: string?): number
+	local item = if itemId then Items.get(itemId) else nil
+	return if item and item.knockback then item.knockback else 1
+end
+
+-- 화살 피해: 당긴 정도(0~1)와 활의 힘 마법
+function Rules.arrowDamage(charge: number, bowId: string?): number
+	local damage = 1 + 5 * charge
+	if charge >= 0.99 then
+		damage += 1
+	end
+	local bow = if bowId then Items.get(bowId) else nil
+	if bow and bow.power then
+		damage *= bow.power
+	end
+	return damage
 end
 
 function Rules.meleeDamage(itemId: string?, sharpness: number): number
@@ -1385,10 +1775,10 @@ return Rules
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="12">
+      <Item class="ModuleScript" referent="13">
         <Properties>
           <string name="Name">Shop</string>
-          <string name="Source"><![CDATA[-- 베드워즈 상점과 팀 강화 목록. "$team" 은 구매한 사람의 팀 색으로 바뀝니다.
+          <string name="Source"><![CDATA[-- 베드워즈 상점(빠른 구매 포함), 팀 강화, 함정 목록. "$team" 은 구매한 사람의 팀 색으로 바뀝니다.
 local Shop = {}
 
 export type Cost = { item: string, amount: number }
@@ -1411,15 +1801,46 @@ local function cost(item: string, amount: number): Cost
 	return { item = item, amount = amount }
 end
 
+-- 빠른 구매: 자주 사는 물건을 한 화면에 모아 둔 탭 (다른 탭의 물건을 key 로 가리킴)
+Shop.QuickBuy = {
+	"wool",
+	"stone_sword",
+	"chain_armor",
+	"pickaxe",
+	"bow",
+	"speed_potion",
+	"tnt",
+	"popup_tower",
+	"golden_apple",
+	"clay",
+	"iron_sword",
+	"iron_armor",
+	"shears",
+	"arrows",
+	"jump_potion",
+	"water_bucket",
+	"fireball",
+	"pearl",
+}
+
 Shop.Categories = {
+	{
+		id = "quick",
+		name = "빠른 구매",
+		icon = "compass",
+		quick = true,
+		items = {},
+	},
 	{
 		id = "blocks",
 		name = "블록",
-		icon = "wool_red",
+		icon = "wool_$team",
 		items = {
 			{ key = "wool", give = "wool_$team", count = 16, cost = cost("iron", 4), lore = { "빨리 쌓고 빨리 부서짐" } },
 			{ key = "clay", give = "clay_$team", count = 16, cost = cost("iron", 12), lore = { "단단한 방어용 블록" } },
 			{ key = "blast_glass", give = "blast_glass", count = 4, cost = cost("iron", 12), lore = { "폭발에 부서지지 않음" } },
+			{ key = "hardstone", give = "hardstone", count = 12, cost = cost("iron", 24), lore = { "폭발에 강하고 곡괭이로만 잘 부서짐" } },
+			{ key = "ladder", give = "ladder", count = 8, cost = cost("iron", 4), lore = { "벽에 붙여 놓고 타고 올라감" } },
 			{ key = "planks", give = "planks", count = 16, cost = cost("gold", 4), lore = { "도끼로 빨리 부서짐" } },
 			{ key = "obsidian", give = "obsidian", count = 4, cost = cost("emerald", 4), lore = { "가장 단단한 블록" } },
 		},
@@ -1432,6 +1853,7 @@ Shop.Categories = {
 			{ key = "stone_sword", give = "stone_sword", cost = cost("iron", 10), sword = true },
 			{ key = "iron_sword", give = "iron_sword", cost = cost("gold", 7), sword = true },
 			{ key = "diamond_sword", give = "diamond_sword", cost = cost("emerald", 4), sword = true },
+			{ key = "kb_stick", give = "kb_stick", cost = cost("gold", 5) },
 		},
 	},
 	{
@@ -1502,7 +1924,19 @@ Shop.Categories = {
 		items = {
 			{ key = "arrows", give = "arrow", count = 8, cost = cost("gold", 2) },
 			{ key = "bow", give = "bow", cost = cost("gold", 12) },
+			{ key = "bow_power", give = "bow_power", cost = cost("gold", 20) },
+			{ key = "bow_punch", give = "bow_punch", cost = cost("emerald", 6) },
 			{ key = "snowball", give = "snowball", count = 4, cost = cost("iron", 16) },
+		},
+	},
+	{
+		id = "potions",
+		name = "물약",
+		icon = "speed_potion",
+		items = {
+			{ key = "speed_potion", give = "speed_potion", cost = cost("emerald", 1) },
+			{ key = "jump_potion", give = "jump_potion", cost = cost("emerald", 1) },
+			{ key = "invis_potion", give = "invis_potion", cost = cost("emerald", 2) },
 		},
 	},
 	{
@@ -1511,43 +1945,76 @@ Shop.Categories = {
 		icon = "tnt",
 		items = {
 			{ key = "golden_apple", give = "golden_apple", cost = cost("gold", 3) },
+			{ key = "bed_bug", give = "bed_bug", cost = cost("iron", 24) },
+			{ key = "golem_egg", give = "golem_egg", cost = cost("iron", 120) },
 			{ key = "fireball", give = "fireball", cost = cost("iron", 40) },
 			{ key = "tnt", give = "tnt", cost = cost("gold", 4), lore = { "설치하면 3초 뒤 폭발" } },
 			{ key = "pearl", give = "pearl", cost = cost("emerald", 4) },
+			{ key = "water_bucket", give = "water_bucket", cost = cost("gold", 3) },
+			{ key = "bridge_egg", give = "bridge_egg", cost = cost("emerald", 1) },
+			{ key = "magic_milk", give = "magic_milk", cost = cost("gold", 4) },
+			{ key = "sponge", give = "sponge", count = 4, cost = cost("gold", 3), lore = { "주변의 물을 빨아들임" } },
+			{ key = "popup_tower", give = "popup_tower", cost = cost("iron", 24) },
 		},
 	},
 }
 
+-- 다이아몬드로 사는 팀 강화. costs 의 개수가 최대 단계, levels 는 단계별 설명
 Shop.Upgrades = {
 	{
 		key = "sharpness",
 		name = "날카로운 검",
 		icon = "iron_sword",
 		costs = { 4 },
-		lore = { "팀 전체의 검 공격력 +1" },
+		levels = { "팀 전체의 검 공격력 +1" },
 	},
 	{
 		key = "protection",
 		name = "강화 갑옷",
 		icon = "iron_chestplate",
-		costs = { 2, 4, 8 },
-		lore = { "단계마다 받는 피해 6% 감소" },
+		costs = { 2, 4, 8, 16 },
+		levels = { "받는 피해 6% 감소", "받는 피해 12% 감소", "받는 피해 18% 감소", "받는 피해 24% 감소" },
+	},
+	{
+		key = "haste",
+		name = "광부의 손",
+		icon = "iron_pickaxe",
+		costs = { 2, 4 },
+		levels = { "팀 전체 블록 부수는 속도 +25%", "팀 전체 블록 부수는 속도 +50%" },
 	},
 	{
 		key = "forge",
 		name = "강화 용광로",
 		icon = "gold",
-		costs = { 2, 4 },
-		lore = { "섬 자원 생성 +50% / +100%" },
+		costs = { 2, 4, 6, 8 },
+		levels = { "철·금 생성 +50%", "철·금 생성 +100%", "섬 생성기에서 에메랄드 생성", "철·금 생성 +200%" },
 	},
 	{
 		key = "healpool",
 		name = "치유의 샘",
 		icon = "golden_apple",
 		costs = { 1 },
-		lore = { "기지 근처에서 체력이 빨리 참" },
+		levels = { "기지 근처에서 체력이 빨리 참" },
+	},
+	{
+		key = "dragon",
+		name = "용의 가호",
+		icon = "fireball",
+		costs = { 5 },
+		levels = { "서든데스 때 우리 팀 용이 한 마리 더 나옴" },
 	},
 }
+
+-- 함정: 산 순서대로 줄을 서고, 적이 기지에 들어오면 맨 앞의 함정이 발동합니다.
+-- 가격은 줄에 이미 있는 함정 수에 따라 1, 2, 4 다이아몬드
+Shop.Traps = {
+	{ key = "alarm", name = "경보 함정", icon = "compass", lore = { "들어온 적의 투명화를 풀고", "팀에게 알림" } },
+	{ key = "fatigue", name = "피로 함정", icon = "wood_pickaxe", lore = { "들어온 적이 10초 동안", "블록을 아주 느리게 부숨" } },
+	{ key = "blind", name = "어둠 함정", icon = "invis_potion", lore = { "들어온 적이 8초 동안", "앞이 안 보이고 느려짐" } },
+	{ key = "counter", name = "반격 함정", icon = "speed_potion", lore = { "기지에 있는 우리 팀이 15초 동안", "빨라지고 높이 뜀" } },
+}
+Shop.TrapCosts = { 1, 2, 4 }
+Shop.MaxTraps = 3
 
 local itemIndex: { [string]: ShopItem } = {}
 for _, category in Shop.Categories do
@@ -1555,9 +2022,23 @@ for _, category in Shop.Categories do
 		itemIndex[item.key] = item :: any
 	end
 end
+-- 빠른 구매 탭은 다른 탭의 물건을 그대로 보여 줌
+for _, category in Shop.Categories do
+	if category.quick then
+		for _, key in Shop.QuickBuy do
+			local item = itemIndex[key]
+			assert(item, "빠른 구매에 없는 물건: " .. key)
+			table.insert(category.items, item)
+		end
+	end
+end
 local upgradeIndex = {}
 for _, upgrade in Shop.Upgrades do
 	upgradeIndex[upgrade.key] = upgrade
+end
+local trapIndex = {}
+for _, trap in Shop.Traps do
+	trapIndex[trap.key] = trap
 end
 
 function Shop.getItem(key: string): ShopItem?
@@ -1568,6 +2049,14 @@ function Shop.getUpgrade(key: string)
 	return upgradeIndex[key]
 end
 
+function Shop.getTrap(key: string)
+	return trapIndex[key]
+end
+
+function Shop.trapCost(queued: number): number?
+	return Shop.TrapCosts[queued + 1]
+end
+
 function Shop.resolve(id: string, team: string?): string
 	return (string.gsub(id, "%$team", team or "red"))
 end
@@ -1576,7 +2065,7 @@ return Shop
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="14">
         <Properties>
           <string name="Name">Skins</string>
           <string name="Source"><![CDATA[-- 캐릭터 스킨: 색 6가지 + 머리 모양 + 옷 모양. 문자열 하나로 저장/전송합니다.
@@ -1937,7 +2426,7 @@ return Skins
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">TextureIds</string>
           <string name="Source"><![CDATA[-- (선택) 직접 올린 텍스처 이미지 ID.
@@ -1952,7 +2441,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">Textures</string>
           <string name="Source"><![CDATA[-- 블록 픽셀 텍스처 (16x16). 이미지 파일 없이 코드로 직접 그린 이 게임만의 텍스처입니다.
@@ -2843,6 +3332,96 @@ function G.bed_side(rng)
 	return px
 end
 
+-- 사다리, 강화 석재, 스펀지, 럭키 블록, 개인 상자
+function G.ladder(rng)
+	local px = table.create(N * N * 4, 0)
+	local wood = { 150, 116, 64 }
+	for y = 0, N - 1 do
+		for _, x in { 2, 13 } do
+			put(px, x, y, mul(wood, 0.85 + rng:next() * 0.15))
+			put(px, x + (if x == 2 then -1 else 1), y, mul(wood, 0.7))
+		end
+	end
+	for _, y in { 2, 6, 10, 14 } do
+		for x = 2, 13 do
+			put(px, x, y, mul(wood, 0.95 + rng:next() * 0.1))
+		end
+	end
+	return px
+end
+function G.hardstone(rng)
+	local px = base({ 224, 222, 172 }, rng, 0.04)
+	specks(px, rng, 0.12, { 196, 192, 140 })
+	local split = cells(rng, 5)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local _, edge = split(x, y)
+			if edge and rng:next() < 0.5 then
+				put(px, x, y, { 200, 196, 146 })
+			end
+		end
+	end
+	return px
+end
+function G.sponge(rng)
+	local px = base({ 204, 194, 72 }, rng, 0.06)
+	for _ = 1, 14 do
+		local x, y = rng:int(0, N - 2), rng:int(0, N - 2)
+		put(px, x, y, { 150, 140, 40 })
+		if rng:next() < 0.5 then
+			put(px, x + 1, y, { 170, 160, 50 })
+		end
+	end
+	return px
+end
+local QUESTION = {
+	"..####..",
+	".##..##.",
+	".....##.",
+	"....##..",
+	"...##...",
+	"...##...",
+	"........",
+	"...##...",
+}
+function G.lucky_block(rng)
+	local px = base({ 250, 206, 46 }, rng, 0.03)
+	bevel(px, { 255, 236, 120 }, { 190, 140, 20 })
+	for row, line in QUESTION do
+		for col = 1, 8 do
+			if string.sub(line, col, col) == "#" then
+				put(px, 3 + col, 3 + row, { 90, 50, 10 })
+			end
+		end
+	end
+	return px
+end
+local function enderBase(rng)
+	local px = base({ 40, 30, 64 }, rng, 0.08)
+	specks(px, rng, 0.08, { 60, 46, 90 })
+	bevel(px, { 30, 140, 120 }, { 20, 90, 80 })
+	return px
+end
+function G.ender_chest_top(rng)
+	return enderBase(rng)
+end
+function G.ender_chest_side(rng)
+	local px = enderBase(rng)
+	for x = 0, N - 1 do
+		put(px, x, 5, { 20, 90, 80 })
+	end
+	return px
+end
+function G.ender_chest_front(rng)
+	local px = G.ender_chest_side(rng)
+	for y = 4, 7 do
+		for x = 7, 8 do
+			put(px, x, y, if y == 4 or y == 7 then { 20, 90, 80 } else { 60, 220, 190 })
+		end
+	end
+	return px
+end
+
 -- 색 블록들 (양털: 뜨개 무늬, 테라코타: 부드러운 흙, 콘크리트: 매끈)
 local function knit(rng, c: Color)
 	local px = base(c, rng, 0.03)
@@ -2947,7 +3526,7 @@ return Textures
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">Util</string>
           <string name="Source"><![CDATA[-- 작은 도우미 함수들 (시간 표시, 고정 시드 난수)
@@ -3003,18 +3582,18 @@ return Util
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="17">
+  <Item class="ServerScriptService" referent="18">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="18">
+    <Item class="Folder" referent="19">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">Actions</string>
-          <string name="Source"><![CDATA[-- 클라이언트 요청 처리: 블록 설치/부수기, 공격, 아이템 사용, 가방 정리, 상점, 투표
+          <string name="Source"><![CDATA[-- 클라이언트 요청 처리: 블록 설치/부수기, 공격(사람/몹), 아이템 사용(물약/양동이/알/타워/낚싯대), 가방, 상점, 투표, 키트
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage.Shared
@@ -3030,8 +3609,11 @@ local Inventory = require(script.Parent.Logic.Inventory)
 local Matches = require(script.Parent.Matches)
 local Containers = require(script.Parent.Containers)
 local Projectiles = require(script.Parent.Projectiles)
-local Explosion = require(script.Parent.Explosion)
+local Blast = require(script.Parent.Blast)
 local Drops = require(script.Parent.Drops)
+local Status = require(script.Parent.Status)
+local Mobs = require(script.Parent.Mobs)
+local Kits = require(Shared.Kits)
 local Monetization = require(script.Parent.Monetization)
 local PlayerData = require(script.Parent.PlayerData)
 local Skins = require(Shared.Skins)
@@ -3074,44 +3656,64 @@ local function playing(player: Player)
 end
 
 local function explode(match, position: Vector3, radius: number, power: number, source: Player?)
-	Explosion.explode(position, {
-		world = match.world,
-		players = Matches.inGame(match),
-		canBreak = function(record)
-			return match.mode.canExplode(match, record)
-		end,
-		canHurt = function(src: Player?, victim: Player): boolean
-			if not src or src == victim then
-				return true
-			end
-			return Combat.canDamage(src, victim)
-		end,
-		source = source,
-		radius = radius,
-		power = power,
-	})
+	Blast.explode(match, position, radius, power, source)
 end
 
-local function primeTnt(match, record, source: Player)
-	task.spawn(function()
-		local part = record.part
-		if not part then
-			return
+local HORIZONTAL = {
+	{ 1, 0 },
+	{ -1, 0 },
+	{ 0, 1 },
+	{ 0, -1 },
+}
+
+-- 물/용암처럼 블록을 놓으면 덮어써지는 칸
+local function replaceable(record): boolean
+	if not record then
+		return true
+	end
+	local def = Blocks.get(record.id)
+	return record.placed and def ~= nil and (def.water == true or def.burn == true)
+end
+
+-- 사다리를 붙일 벽 방향 (누른 면의 반대쪽이 우선)
+local function ladderFace(world, x: number, y: number, z: number, nx: any, nz: any): { number }?
+	if isInt(nx, nz) and math.abs(nx) + math.abs(nz) == 1 and world:isSolid(x - nx, y, z - nz) then
+		return { -nx, -nz }
+	end
+	for _, d in HORIZONTAL do
+		if world:isSolid(x + d[1], y, z + d[2]) then
+			return { d[1], d[2] }
 		end
-		for i = 1, 12 do
-			task.wait(0.25)
-			if match.world:get(record.x, record.y, record.z) ~= record or match.state ~= "playing" then
-				return
+	end
+	return nil
+end
+
+-- 스펀지: 주변(반지름 3칸)의 놓인 물/용암을 빨아들임
+local function absorb(world, x: number, y: number, z: number)
+	for dx = -3, 3 do
+		for dy = -3, 3 do
+			for dz = -3, 3 do
+				local record = world:get(x + dx, y + dy, z + dz)
+				local def = if record then Blocks.get(record.id) else nil
+				if record and record.placed and def and (def.water or def.burn) then
+					world:remove(record.x, record.y, record.z)
+				end
 			end
-			part.Color = if i % 2 == 0 then Color3.fromRGB(214, 52, 40) else Color3.fromRGB(255, 255, 255)
 		end
-		if match.world:get(record.x, record.y, record.z) ~= record then
-			return
+	end
+end
+
+-- 양동이: 그 칸과 아래로 몇 칸 흘러내림
+local function pour(match, player: Player, x: number, y: number, z: number, liquid: string)
+	local world = match.world
+	world:set(x, y, z, liquid, true)
+	for d = 1, (if liquid == "lava_flow" then 3 else 5) do
+		local below = world:get(x, y - d, z)
+		if below or not match.mode.canPlace(match, player, x, y - d, z) then
+			break
 		end
-		local position = part.Position
-		match.world:remove(record.x, record.y, record.z)
-		explode(match, position, 3.2, 8, source)
-	end)
+		world:set(x, y - d, z, liquid, true)
+	end
 end
 
 local function blockedByCharacter(match, center: Vector3): boolean
@@ -3142,7 +3744,63 @@ Net.on("select", function(player, index)
 	end
 end)
 
-Net.on("place", function(player, x, y, z)
+-- 팝업 타워: 그 자리에 사다리가 달린 양털 탑 (앞쪽은 문, 위에는 난간 있는 발판)
+local function popupTower(match, player: Player, x: number, y: number, z: number, forward: Vector3): boolean
+	local world = match.world
+	local state = Session.get(player)
+	local wool = "wool_" .. (if state and state.team then state.team else "white")
+	if not Blocks.get(wool) then
+		wool = "wool_white"
+	end
+	local fx, fz = 0, 1
+	if math.abs(forward.X) > math.abs(forward.Z) then
+		fx, fz = if forward.X > 0 then 1 else -1, 0
+	else
+		fx, fz = 0, if forward.Z > 0 then 1 else -1
+	end
+	local sx, sz = fz, -fx
+	local placed = 0
+	local function put(s: number, h: number, f: number, id: string, data: { [string]: any }?)
+		local cx, cy, cz = x + s * sx + f * fx, y + h, z + s * sz + f * fz
+		-- 사람이 서 있는 칸에는 벽을 만들지 않음 (끼임 방지)
+		local solid = id ~= "ladder"
+		if solid and blockedByCharacter(match, world:cellCenter(cx, cy, cz)) then
+			return
+		end
+		if replaceable(world:get(cx, cy, cz)) and match.mode.canPlace(match, player, cx, cy, cz) then
+			world:set(cx, cy, cz, id, true, data)
+			placed += 1
+		end
+	end
+	-- 벽 (뒤쪽 = 플레이어가 보는 방향 반대, 앞쪽 아래 두 칸은 입구)
+	for h = 0, 4 do
+		for s = -1, 1 do
+			for f = -1, 1 do
+				if not (s == 0 and f == 0) and not (s == 0 and f == -1 and h <= 1) then
+					put(s, h, f, wool)
+				end
+			end
+		end
+	end
+	-- 발판과 난간
+	for s = -2, 2 do
+		for f = -2, 2 do
+			if not (s == 0 and f == 0) then
+				put(s, 5, f, wool)
+				if math.abs(s) == 2 or math.abs(f) == 2 then
+					put(s, 6, f, wool)
+				end
+			end
+		end
+	end
+	-- 가운데 사다리 (앞쪽 벽에 붙음)
+	for h = 0, 5 do
+		put(0, h, 0, "ladder", { face = { fx, fz } })
+	end
+	return placed > 0
+end
+
+Net.on("place", function(player, x, y, z, nx, _ny, nz)
 	if not isInt(x, y, z) then
 		return
 	end
@@ -3152,36 +3810,82 @@ Net.on("place", function(player, x, y, z)
 	end
 	local stack, index = Inventory.selectedStack(state.inv)
 	local def = if stack then Items.get(stack.id) else nil
-	if not stack or not def or def.kind ~= "block" or not def.block then
+	if not stack or not def then
+		return
+	end
+	local kind = def.kind
+	if kind ~= "block" and kind ~= "bucket" and kind ~= "deploy" then
 		return
 	end
 	local world = match.world
-	if world:get(x, y, z) then
+	if not replaceable(world:get(x, y, z)) then
 		return
 	end
 	local center = world:cellCenter(x, y, z)
-	if (center - (state.root :: BasePart).Position).Magnitude > Config.Reach.BlockServer then
+	local root = state.root :: BasePart
+	if (center - root.Position).Magnitude > Config.Reach.BlockServer then
 		return
 	end
 	local touching = false
 	for _, n in NEIGHBORS do
-		if world:get(x + n[1], y + n[2], z + n[3]) then
+		local other = world:get(x + n[1], y + n[2], z + n[3])
+		if other and not replaceable(other) then
 			touching = true
 			break
 		end
 	end
-	if not touching or blockedByCharacter(match, center) then
+	if not touching or not match.mode.canPlace(match, player, x, y, z) then
 		return
 	end
-	if not match.mode.canPlace(match, player, x, y, z) then
+
+	if kind == "bucket" and def.liquid then
+		Inventory.consumeSlot(state.inv, index, 1)
+		Net.broadcast("swing", player)
+		pour(match, player, x, y, z, def.liquid)
+		Net.send(player, "sound", "place")
 		return
+	elseif kind == "deploy" then
+		if def.deploy == "tower" then
+			local look = root.CFrame.LookVector
+			if popupTower(match, player, x, y, z, Vector3.new(look.X, 0, look.Z)) then
+				Inventory.consumeSlot(state.inv, index, 1)
+				Net.broadcast("swing", player)
+			end
+		elseif def.deploy == "golem" then
+			local position = Mobs.groundAt(match, x, y, z)
+			if position and Mobs.spawn(match, "golem", position, { team = state.team, owner = player, life = Config.BedWars.GolemLife }) then
+				Inventory.consumeSlot(state.inv, index, 1)
+				Net.broadcast("swing", player)
+				Session.chat({ player }, '<font color="#55FF55">수호 골렘이 4분 동안 기지를 지킵니다.</font>')
+			end
+		end
+		return
+	end
+
+	if not def.block then
+		return
+	end
+	local blockDef = Blocks.get(def.block)
+	-- 사다리처럼 통과하는 블록은 서 있는 자리에도 놓을 수 있음
+	if (blockDef == nil or blockDef.canCollide ~= false) and blockedByCharacter(match, center) then
+		return
+	end
+	local data = nil
+	if blockDef and blockDef.shape == "ladder" then
+		local face = ladderFace(world, x, y, z, nx, nz)
+		if not face then
+			return
+		end
+		data = { face = face }
 	end
 	Inventory.consumeSlot(state.inv, index, 1)
 	Net.broadcast("swing", player)
-	local record = world:set(x, y, z, def.block, true)
-	local blockDef = Blocks.get(def.block)
+	local record = world:set(x, y, z, def.block, true, data)
 	if record and blockDef and blockDef.tnt then
-		primeTnt(match, record, player)
+		Blast.prime(match, record, player)
+	end
+	if record and def.block == "sponge" then
+		absorb(world, x, y, z)
 	end
 end)
 
@@ -3212,7 +3916,8 @@ Net.on("break", function(player, x, y, z)
 		return
 	end
 	local stack = state.inv.slots[state.inv.selected]
-	local need = Rules.breakTime(record.id, if stack then stack.id else nil)
+	local haste = if match.mode.haste then match.mode.haste(match, player) else 0
+	local need = Rules.breakTime(record.id, if stack then stack.id else nil, Rules.breakSpeed(haste, Status.has(player, "fatigue")))
 	local breaking = state.breaking
 	if not need or not breaking or breaking.key ~= World.key(x, y, z) then
 		return
@@ -3234,10 +3939,22 @@ Net.on("attack", function(player, target)
 	end
 end)
 
-local function launchArrow(player: Player, origin: Vector3, dir: Vector3, charge: number)
-	local damage = 1 + 5 * charge
-	if charge >= 0.99 then
-		damage += 1
+Net.on("attackMob", function(player, mobId)
+	local state = playing(player)
+	if state then
+		Mobs.melee(player, mobId)
+	end
+end)
+
+local function launchArrow(player: Player, match, origin: Vector3, dir: Vector3, charge: number, bowId: string)
+	local damage = Rules.arrowDamage(charge, bowId)
+	local bow = Items.get(bowId)
+	local punch = if bow and bow.punch then bow.punch else 1
+	local function hit()
+		Net.send(player, "sound", "arrowHit")
+		if match.mode.onArrowHit then
+			match.mode.onArrowHit(match, player)
+		end
 	end
 	Projectiles.launch({
 		shooter = player,
@@ -3249,9 +3966,16 @@ local function launchArrow(player: Player, origin: Vector3, dir: Vector3, charge
 		onHitPlayer = function(victim, _pos, velocity)
 			if Combat.canDamage(player, victim) then
 				local push = Vector3.new(velocity.X, 0, velocity.Z)
-				local knock = (if push.Magnitude > 0.1 then push.Unit else Vector3.zero) * 14 + Vector3.new(0, 10, 0)
+				local knock = (if push.Magnitude > 0.1 then push.Unit else Vector3.zero) * 14 * punch + Vector3.new(0, 10 * math.min(punch, 1.5), 0)
 				Combat.damage(victim, damage, { attacker = player, cause = "arrow", knockback = knock })
-				Net.send(player, "sound", "arrowHit")
+				hit()
+			end
+		end,
+		onHitMob = function(mob, _pos, velocity)
+			if Mobs.canHit(player, mob) then
+				local push = Vector3.new(velocity.X, 0, velocity.Z)
+				Mobs.damage(mob, damage, player, (if push.Magnitude > 0.1 then push.Unit else Vector3.zero) * 10 * punch)
+				hit()
 			end
 		end,
 		onHitWorld = function() end,
@@ -3320,6 +4044,91 @@ local function throw(player: Player, match, kind: string, origin: Vector3, dir: 
 				explode(match, position, 2.6, 5, player)
 			end,
 		})
+	elseif kind == "bridge_egg" then
+		-- 날아간 길 아래에 양털이 두 줄로 깔림
+		local state = Session.get(player)
+		local wool = "wool_" .. (if state and state.team then state.team else "white")
+		if not Blocks.get(wool) then
+			wool = "wool_white"
+		end
+		local world = match.world
+		-- 다리 폭: 던진 방향에 수직인 축으로 한 칸 더
+		local px, pz = if math.abs(dir.X) > math.abs(dir.Z) then 0 else 1, if math.abs(dir.X) > math.abs(dir.Z) then 1 else 0
+		Projectiles.launch({
+			shooter = player,
+			origin = origin,
+			velocity = Vector3.new(dir.X, math.clamp(dir.Y, -0.2, 0.25), dir.Z).Unit * 48,
+			gravity = 6,
+			lifetime = 1.15,
+			size = Vector3.new(0.6, 0.8, 0.6),
+			color = Color3.fromRGB(236, 226, 196),
+			shape = Enum.PartType.Ball,
+			onStep = function(position)
+				if match.state ~= "playing" or (position - origin).Magnitude < 3 then
+					return
+				end
+				local cx, cy, cz = world:toCell(position - Vector3.new(0, 2 * B, 0))
+				for _, k in { 0, 1 } do
+					local x, z = cx + px * k, cz + pz * k
+					if replaceable(world:get(x, cy, z)) and match.mode.canPlace(match, player, x, cy, z) then
+						world:set(x, cy, z, wool, true)
+					end
+				end
+			end,
+			onHitPlayer = function() end,
+			onHitWorld = function() end,
+		})
+	elseif kind == "bed_bug" then
+		local state = Session.get(player)
+		local team = if state then state.team else nil
+		local function release(position: Vector3)
+			if match.state == "playing" then
+				Mobs.spawn(match, "silverfish", position, { team = team, owner = player, life = Config.BedWars.BugLife })
+			end
+		end
+		Projectiles.launch({
+			shooter = player,
+			origin = origin,
+			velocity = dir * 80,
+			gravity = 80,
+			size = Vector3.new(0.7, 0.7, 0.7),
+			color = Color3.fromRGB(150, 150, 156),
+			shape = Enum.PartType.Ball,
+			onHitPlayer = function(_victim, position)
+				release(position - Vector3.new(0, 2, 0))
+			end,
+			onHitWorld = function(position, normal)
+				release(position + normal * 0.6)
+			end,
+		})
+	elseif kind == "bobber" then
+		-- 낚싯찌: 맞은 사람을 내 쪽으로 끌어당김
+		Projectiles.launch({
+			shooter = player,
+			origin = origin,
+			velocity = dir * 70,
+			gravity = 60,
+			lifetime = 1.4,
+			size = Vector3.new(0.4, 0.4, 0.4),
+			color = Color3.fromRGB(220, 50, 50),
+			shape = Enum.PartType.Ball,
+			onHitPlayer = function(victim)
+				local me = Session.get(player)
+				local them = Session.get(victim)
+				if Combat.canDamage(player, victim) and me and me.root and them and them.root then
+					local toward = me.root.Position - them.root.Position
+					local flat = Vector3.new(toward.X, 0, toward.Z)
+					local pull = (if flat.Magnitude > 0.1 then flat.Unit else Vector3.zero) * 22 + Vector3.new(0, 16, 0)
+					Combat.damage(victim, 0.5, { attacker = player, cause = "melee", knockback = pull })
+				end
+			end,
+			onHitMob = function(mob)
+				if Mobs.canHit(player, mob) then
+					Mobs.damage(mob, 0.5, player)
+				end
+			end,
+			onHitWorld = function() end,
+		})
 	end
 end
 
@@ -3341,6 +4150,8 @@ Net.on("use", function(player, dir, charge)
 			Net.send(player, "openVote")
 		elseif def.action == "leave" then
 			Matches.leave(player)
+		elseif def.action == "kits" then
+			Net.send(player, "openKits", { kit = state.kit, perk = state.perk })
 		end
 		return
 	end
@@ -3364,6 +4175,29 @@ Net.on("use", function(player, dir, charge)
 		Combat.heal(player, 4)
 		Combat.setAbsorption(player, 4, 120)
 		Net.send(player, "sound", "eat")
+	elseif def.kind == "potion" and def.effect then
+		Inventory.consumeSlot(state.inv, index, 1)
+		if def.effect == "heal" then
+			Combat.heal(player, 8)
+		else
+			Status.add(player, def.effect, def.duration or 30)
+		end
+		Net.send(player, "sound", "eat")
+		local effect = Config.Effects[def.effect]
+		if effect then
+			Session.chat({ player }, string.format('<font color="%s">%s</font> 효과를 받았습니다.', effect.color, effect.name))
+		end
+	elseif def.kind == "rod" then
+		if typeof(dir) ~= "Vector3" or dir.Magnitude < 0.5 or dir.Magnitude > 2 then
+			return
+		end
+		if now - state.lastRod < 0.8 then
+			return
+		end
+		state.lastRod = now
+		local unit = dir.Unit
+		throw(player, match, "bobber", (state.root :: BasePart).Position + Vector3.new(0, 1.5, 0) + unit * 2.5, unit)
+		Net.broadcast("swing", player)
 	elseif def.kind == "bow" or def.kind == "throwable" then
 		if typeof(dir) ~= "Vector3" or dir.Magnitude < 0.5 or dir.Magnitude > 2 then
 			return
@@ -3376,7 +4210,7 @@ Net.on("use", function(player, dir, charge)
 				return
 			end
 			local power = math.clamp(tonumber(charge) or 1, 0.1, 1)
-			launchArrow(player, origin, unit, power)
+			launchArrow(player, match, origin, unit, power, stack.id)
 		elseif def.projectile then
 			Inventory.consumeSlot(state.inv, index, 1)
 			throw(player, match, def.projectile, origin, unit)
@@ -3466,6 +4300,13 @@ Net.on("upgrade", function(player, key)
 	end
 end)
 
+Net.on("trap", function(player, key)
+	local state, match = playing(player)
+	if state and match and match.modeId == "bedwars" and type(key) == "string" then
+		match.mode.buyTrap(match, player, key)
+	end
+end)
+
 Net.on("join", function(player, modeId)
 	if type(modeId) == "string" then
 		Matches.join(player, modeId)
@@ -3488,6 +4329,9 @@ Net.on("fall", function(player, blocks)
 		return
 	end
 	local damage = math.floor(math.clamp(blocks, 0, 60) - Config.Combat.FallSafeBlocks + 0.5)
+	if match.mode.fallScale then
+		damage = math.floor(damage * match.mode.fallScale(match, player) + 0.5)
+	end
 	if damage > 0 then
 		Combat.damage(player, damage, { cause = "fall", ignoreArmor = true })
 	end
@@ -3542,6 +4386,26 @@ Net.on("flying", function(player, flying)
 	character:SetAttribute("Flying", allowed)
 end)
 
+-- 스카이워즈 키트/능력 고르기 (대기실에서)
+Net.on("kit", function(player, kitId, perkId)
+	local state = Session.get(player)
+	if not state then
+		return
+	end
+	if type(kitId) == "string" and Kits.get(kitId) then
+		state.kit = kitId
+	end
+	if type(perkId) == "string" and Kits.getPerk(perkId) then
+		state.perk = perkId
+	end
+	local kit = Kits.get(state.kit)
+	local perk = Kits.getPerk(state.perk)
+	Net.send(player, "kitState", { kit = state.kit, perk = state.perk })
+	if kit and perk then
+		Session.chat({ player }, string.format('키트: <font color="#55FF55">%s</font> · 능력: <font color="#55FFFF">%s</font>', kit.name, perk.name))
+	end
+end)
+
 Net.on("doubleJump", function(player)
 	local state, match = playing(player)
 	if state and match and match.mode.doubleJump then
@@ -3553,7 +4417,98 @@ return Actions
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
+        <Properties>
+          <string name="Name">Blast</string>
+          <string name="Source"><![CDATA[-- 경기장 안의 폭발 (TNT, 화염구, 럭키 블록 함정). 모드 규칙에 따라 블록을 부수고,
+-- 폭발 지점 가까이에 물이 있으면 블록은 부서지지 않습니다(마인크래프트처럼 물속 TNT).
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Blocks = require(ReplicatedStorage.Shared.Blocks)
+local Session = require(script.Parent.Session)
+local Combat = require(script.Parent.Combat)
+local Explosion = require(script.Parent.Explosion)
+
+local Blast = {}
+
+local function inGame(match): { Player }
+	local out = {}
+	for _, player in match.players do
+		local state = Session.get(player)
+		if state and state.location == "match" and state.match == match then
+			table.insert(out, player)
+		end
+	end
+	return out
+end
+
+-- 폭발 지점 주변 한 칸 안에 물이 있는지
+function Blast.nearWater(world, position: Vector3): boolean
+	local cx, cy, cz = world:toCell(position)
+	for x = cx - 1, cx + 1 do
+		for y = cy - 1, cy + 1 do
+			for z = cz - 1, cz + 1 do
+				local record = world:get(x, y, z)
+				local def = if record then Blocks.get(record.id) else nil
+				if def and def.water then
+					return true
+				end
+			end
+		end
+	end
+	return false
+end
+
+function Blast.explode(match, position: Vector3, radius: number, power: number, source: Player?)
+	local wet = Blast.nearWater(match.world, position)
+	Explosion.explode(position, {
+		world = match.world,
+		players = inGame(match),
+		canBreak = function(record)
+			return not wet and match.mode.canExplode(match, record)
+		end,
+		canHurt = function(src: Player?, victim: Player): boolean
+			if not src or src == victim then
+				return true
+			end
+			return Combat.canDamage(src, victim)
+		end,
+		source = source,
+		radius = radius,
+		power = power,
+		match = match,
+	})
+end
+
+-- 놓인 TNT: 3초 동안 깜빡이다 터짐
+function Blast.prime(match, record, source: Player?, fuse: number?)
+	task.spawn(function()
+		local part = record.part
+		if not part then
+			return
+		end
+		local steps = math.max(2, math.floor((fuse or 3) / 0.25))
+		for i = 1, steps do
+			task.wait(0.25)
+			if match.world:get(record.x, record.y, record.z) ~= record or match.state ~= "playing" then
+				return
+			end
+			part.Color = if i % 2 == 0 then Color3.fromRGB(214, 52, 40) else Color3.fromRGB(255, 255, 255)
+		end
+		if match.world:get(record.x, record.y, record.z) ~= record then
+			return
+		end
+		local position = part.Position
+		match.world:remove(record.x, record.y, record.z)
+		Blast.explode(match, position, 3.2, 8, source)
+	end)
+end
+
+return Blast
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">Combat</string>
           <string name="Source"><![CDATA[-- 전투: 피해(갑옷/보호막 적용), 넉백, 근접 공격 판정, 자연 회복
@@ -3562,8 +4517,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage.Shared
 local Config = require(Shared.Config)
 local Rules = require(Shared.Rules)
+local Blocks = require(Shared.Blocks)
 local Session = require(script.Parent.Session)
 local Net = require(script.Parent.Net)
+local Status = require(script.Parent.Status)
 
 local Combat = {}
 
@@ -3579,6 +4536,10 @@ Combat.getSharpness = function(_player: Player): number
 end
 Combat.getRegenInterval = function(_player: Player): number
 	return Config.Combat.RegenInterval
+end
+-- 넉백을 얼마나 받는지 (스카이워즈 '단단한 몸' 능력은 0.65)
+Combat.getKnockbackScale = function(_player: Player): number
+	return 1
 end
 
 local function setAbsorptionAttribute(player: Player, amount: number)
@@ -3625,7 +4586,7 @@ local function hitSound(root: BasePart)
 end
 
 function Combat.knockback(player: Player, velocity: Vector3)
-	Net.send(player, "kb", velocity)
+	Net.send(player, "kb", velocity * Combat.getKnockbackScale(player))
 end
 
 export type DamageOptions = {
@@ -3733,7 +4694,12 @@ function Combat.melee(attacker: Player, victim: Player)
 	v.hurtUntil = now + Config.Combat.HurtTime
 
 	local stack = a.inv.slots[a.inv.selected]
-	local damage = Rules.meleeDamage(if stack then stack.id else nil, Combat.getSharpness(attacker))
+	local held = if stack then stack.id else nil
+	local damage = Rules.meleeDamage(held, Combat.getSharpness(attacker))
+	-- 공격하면 투명화가 풀림
+	if Status.has(attacker, "invis") then
+		Status.remove(attacker, "invis")
+	end
 	local falling = a.root.AssemblyLinearVelocity.Y < -3
 		and a.humanoid ~= nil
 		and a.humanoid.FloorMaterial == Enum.Material.Air
@@ -3744,18 +4710,62 @@ function Combat.melee(attacker: Player, victim: Player)
 	Net.broadcast("swing", attacker)
 	local flat = Vector3.new(offset.X, 0, offset.Z)
 	local dir = if flat.Magnitude > 0.05 then flat.Unit else a.root.CFrame.LookVector
-	local knock = dir * Config.Combat.KnockbackH + Vector3.new(0, Config.Combat.KnockbackV, 0)
+	local scale = Rules.knockbackMultiplier(held)
+	local knock = dir * Config.Combat.KnockbackH * scale + Vector3.new(0, Config.Combat.KnockbackV * math.min(scale, 1.4), 0)
 	Combat.damage(victim, damage, { attacker = attacker, cause = "melee", knockback = knock })
 end
 
--- 자연 회복: 마지막으로 맞고 몇 초 지나면 조금씩 찹니다.
+-- 용암에 닿으면 불이 붙고, 물에 들어가면 꺼짐
+local function liquidAt(state): (boolean, boolean)
+	local match = state.match
+	local world = match and match.world
+	local root = state.root
+	if not world or not root or state.location ~= "match" then
+		return false, false
+	end
+	local inLava, inWater = false, false
+	for _, dy in { -2.4, 0 } do
+		local x, y, z = world:toCell(root.Position + Vector3.new(0, dy, 0))
+		local record = world:get(x, y, z)
+		local def = if record then Blocks.get(record.id) else nil
+		if def and def.burn then
+			inLava = true
+		elseif def and def.water then
+			inWater = true
+		end
+	end
+	return inLava, inWater
+end
+
+-- 자연 회복: 마지막으로 맞고 몇 초 지나면 조금씩 찹니다. 재생 물약, 불, 용암도 여기서 처리
 task.spawn(function()
 	local progress: { [Player]: number } = {}
+	local effectTick: { [Player]: number } = {}
 	while true do
 		local dt = task.wait(0.5)
 		local now = os.clock()
+		Status.sweep()
 		for player, state in Session.all() do
 			local humanoid = state.humanoid
+			if state.alive and humanoid and humanoid.Health > 0 then
+				local inLava, inWater = liquidAt(state)
+				if inLava then
+					Status.add(player, "fire", 4)
+					Combat.damage(player, 2, { cause = "lava", ignoreArmor = true })
+				elseif inWater and Status.has(player, "fire") then
+					Status.remove(player, "fire")
+				end
+				effectTick[player] = (effectTick[player] or 0) + dt
+				if effectTick[player] >= 1 then
+					effectTick[player] = 0
+					if Status.has(player, "regen") then
+						humanoid.Health = math.min(humanoid.MaxHealth, humanoid.Health + 1)
+					end
+					if not inLava and Status.has(player, "fire") then
+						Combat.damage(player, 1, { cause = "lava", ignoreArmor = true })
+					end
+				end
+			end
 			if state.alive and humanoid and humanoid.Health > 0 and humanoid.Health < humanoid.MaxHealth then
 				if now - state.lastDamaged >= Config.Combat.RegenDelay then
 					progress[player] = (progress[player] or 0) + dt
@@ -3776,6 +4786,11 @@ task.spawn(function()
 				progress[player] = nil
 			end
 		end
+		for player in effectTick do
+			if not player.Parent then
+				effectTick[player] = nil
+			end
+		end
 	end
 end)
 
@@ -3783,7 +4798,7 @@ return Combat
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">Containers</string>
           <string name="Source"><![CDATA[-- 상자 같은 보관함. 여러 명이 동시에 열어도 내용이 같이 바뀝니다.
@@ -3868,7 +4883,7 @@ return Containers
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">Drops</string>
           <string name="Source"><![CDATA[-- 바닥에 떨어진 아이템 꾸러미. 닿으면 주워집니다(스카이워즈에서 죽은 사람 아이템).
@@ -4004,10 +5019,10 @@ return Drops
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">Explosion</string>
-          <string name="Source"><![CDATA[-- 폭발 (TNT, 화염구): 주변 블록 파괴 + 피해 + 넉백
+          <string name="Source"><![CDATA[-- 폭발 (TNT, 화염구): 주변 블록 파괴 + 피해 + 넉백 (몹 포함)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -4026,7 +5041,11 @@ export type Options = {
 	source: Player?,
 	radius: number, -- 블록 단위
 	power: number, -- 가운데에서 받는 최대 피해
+	match: any?,
 }
+
+-- 몹(골렘, 좀벌레, 용)도 폭발에 다치게 Mobs 가 채워 넣음
+Explosion.hurtMobs = function(_match: any, _position: Vector3, _reach: number, _power: number, _source: Player?) end
 
 function Explosion.explode(position: Vector3, opts: Options)
 	local effect = Instance.new("Explosion")
@@ -4057,6 +5076,9 @@ function Explosion.explode(position: Vector3, opts: Options)
 	end
 
 	local reach = opts.radius * B * 1.4
+	if opts.match then
+		Explosion.hurtMobs(opts.match, position, reach, opts.power, opts.source)
+	end
 	for _, player in opts.players do
 		local state = Session.get(player)
 		local root = state and state.root
@@ -4085,7 +5107,7 @@ return Explosion
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">LobbyService</string>
           <string name="Source"><![CDATA[-- 로비 만들기: 블록 마을, 스폰, 게임 포털(들어가면 참가), NPC, 안내 홀로그램, 승리 순위, 파쿠르
@@ -4382,11 +5404,11 @@ return LobbyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="25">
+      <Item class="Folder" referent="27">
         <Properties>
           <string name="Name">Logic</string>
         </Properties>
-        <Item class="ModuleScript" referent="26">
+        <Item class="ModuleScript" referent="28">
           <Properties>
             <string name="Name">Inventory</string>
             <string name="Source"><![CDATA[-- 플레이어 가방 (마인크래프트처럼 핫바 9칸 + 가방 27칸, 갑옷 4칸, 마우스로 집은 아이템)
@@ -4756,7 +5778,7 @@ return Inventory
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="27">
+        <Item class="ModuleScript" referent="29">
           <Properties>
             <string name="Name">Loot</string>
             <string name="Source"><![CDATA[-- 스카이워즈 상자 아이템 표. weight 가 클수록 자주 나옵니다.
@@ -4798,6 +5820,15 @@ Loot.Tables = {
 			e("iron_pickaxe", 1),
 			e("wood_axe", 2),
 			e("tnt", 2, 1, 2),
+			e("water_bucket", 2),
+			e("lava_bucket", 1),
+			e("fishing_rod", 2),
+			e("speed_potion", 1),
+			e("jump_potion", 1),
+			e("heal_potion", 1),
+			e("iron_sword_sharp", 1),
+			e("iron_helmet_prot", 1),
+			e("bow_power", 1),
 		},
 	},
 	center = {
@@ -4823,6 +5854,20 @@ Loot.Tables = {
 			e("obsidian", 1, 2, 4),
 			e("diamond_pickaxe", 1),
 			e("snowball", 3, 8, 16),
+			e("diamond_sword_sharp", 1),
+			e("diamond_chestplate_prot", 1),
+			e("iron_chestplate_prot", 2),
+			e("iron_leggings_prot", 2),
+			e("bow_power", 2),
+			e("bow_punch", 1),
+			e("kb_stick", 1),
+			e("lava_bucket", 2),
+			e("water_bucket", 2),
+			e("fishing_rod", 2),
+			e("regen_potion", 2),
+			e("speed_potion", 2),
+			e("invis_potion", 1),
+			e("hardstone", 2, 8, 16),
 		},
 	},
 }
@@ -4901,7 +5946,131 @@ return Loot
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="28">
+        <Item class="ModuleScript" referent="30">
+          <Properties>
+            <string name="Name">LuckyTable</string>
+            <string name="Source"><![CDATA[-- 럭키 블록을 부쉈을 때 나오는 결과표. weight 가 클수록 자주 나옵니다.
+-- kind: items(아이템이 튀어나옴), tnt(불붙은 TNT), mobs(좀벌레 떼), effect(효과), launch(하늘로), lightning(번개), nothing
+local LuckyTable = {}
+
+export type Outcome = {
+	id: string,
+	weight: number,
+	kind: string,
+	good: boolean,
+	message: string,
+	items: { { id: string, count: number } }?,
+	effects: { { name: string, duration: number } }?,
+	count: number?,
+}
+
+local function s(id: string, count: number?)
+	return { id = id, count = count or 1 }
+end
+
+LuckyTable.Outcomes = {
+	{ id = "sword", weight = 8, kind = "items", good = true, message = "날카로운 다이아몬드 검!", items = { s("diamond_sword_sharp") } },
+	{
+		id = "armor",
+		weight = 7,
+		kind = "items",
+		good = true,
+		message = "보호 마법이 붙은 철 갑옷 한 벌!",
+		items = { s("iron_helmet_prot"), s("iron_chestplate_prot"), s("iron_leggings_prot"), s("iron_boots_prot") },
+	},
+	{ id = "diamond_piece", weight = 6, kind = "items", good = true, message = "다이아몬드 흉갑!", items = { s("diamond_chestplate_prot") } },
+	{ id = "potions", weight = 8, kind = "items", good = true, message = "물약 꾸러미!", items = { s("speed_potion"), s("jump_potion"), s("regen_potion") } },
+	{ id = "travel", weight = 7, kind = "items", good = true, message = "순간이동 진주와 황금 사과!", items = { s("pearl", 2), s("golden_apple", 3) } },
+	{ id = "archer", weight = 7, kind = "items", good = true, message = "힘 마법 활과 화살!", items = { s("bow_power"), s("arrow", 16) } },
+	{ id = "stick", weight = 5, kind = "items", good = true, message = "넉백 막대기!", items = { s("kb_stick") } },
+	{ id = "buckets", weight = 5, kind = "items", good = true, message = "물과 용암 양동이!", items = { s("water_bucket"), s("lava_bucket") } },
+	{ id = "blocks", weight = 8, kind = "items", good = true, message = "블록 한 무더기!", items = { s("planks", 48), s("hardstone", 16) } },
+	{ id = "rod", weight = 5, kind = "items", good = true, message = "낚싯대와 눈덩이!", items = { s("fishing_rod"), s("snowball", 12) } },
+	{ id = "bombs", weight = 4, kind = "items", good = true, message = "폭탄 상자!", items = { s("tnt", 4), s("fireball", 2) } },
+	{ id = "invis", weight = 3, kind = "items", good = true, message = "투명화 물약!", items = { s("invis_potion") } },
+	{ id = "tnt", weight = 6, kind = "tnt", good = false, message = "앗! 불붙은 TNT다!", count = 3 },
+	{ id = "bugs", weight = 6, kind = "mobs", good = false, message = "좀벌레 떼가 나타났다!", count = 4 },
+	{ id = "dark", weight = 4, kind = "effect", good = false, message = "눈앞이 캄캄해졌다…", effects = { { name = "blind", duration = 6 }, { name = "slow", duration = 6 } } },
+	{ id = "rocket", weight = 4, kind = "launch", good = false, message = "하늘로 날아간다!" },
+	{ id = "lightning", weight = 3, kind = "lightning", good = false, message = "번개가 내리쳤다!" },
+	{ id = "speedy", weight = 4, kind = "effect", good = true, message = "몸이 가벼워졌다!", effects = { { name = "speed", duration = 30 }, { name = "jump", duration = 30 } } },
+	{ id = "nothing", weight = 3, kind = "nothing", good = false, message = "…아무것도 없었다." },
+} :: { Outcome }
+
+function LuckyTable.pick(random: () -> number): Outcome
+	local total = 0
+	for _, outcome in LuckyTable.Outcomes do
+		total += outcome.weight
+	end
+	local r = random() * total
+	for _, outcome in LuckyTable.Outcomes do
+		r -= outcome.weight
+		if r < 0 then
+			return outcome
+		end
+	end
+	return LuckyTable.Outcomes[#LuckyTable.Outcomes]
+end
+
+return LuckyTable
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="31">
+          <Properties>
+            <string name="Name">MobMotion</string>
+            <string name="Source"><![CDATA[-- 땅 몹 움직임 계산 (순수 계산이라 테스트로 바로 확인): 걷기, 한 칸 오르기, 두 칸 벽에서 멈춤, 떨어지기, 착지
+local MobMotion = {}
+
+MobMotion.Gravity = 90
+MobMotion.MaxFall = 120
+MobMotion.Friction = 6
+
+export type WorldLike = {
+	toCell: (any, Vector3) -> (number, number, number),
+	isSolid: (any, number, number, number) -> boolean,
+	cellCenter: (any, number, number, number) -> Vector3,
+}
+
+-- feet: 발 위치, velocity: 넉백 등으로 받은 속도(+낙하 속도), wish: 걸어가려는 속도
+function MobMotion.ground(world: any, feet: Vector3, velocity: Vector3, wish: Vector3, dt: number, blockSize: number): (Vector3, Vector3)
+	local B = blockSize
+	-- 넉백으로 받은 속도는 점점 줄어듦
+	local horizontal = Vector3.new(velocity.X, 0, velocity.Z) * math.max(0, 1 - MobMotion.Friction * dt)
+	local vy = math.max(-MobMotion.MaxFall, velocity.Y - MobMotion.Gravity * dt)
+	local move = (wish + horizontal) * dt
+
+	-- 앞이 막혔으면 한 칸 오르기, 두 칸이면 멈춤
+	if move.Magnitude > 0 then
+		local nextFeet = feet + move
+		local x, y, z = world:toCell(nextFeet + Vector3.new(0, B / 2 - 0.2, 0))
+		if world:isSolid(x, y, z) then
+			if not world:isSolid(x, y + 1, z) and not world:isSolid(x, y + 2, z) and vy <= 0.1 then
+				local center = world:cellCenter(x, y, z)
+				nextFeet = Vector3.new(nextFeet.X, center.Y + B / 2, nextFeet.Z)
+				vy = 0
+			else
+				nextFeet = feet
+				horizontal = Vector3.zero
+			end
+		end
+		feet = nextFeet
+	end
+	feet += Vector3.new(0, vy * dt, 0)
+	local fx, fy, fz = world:toCell(feet + Vector3.new(0, -0.05, 0))
+	if vy <= 0 and world:isSolid(fx, fy, fz) then
+		local center = world:cellCenter(fx, fy, fz)
+		feet = Vector3.new(feet.X, center.Y + B / 2, feet.Z)
+		vy = 0
+	end
+	return feet, Vector3.new(horizontal.X, vy, horizontal.Z)
+end
+
+return MobMotion
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="32">
           <Properties>
             <string name="Name">Teams</string>
             <string name="Source"><![CDATA[-- 팀 나누기: 사람 수가 가장 적은 팀부터 채워서 인원을 고르게 맞춥니다.
@@ -4936,7 +6105,7 @@ return Teams
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="29">
+        <Item class="ModuleScript" referent="33">
           <Properties>
             <string name="Name">Vote</string>
             <string name="Source"><![CDATA[-- 맵 투표 집계. 가장 많은 표를 받은 맵, 동점이면 그중에서 무작위로 고릅니다.
@@ -4977,7 +6146,100 @@ return Vote
           </Properties>
         </Item>
       </Item>
-      <Item class="Script" referent="30">
+      <Item class="ModuleScript" referent="34">
+        <Properties>
+          <string name="Name">Lucky</string>
+          <string name="Source"><![CDATA[-- 럭키 블록: 부수면 결과표(LuckyTable)에서 하나를 뽑아 좋은 일이나 나쁜 일이 일어납니다.
+local Session = require(script.Parent.Session)
+local Net = require(script.Parent.Net)
+local Combat = require(script.Parent.Combat)
+local Status = require(script.Parent.Status)
+local Drops = require(script.Parent.Drops)
+local Blast = require(script.Parent.Blast)
+local Mobs = require(script.Parent.Mobs)
+local LuckyTable = require(script.Parent.Logic.LuckyTable)
+
+local Lucky = {}
+
+local random = Random.new()
+local function rand(): number
+	return random:NextNumber()
+end
+
+local function canPickup(match)
+	return function(other: Player): boolean
+		local s = Session.get(other)
+		return s ~= nil and s.match == match and s.location == "match"
+	end
+end
+
+local function lightning(match, position: Vector3)
+	local bolt = Instance.new("Part")
+	bolt.Name = "Lightning"
+	bolt.Anchored = true
+	bolt.CanCollide = false
+	bolt.CanQuery = false
+	bolt.CanTouch = false
+	bolt.Material = Enum.Material.Neon
+	bolt.Color = Color3.fromRGB(220, 230, 255)
+	bolt.Size = Vector3.new(0.6, 80, 0.6)
+	bolt.CFrame = CFrame.new(position + Vector3.new(0, 40, 0))
+	bolt.Parent = match.world.extras
+	task.delay(0.25, function()
+		bolt:Destroy()
+	end)
+end
+
+function Lucky.open(match, player: Player, x: number, y: number, z: number)
+	local world = match.world
+	local center = world:cellCenter(x, y, z)
+	local outcome = LuckyTable.pick(rand)
+	local color = if outcome.good then "#55FF55" else "#FF5555"
+	Net.send(player, "chat", string.format('<font color="#FFD24A">럭키 블록</font> > <font color="%s">%s</font>', color, outcome.message))
+	Net.send(player, "sound", if outcome.good then "buy" else "deny")
+	local state = Session.get(player)
+
+	if outcome.kind == "items" and outcome.items then
+		local stacks = {}
+		for _, item in outcome.items do
+			table.insert(stacks, { id = item.id, count = item.count })
+		end
+		Drops.spawn(world.extras, center, stacks, canPickup(match))
+	elseif outcome.kind == "tnt" then
+		for i = 1, outcome.count or 1 do
+			local dx = (i - 2)
+			local record = world:get(x + dx, y, z)
+			if not record then
+				local tnt = world:set(x + dx, y, z, "tnt", true)
+				if tnt then
+					Blast.prime(match, tnt, nil, 2)
+				end
+			end
+		end
+	elseif outcome.kind == "mobs" then
+		for i = 1, outcome.count or 1 do
+			local angle = i * math.pi * 2 / (outcome.count or 1)
+			local position = center - Vector3.new(0, 1.4, 0) + Vector3.new(math.cos(angle), 0, math.sin(angle)) * 1.5
+			Mobs.spawn(match, "silverfish", position, { life = 25 })
+		end
+	elseif outcome.kind == "effect" and outcome.effects then
+		for _, effect in outcome.effects do
+			Status.add(player, effect.name, effect.duration)
+		end
+	elseif outcome.kind == "launch" then
+		Combat.knockback(player, Vector3.new(0, 115, 0))
+	elseif outcome.kind == "lightning" and state and state.root then
+		lightning(match, state.root.Position)
+		Combat.damage(player, 5, { cause = "lava", ignoreArmor = true })
+		Status.add(player, "fire", 3)
+	end
+end
+
+return Lucky
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="Script" referent="35">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -5126,11 +6388,11 @@ end)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="31">
+      <Item class="Folder" referent="36">
         <Properties>
           <string name="Name">Maps</string>
         </Properties>
-        <Item class="ModuleScript" referent="32">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">BedWarsMaps</string>
             <string name="Source"><![CDATA[-- 베드워즈 맵 3종.
@@ -5256,7 +6518,14 @@ local function teamIsland(api, theme: Theme, dir, rng)
 		local x, z = at(s, f)
 		return { x, y, z }
 	end
+	-- 팀 상자(팀원끼리 같이 씀)와 개인 상자(어느 개인 상자에서 열어도 내 것)
+	local chestCell = cell(-2, 1, 3)
+	local enderCell = cell(2, 1, 3)
+	api.set(chestCell[1], chestCell[2], chestCell[3], "chest")
+	api.set(enderCell[1], enderCell[2], enderCell[3], "ender_chest")
 	api.marker("team", {
+		chest = chestCell,
+		ender = enderCell,
 		team = dir.id,
 		spawn = cell(0, 1, 1),
 		lookAt = { 0, 1, 0 },
@@ -5648,7 +6917,7 @@ return {
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="33">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">Lobby</string>
             <string name="Source"><![CDATA[-- 로비: 큰 떠 있는 섬 위의 마을.
@@ -5894,7 +7163,7 @@ return Lobby
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="34">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">Rooms</string>
             <string name="Source"><![CDATA[-- 게임 시작 전 대기실과, 탈락한 사람이 구경하는 관전실
@@ -5965,7 +7234,7 @@ return Rooms
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="35">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">Shapes</string>
             <string name="Source"><![CDATA[-- 맵 그리기 도구: 떠 있는 섬, 나무 여러 종류, 집, 탑, 지붕, 문, 분수, 가판대, 울타리 등.
@@ -6797,7 +8066,7 @@ return Shapes
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="36">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">SkyWarsMaps</string>
             <string name="Source"><![CDATA[-- 스카이워즈 맵 3종: 시작 섬 8개(작은 집 + 상자 2개), 중간 섬 4개(폐허 + 상자), 큰 가운데 섬(좋은 상자 4개).
@@ -6863,6 +8132,11 @@ local function startIsland(api, theme: Theme, index: number, rng)
 	chest(api, sx, 1, sz, "island")
 	local tx, tz = at(-4, -2)
 	theme.tree(api, tx, 0, tz, rng)
+	-- 럭키 블록 자리 (경기 시작 때 확률로 놓임)
+	for _, spot in { { -3, 1 }, { 3, -3 } } do
+		local lx, lz = at(spot[1], spot[2])
+		api.marker("lucky", { x = lx, y = 1, z = lz })
+	end
 	Shapes.flora(api, rng, cx - 7, cz - 7, cx + 7, cz + 7, 3, -2, GROUND, theme.flora, theme.floraChance)
 	-- 유리관 자리(스폰 주변 3x3, 높이 3)는 비워 둠
 	for dx = -1, 1 do
@@ -6885,6 +8159,7 @@ local function midIsland(api, theme: Theme, index: number, rng)
 	Shapes.island(api, cx, 1, cz, { rx = 4, rz = 4, top = theme.top, fill = theme.fill, deep = theme.deep, depth = 5, edge = 0.2, ores = true, drips = 0.1, rng = rng })
 	theme.ruin(api, cx, 1, cz, rng)
 	chest(api, cx, 2, cz, "island")
+	api.marker("lucky", { x = cx + 2, y = 2, z = cz - 2 })
 end
 
 local function build(theme: Theme)
@@ -6899,6 +8174,9 @@ local function build(theme: Theme)
 		theme.center(api, rng)
 		for _, p in Shapes.ring(4, theme.centerChestRadius, math.pi / 4) do
 			chest(api, p.x, 3, p.z, "center")
+		end
+		for _, p in Shapes.ring(4, theme.centerChestRadius + 2, 0) do
+			api.marker("lucky", { x = p.x, y = 3, z = p.z })
 		end
 		Shapes.flora(api, rng, -13, -13, 13, 13, 6, 0, GROUND, theme.flora, theme.floraChance)
 		theme.sky(api, rng)
@@ -7162,7 +8440,7 @@ return {
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">TntRunMaps</string>
             <string name="Source"><![CDATA[-- TNT 런 맵 3종: 4층 바닥 + 둘레를 둘러싼 배경 건축물, 맨 아래는 용암.
@@ -7373,7 +8651,7 @@ return {
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">Matches</string>
           <string name="Source"><![CDATA[-- 경기 관리: 대기열 -> 대기실(맵 투표) -> 게임 -> 결과 -> 로비
@@ -7392,6 +8670,8 @@ local Inventory = require(script.Parent.Logic.Inventory)
 local Vote = require(script.Parent.Logic.Vote)
 local PlayerData = require(script.Parent.PlayerData)
 local Rooms = require(script.Parent.Maps.Rooms)
+local Status = require(script.Parent.Status)
+local Mobs = require(script.Parent.Mobs)
 
 local B = Config.BlockSize
 
@@ -7473,6 +8753,9 @@ end
 local function giveWaitingItems(state)
 	Inventory.clear(state.inv)
 	state.inv.slots[1] = { id = "vote_paper", count = 1 }
+	if state.match and state.match.modeId == "skywars" then
+		state.inv.slots[2] = { id = "kit_selector", count = 1 }
+	end
 	state.inv.slots[9] = { id = "leave_bed", count = 1 }
 	state.inv.dirty = true
 end
@@ -7491,6 +8774,7 @@ local function destroyMatch(match)
 		return
 	end
 	match.destroyed = true
+	Mobs.clearMatch(match)
 	if match.mode.cleanup and match.state ~= "waiting" then
 		local ok, err = pcall(match.mode.cleanup, match)
 		if not ok then
@@ -7660,7 +8944,9 @@ function Matches.toLobby(player: Player)
 	state.container = nil
 	state.respawnToken = nil
 	giveLobbyItems(state)
+	Status.clear(player)
 	player:SetAttribute("DoubleJumps", nil)
+	player:SetAttribute("Haste", nil)
 	Session.setContext(player, { location = "lobby" })
 	Session.spawn(player, lobbySpawn)
 end
@@ -7762,7 +9048,14 @@ end
 function Matches.deathMessage(match, victim: Player, killer: Player?, cause: string, final: boolean)
 	local v = Matches.coloredName(victim)
 	local text
-	if killer then
+	local mobDef = if string.sub(cause, 1, 4) == "mob_" then Config.Mobs[string.sub(cause, 5)] else nil
+	if mobDef then
+		if killer then
+			text = string.format("%s님이 %s님의 %s에게 당했습니다.", v, Matches.coloredName(killer), mobDef.name)
+		else
+			text = string.format("%s님이 %s에게 당했습니다.", v, mobDef.name)
+		end
+	elseif killer then
 		local k = Matches.coloredName(killer)
 		if cause == "void" then
 			text = string.format("%s님이 %s님에게 밀려 공허로 떨어졌습니다.", v, k)
@@ -7772,6 +9065,8 @@ function Matches.deathMessage(match, victim: Player, killer: Player?, cause: str
 			text = string.format("%s님이 %s님의 폭발에 휘말렸습니다.", v, k)
 		elseif cause == "fall" then
 			text = string.format("%s님이 %s님에게 밀려 떨어졌습니다.", v, k)
+		elseif cause == "lava" then
+			text = string.format("%s님이 %s님을 피하다 불에 탔습니다.", v, k)
 		else
 			text = string.format("%s님이 %s님에게 처치당했습니다.", v, k)
 		end
@@ -7909,6 +9204,7 @@ end
 -- 죽었을 때
 Session.onDied = function(player: Player, state)
 	local match = state.match
+	Status.clear(player)
 	if state.location == "lobby" then
 		task.delay(1, function()
 			if state.location == "lobby" and player.Parent then
@@ -7981,6 +9277,14 @@ Combat.getSharpness = function(player: Player): number
 		return match.mode.sharpness(match, player)
 	end
 	return 0
+end
+Combat.getKnockbackScale = function(player: Player): number
+	local state = Session.get(player)
+	local match = state and state.match
+	if match and match.mode.knockbackScale and state.location == "match" then
+		return match.mode.knockbackScale(match, player)
+	end
+	return 1
 end
 Combat.getRegenInterval = function(player: Player): number
 	local state = Session.get(player)
@@ -8146,14 +9450,586 @@ return Matches
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="39">
+      <Item class="ModuleScript" referent="44">
+        <Properties>
+          <string name="Name">Mobs</string>
+          <string name="Source"><![CDATA[-- 몹: 베드워즈 수호 골렘/좀벌레, 서든데스 용, 럭키 블록 좀벌레.
+-- 물리 대신 서버가 블록 격자를 보고 직접 움직입니다(걷기, 한 칸 오르기, 떨어지기). 용은 날아다니며 놓인 블록을 부숩니다.
+-- 몹 파트에는 "Mob" 태그와 "MobId" 속성이 있어서 클라이언트가 조준하고 "attackMob" 으로 때립니다.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage.Shared
+local Config = require(Shared.Config)
+local Rules = require(Shared.Rules)
+local Session = require(script.Parent.Session)
+local Combat = require(script.Parent.Combat)
+local Net = require(script.Parent.Net)
+local Explosion = require(script.Parent.Explosion)
+local Projectiles = require(script.Parent.Projectiles)
+local MobMotion = require(script.Parent.Logic.MobMotion)
+
+local B = Config.BlockSize
+
+local Mobs = {}
+
+export type Mob = {
+	id: number,
+	kind: string,
+	def: { [string]: any },
+	match: any,
+	team: string?, -- 이 팀은 공격하지 않음 (nil 이면 owner 빼고 모두 공격)
+	owner: Player?,
+	model: Model,
+	parts: { { part: BasePart, offset: CFrame, swing: number?, pivot: Vector3? } },
+	feet: Vector3, -- 땅 몹: 발 위치 / 용: 몸 가운데
+	yaw: number,
+	velocity: Vector3,
+	health: number,
+	maxHealth: number,
+	expires: number,
+	lastAttack: number,
+	walkPhase: number,
+	target: Player?,
+	retarget: number,
+	wander: Vector3?,
+	bar: Frame?,
+	flying: boolean,
+	moving: boolean,
+	dead: boolean,
+}
+
+local mobs: { [number]: Mob } = {}
+local byPart: { [BasePart]: Mob } = {}
+local nextId = 0
+
+local function rgb(r: number, g: number, b: number): Color3
+	return Color3.fromRGB(r, g, b)
+end
+
+-- 몸 조각: 이름, 크기, 발 기준 위치, 색, 흔들리는 다리면 swing 방향
+type Piece = { any } -- { 이름, 크기, 위치, 색, 흔들기 방향? }
+
+local function teamColor(teamId: string?): Color3
+	for _, team in Config.Teams do
+		if team.id == teamId then
+			return team.color
+		end
+	end
+	return rgb(200, 200, 200)
+end
+
+local function shapeFor(kind: string, teamId: string?): ({ Piece }, number)
+	if kind == "golem" then
+		local body = rgb(214, 210, 198)
+		local vine = rgb(80, 128, 50)
+		local band = teamColor(teamId)
+		return {
+			{ "LegL", Vector3.new(1.1, 2.6, 1.1), Vector3.new(-0.7, 1.3, 0), body, 1 },
+			{ "LegR", Vector3.new(1.1, 2.6, 1.1), Vector3.new(0.7, 1.3, 0), body, -1 },
+			{ "Body", Vector3.new(3, 2.8, 1.8), Vector3.new(0, 4, 0), body },
+			{ "Band", Vector3.new(3.05, 0.5, 1.85), Vector3.new(0, 3.2, 0), band },
+			{ "Vine", Vector3.new(0.4, 1.6, 1.85), Vector3.new(0.7, 4.3, 0), vine },
+			{ "ArmL", Vector3.new(0.9, 3.6, 0.9), Vector3.new(-1.95, 3.6, 0), body, -1 },
+			{ "ArmR", Vector3.new(0.9, 3.6, 0.9), Vector3.new(1.95, 3.6, 0), body, 1 },
+			{ "Head", Vector3.new(1.4, 1.5, 1.4), Vector3.new(0, 6.15, -0.2), body },
+			{ "Nose", Vector3.new(0.35, 0.7, 0.35), Vector3.new(0, 5.9, -1), rgb(190, 176, 160) },
+			{ "Eyes", Vector3.new(1, 0.22, 0.1), Vector3.new(0, 6.35, -0.92), rgb(150, 30, 30) },
+		}, 7
+	elseif kind == "silverfish" then
+		local shell = rgb(150, 150, 156)
+		local dark = rgb(110, 110, 118)
+		return {
+			{ "Head", Vector3.new(0.7, 0.5, 0.6), Vector3.new(0, 0.25, -0.9), dark },
+			{ "Seg1", Vector3.new(0.9, 0.65, 0.6), Vector3.new(0, 0.33, -0.3), shell, 1 },
+			{ "Seg2", Vector3.new(0.8, 0.55, 0.6), Vector3.new(0, 0.28, 0.3), shell, -1 },
+			{ "Tail", Vector3.new(0.5, 0.4, 0.5), Vector3.new(0, 0.2, 0.85), dark, 1 },
+		}, 0.7
+	else
+		-- 용: 날개 달린 큰 몸 (팀 색 비늘)
+		local scale = rgb(34, 30, 40)
+		local accent = teamColor(teamId)
+		return {
+			{ "Body", Vector3.new(3.4, 2.6, 7), Vector3.new(0, 0, 0), scale },
+			{ "Ridge", Vector3.new(0.6, 0.8, 6), Vector3.new(0, 1.6, 0.4), accent },
+			{ "Neck", Vector3.new(1.6, 1.6, 3), Vector3.new(0, 0.6, -4.8), scale },
+			{ "Head", Vector3.new(2.4, 2, 3), Vector3.new(0, 0.9, -7.4), scale },
+			{ "Eyes", Vector3.new(2.45, 0.35, 0.5), Vector3.new(0, 1.4, -8), rgb(200, 60, 255) },
+			{ "Tail", Vector3.new(1.4, 1.2, 6), Vector3.new(0, 0.2, 6.4), scale },
+			{ "WingL", Vector3.new(8, 0.3, 4.5), Vector3.new(-5.6, 1, -0.5), accent:Lerp(scale, 0.55), 1 },
+			{ "WingR", Vector3.new(8, 0.3, 4.5), Vector3.new(5.6, 1, -0.5), accent:Lerp(scale, 0.55), -1 },
+		}, 3
+	end
+end
+
+local function makeBar(model: Model, adornee: BasePart, name: string, height: number, color: Color3): Frame
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "MobBar"
+	gui.Size = UDim2.new(5, 0, 1.1, 0)
+	gui.StudsOffset = Vector3.new(0, height, 0)
+	gui.MaxDistance = 80
+	gui.LightInfluence = 0
+	gui.Adornee = adornee
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(1, 0, 0.6, 0)
+	label.Font = Enum.Font.Arcade
+	label.TextScaled = true
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0.3
+	label.Text = name
+	label.Parent = gui
+	local back = Instance.new("Frame")
+	back.BackgroundColor3 = Color3.new(0, 0, 0)
+	back.BackgroundTransparency = 0.3
+	back.BorderSizePixel = 0
+	back.Position = UDim2.new(0.1, 0, 0.66, 0)
+	back.Size = UDim2.new(0.8, 0, 0.22, 0)
+	back.Parent = gui
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.BackgroundColor3 = Color3.fromRGB(230, 50, 50)
+	fill.BorderSizePixel = 0
+	fill.Size = UDim2.new(1, 0, 1, 0)
+	fill.Parent = back
+	gui.Parent = model
+	return fill
+end
+
+-- 땅을 찾아 발 위치 맞추기: 위에서부터 내려가며 단단한 블록 위
+local function groundY(world, x: number, y: number, z: number): number?
+	for dy = 0, -6, -1 do
+		if world:isSolid(x, y + dy - 1, z) and not world:isSolid(x, y + dy, z) then
+			return y + dy
+		end
+	end
+	return nil
+end
+
+function Mobs.spawn(match, kind: string, position: Vector3, opts: { team: string?, owner: Player?, life: number? }): Mob?
+	local def = Config.Mobs[kind]
+	if not def or not match.world or match.state ~= "playing" then
+		return nil
+	end
+	nextId += 1
+	local id = nextId
+	local pieces, height = shapeFor(kind, opts.team)
+	local model = Instance.new("Model")
+	model.Name = "Mob_" .. kind
+	model:AddTag("Mob")
+	model:SetAttribute("MobId", id)
+	model:SetAttribute("MobKind", kind)
+	model:SetAttribute("Team", opts.team)
+	local mob: Mob = {
+		id = id,
+		kind = kind,
+		def = def,
+		match = match,
+		team = opts.team,
+		owner = opts.owner,
+		model = model,
+		parts = {},
+		feet = position,
+		yaw = 0,
+		velocity = Vector3.zero,
+		health = def.health,
+		maxHealth = def.health,
+		expires = os.clock() + (opts.life or 1e9),
+		lastAttack = 0,
+		walkPhase = 0,
+		target = nil,
+		retarget = 0,
+		wander = nil,
+		bar = nil,
+		flying = kind == "dragon",
+		moving = false,
+		dead = false,
+	}
+	local first: BasePart? = nil
+	for _, piece in pieces do
+		local part = Instance.new("Part")
+		part.Name = piece[1]
+		part.Anchored = true
+		part.CanCollide = false
+		part.CanTouch = false
+		part.CanQuery = true
+		part.CastShadow = kind ~= "silverfish"
+		part.Size = piece[2]
+		part.Color = piece[4]
+		part.Material = Enum.Material.SmoothPlastic
+		part.TopSurface = Enum.SurfaceType.Smooth
+		part.BottomSurface = Enum.SurfaceType.Smooth
+		part:AddTag("Mob")
+		part:SetAttribute("MobId", id)
+		part.Parent = model
+		byPart[part] = mob
+		local pivot = if piece[5] then piece[3] + Vector3.new(0, piece[2].Y / 2, 0) else nil
+		if kind == "dragon" and piece[5] then
+			-- 날개는 몸 쪽 끝을 축으로 펄럭임
+			pivot = piece[3] + Vector3.new(-piece[2].X / 2 * (piece[5] :: number), 0, 0)
+		end
+		table.insert(mob.parts, { part = part, offset = CFrame.new(piece[3]), swing = piece[5], pivot = pivot })
+		first = first or part
+	end
+	local name = def.name
+	if opts.owner then
+		name = opts.owner.DisplayName .. "의 " .. name
+	end
+	if first then
+		mob.bar = makeBar(model, first, name, height, if opts.team then teamColor(opts.team) else Color3.new(1, 1, 1))
+	end
+	model.Parent = match.world.extras
+	mobs[id] = mob
+	return mob
+end
+
+local function placeParts(mob: Mob, t: number)
+	local root = CFrame.new(mob.feet) * CFrame.Angles(0, mob.yaw, 0)
+	local moving = mob.moving
+	local parts, cframes = {}, {}
+	for _, p in mob.parts do
+		local cf = root * p.offset
+		if p.swing and p.pivot then
+			local angle
+			if mob.flying then
+				angle = math.sin(t * 5 + mob.id) * 0.45 * p.swing
+				local pivot = root * CFrame.new(p.pivot)
+				cf = pivot * CFrame.Angles(0, 0, angle) * pivot:Inverse() * cf
+			else
+				angle = if moving then math.sin(mob.walkPhase) * 0.6 * p.swing else 0
+				if mob.kind == "silverfish" then
+					cf = cf * CFrame.new(math.sin(mob.walkPhase + p.swing) * 0.12, 0, 0)
+				else
+					local pivot = root * CFrame.new(p.pivot)
+					cf = pivot * CFrame.Angles(angle, 0, 0) * pivot:Inverse() * cf
+				end
+			end
+		end
+		table.insert(parts, p.part)
+		table.insert(cframes, cf)
+	end
+	workspace:BulkMoveTo(parts, cframes, Enum.BulkMoveMode.FireCFrameChanged)
+end
+
+function Mobs.remove(mob: Mob)
+	if mob.dead then
+		return
+	end
+	mob.dead = true
+	mobs[mob.id] = nil
+	for _, p in mob.parts do
+		byPart[p.part] = nil
+	end
+	mob.model:Destroy()
+end
+
+function Mobs.get(id: number): Mob?
+	return mobs[id]
+end
+
+function Mobs.fromPart(part: BasePart): Mob?
+	return byPart[part]
+end
+
+function Mobs.clearMatch(match)
+	for _, mob in mobs do
+		if mob.match == match then
+			Mobs.remove(mob)
+		end
+	end
+end
+
+function Mobs.count(match, kind: string, team: string?): number
+	local n = 0
+	for _, mob in mobs do
+		if mob.match == match and mob.kind == kind and (team == nil or mob.team == team) then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- 이 몹이 그 사람을 공격해도 되는지 (같은 팀/주인은 안 됨)
+local function hostileTo(mob: Mob, player: Player): boolean
+	local state = Session.get(player)
+	if not state or state.match ~= mob.match or state.location ~= "match" or not state.alive or state.waitingRespawn then
+		return false
+	end
+	if player == mob.owner then
+		return false
+	end
+	if mob.team and state.team == mob.team then
+		return false
+	end
+	return true
+end
+
+-- 사람이 몹을 때릴 수 있는지
+function Mobs.canHit(player: Player, mob: Mob): boolean
+	local state = Session.get(player)
+	if not state or state.match ~= mob.match or state.location ~= "match" or not state.alive or mob.match.state ~= "playing" then
+		return false
+	end
+	if player == mob.owner then
+		return false
+	end
+	return not (mob.team and state.team == mob.team)
+end
+
+function Mobs.damage(mob: Mob, amount: number, source: Player?, push: Vector3?)
+	if mob.dead then
+		return
+	end
+	mob.health -= amount
+	if mob.bar then
+		mob.bar.Size = UDim2.new(math.clamp(mob.health / mob.maxHealth, 0, 1), 0, 1, 0)
+	end
+	for _, p in mob.parts do
+		local part = p.part
+		local original = part.Color
+		part.Color = original:Lerp(Color3.fromRGB(255, 40, 40), 0.6)
+		task.delay(0.2, function()
+			if part.Parent then
+				part.Color = original
+			end
+		end)
+	end
+	if push and not mob.flying then
+		mob.velocity += push * (if mob.kind == "golem" then 0.3 else 1)
+	end
+	if source and mob.health > 0 and mob.kind ~= "dragon" then
+		mob.target = source
+		mob.retarget = os.clock() + 4
+	end
+	if mob.health <= 0 then
+		if source then
+			local name = Config.Mobs[mob.kind].name
+			Net.send(source, "chat", string.format('<font color="#AAAAAA">%s을(를) 쓰러뜨렸습니다.</font>', name))
+		end
+		Mobs.remove(mob)
+	end
+end
+
+-- 근접 공격으로 몹 때리기
+function Mobs.melee(player: Player, mobId: any)
+	if type(mobId) ~= "number" then
+		return
+	end
+	local mob = mobs[mobId]
+	local state = Session.get(player)
+	if not mob or not state or not state.root or not Mobs.canHit(player, mob) then
+		return
+	end
+	local now = os.clock()
+	if now - state.lastAttack < 0.25 then
+		return
+	end
+	local center = mob.feet + (if mob.flying then Vector3.zero else Vector3.new(0, 1, 0))
+	if (center - state.root.Position).Magnitude > Config.Reach.AttackServer + (if mob.kind == "dragon" then 6 else 2) then
+		return
+	end
+	state.lastAttack = now
+	local stack = state.inv.slots[state.inv.selected]
+	local held = if stack then stack.id else nil
+	local damage = Rules.meleeDamage(held, Combat.getSharpness(player))
+	local flat = center - state.root.Position
+	flat = Vector3.new(flat.X, 0, flat.Z)
+	local push = (if flat.Magnitude > 0.05 then flat.Unit else Vector3.zero) * 14 * Rules.knockbackMultiplier(held) + Vector3.new(0, 8, 0)
+	Net.broadcast("swing", player)
+	Mobs.damage(mob, damage, player, push)
+end
+
+local function nearestTarget(mob: Mob, range: number): Player?
+	local best, bestDistance = nil, range
+	for _, player in mob.match.players do
+		if hostileTo(mob, player) then
+			local state = Session.get(player)
+			local root = state and state.root
+			if root then
+				local d = (root.Position - mob.feet).Magnitude
+				if d < bestDistance then
+					best, bestDistance = player, d
+				end
+			end
+		end
+	end
+	return best
+end
+
+local function attack(mob: Mob, victim: Player, now: number)
+	if now - mob.lastAttack < mob.def.attackInterval then
+		return
+	end
+	local state = Session.get(victim)
+	local root = state and state.root
+	if not root then
+		return
+	end
+	mob.lastAttack = now
+	local offset = root.Position - mob.feet
+	local flat = Vector3.new(offset.X, 0, offset.Z)
+	local dir = if flat.Magnitude > 0.05 then flat.Unit else Vector3.zAxis
+	local kb = mob.def.knockback
+	local knock = dir * Config.Combat.KnockbackH * kb + Vector3.new(0, Config.Combat.KnockbackV * math.min(kb, 1.3), 0)
+	-- 주인이 있으면 처치 기록은 주인에게
+	local credit = if mob.owner and Combat.canDamage(mob.owner, victim) then mob.owner else nil
+	Combat.damage(victim, mob.def.damage, { attacker = credit, cause = "mob_" .. mob.kind, knockback = knock })
+end
+
+local function stepGround(mob: Mob, dt: number, now: number)
+	local world = mob.match.world
+	local def = mob.def
+	if now > mob.retarget or not mob.target or not hostileTo(mob, mob.target) then
+		mob.target = nearestTarget(mob, def.range)
+		mob.retarget = now + 1
+	end
+	local wish = Vector3.zero
+	local target = mob.target
+	local targetState = if target then Session.get(target) else nil
+	local targetRoot = targetState and targetState.root
+	if targetRoot then
+		local offset = targetRoot.Position - mob.feet
+		local flat = Vector3.new(offset.X, 0, offset.Z)
+		if flat.Magnitude > 1.5 then
+			wish = flat.Unit * def.speed
+		end
+		if offset.Magnitude < def.reach + 1 then
+			attack(mob, target :: Player, now)
+		end
+	end
+
+	local feet, velocity = MobMotion.ground(world, mob.feet, mob.velocity, wish, dt, B)
+	local horizontal = Vector3.new(velocity.X, 0, velocity.Z)
+	mob.velocity = velocity
+	mob.feet = feet
+	local look = if wish.Magnitude > 0 then wish else horizontal
+	if look.Magnitude > 0.5 then
+		mob.yaw = math.atan2(-look.X, -look.Z)
+	end
+	mob.moving = wish.Magnitude > 0
+	if mob.moving then
+		mob.walkPhase += dt * (if mob.kind == "silverfish" then 18 else 7)
+	end
+	if feet.Y < (mob.match.voidY or -1e9) then
+		Mobs.remove(mob)
+	end
+end
+
+-- 용: 가장 가까운 적에게 날아가 들이받고, 지나가는 길의 놓인 블록을 부숨
+local function stepDragon(mob: Mob, dt: number, now: number)
+	local match = mob.match
+	local world = match.world
+	if now > mob.retarget or not mob.target or not hostileTo(mob, mob.target) then
+		mob.target = nearestTarget(mob, mob.def.range)
+		mob.retarget = now + 3
+	end
+	local goal: Vector3
+	local targetState = if mob.target then Session.get(mob.target) else nil
+	local targetRoot = targetState and targetState.root
+	if targetRoot then
+		goal = targetRoot.Position + Vector3.new(0, 2, 0)
+	else
+		if not mob.wander or (mob.wander - mob.feet).Magnitude < 6 then
+			local angle = math.random() * math.pi * 2
+			mob.wander = match.origin + Vector3.new(math.cos(angle) * 25 * B, (8 + math.random() * 5) * B, math.sin(angle) * 25 * B)
+		end
+		goal = mob.wander :: Vector3
+	end
+	local offset = goal - mob.feet
+	local dir = if offset.Magnitude > 0.1 then offset.Unit else Vector3.zAxis
+	local speed = mob.def.speed
+	mob.velocity = mob.velocity:Lerp(dir * speed, math.min(1, dt * 1.6))
+	mob.feet += mob.velocity * dt
+	if mob.velocity.Magnitude > 0.5 then
+		mob.yaw = math.atan2(-mob.velocity.X, -mob.velocity.Z)
+	end
+	-- 지나가는 자리의 블록 부수기 (사람이 놓은 블록만)
+	local cx, cy, cz = world:toCell(mob.feet)
+	for dx = -1, 1 do
+		for dy = -1, 1 do
+			for dz = -1, 1 do
+				local record = world:get(cx + dx, cy + dy, cz + dz)
+				if record and record.placed and match.mode.canExplode(match, record) then
+					world:remove(record.x, record.y, record.z)
+				end
+			end
+		end
+	end
+	if targetRoot and (targetRoot.Position - mob.feet).Magnitude < mob.def.reach then
+		attack(mob, mob.target :: Player, now)
+	end
+end
+
+local clock = 0
+RunService.Heartbeat:Connect(function(dt)
+	clock += dt
+	local now = os.clock()
+	for _, mob in mobs do
+		local ok, err = pcall(function()
+			if mob.dead then
+				return
+			end
+			if now > mob.expires or mob.match.state ~= "playing" or not mob.match.world then
+				Mobs.remove(mob)
+				return
+			end
+			if mob.flying then
+				stepDragon(mob, dt, now)
+			else
+				stepGround(mob, dt, now)
+			end
+			if not mob.dead then
+				placeParts(mob, clock)
+			end
+		end)
+		if not ok then
+			warn("[블록 아레나] 몹 오류:", err)
+			Mobs.remove(mob)
+		end
+	end
+end)
+
+-- 땅 몹을 놓을 위치: 그 칸 위의 바닥
+function Mobs.groundAt(match, x: number, y: number, z: number): Vector3?
+	local world = match.world
+	local gy = groundY(world, x, y, z)
+	if not gy then
+		return nil
+	end
+	local center = world:cellCenter(x, gy, z)
+	return center - Vector3.new(0, B / 2, 0)
+end
+
+-- 폭발과 화살에 몹도 다치게 연결
+Explosion.hurtMobs = function(match, position: Vector3, reach: number, power: number, source: Player?)
+	for _, mob in mobs do
+		if mob.match == match and not mob.dead then
+			local center = mob.feet + (if mob.flying then Vector3.zero else Vector3.new(0, 1, 0))
+			local distance = (center - position).Magnitude
+			if distance <= reach and (not source or Mobs.canHit(source, mob)) then
+				local falloff = 1 - distance / reach
+				local dir = if distance > 0.1 then (center - position).Unit else Vector3.yAxis
+				Mobs.damage(mob, math.max(0.5, power * falloff), source, dir * 30 * falloff + Vector3.new(0, 18 * falloff, 0))
+			end
+		end
+	end
+end
+Projectiles.mobFromPart = function(part: BasePart): any
+	return byPart[part]
+end
+
+return Mobs
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="Folder" referent="45">
         <Properties>
           <string name="Name">Modes</string>
         </Properties>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">BedWars</string>
-            <string name="Source"><![CDATA[-- 베드워즈: 4팀, 침대가 있으면 부활, 자원 생성기와 상점, 팀 강화, 시간 이벤트
+            <string name="Source"><![CDATA[-- 베드워즈: 4팀, 침대가 있으면 부활, 자원 생성기와 상점, 팀 강화·함정, 팀 상자/개인 상자, 시간 이벤트(서든데스 용)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage.Shared
@@ -8168,6 +10044,9 @@ local Net = require(Server.Net)
 local Inventory = require(Server.Logic.Inventory)
 local Teams = require(Server.Logic.Teams)
 local Npc = require(Server.Npc)
+local Status = require(Server.Status)
+local Mobs = require(Server.Mobs)
+local Containers = require(Server.Containers)
 
 local B = Config.BlockSize
 local BW = Config.BedWars
@@ -8178,6 +10057,8 @@ local Matches: any = nil
 local ARMOR_ORDER = { leather = 1, chain = 2, iron = 3, diamond = 4 }
 local CURRENCY_NAMES = { iron = "철", gold = "금", diamond = "다이아몬드", emerald = "에메랄드" }
 local CURRENCY_HEX = { iron = "#FFFFFF", gold = "#FFAA00", diamond = "#55FFFF", emerald = "#55FF55" }
+-- 강화 용광로 단계별 철·금 생성 배율 (3단계는 에메랄드가 추가로 나옴)
+local FORGE_MULT = { [0] = 1, [1] = 1.5, [2] = 2, [3] = 2, [4] = 3 }
 
 function BedWars.init(matches)
 	Matches = matches
@@ -8226,6 +10107,8 @@ local function giveLoadout(match, player: Player)
 	}
 	inv.armorLocked = true
 	inv.dirty = true
+	local team = match.data.teams[pd.team]
+	player:SetAttribute("Haste", if team then team.upgrades.haste else 0)
 end
 
 local function contextFor(match, player: Player)
@@ -8285,6 +10168,47 @@ end
 local function teamOf(match, player: Player)
 	local pd = match.data.players[player]
 	return if pd then match.data.teams[pd.team] else nil
+end
+
+local function membersOf(team): { Player }
+	local out = {}
+	for member in team.members do
+		table.insert(out, member)
+	end
+	return out
+end
+
+-- 상자 블록에 F 키 열기
+local function chestPrompt(match, x: number, y: number, z: number, label: string, onOpen: (Player) -> ())
+	local record = match.world:get(x, y, z)
+	if not record or not record.part then
+		return
+	end
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "열기"
+	prompt.ObjectText = label
+	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = record.part
+	prompt.Triggered:Connect(function(player)
+		local state = Session.get(player)
+		if state and state.match == match and state.location == "match" and state.alive and not state.waitingRespawn then
+			onOpen(player)
+		end
+	end)
+end
+
+-- 개인 상자: 경기 동안 그 사람만의 보관함 (어느 섬의 개인 상자에서 열어도 같음)
+local function enderOf(match, player: Player)
+	local data = match.data
+	local container = data.ender[player]
+	if not container then
+		container = Containers.new("개인 상자", BW.EnderChestSize)
+		data.ender[player] = container
+	end
+	return container
 end
 
 local function aliveTeams(match)
@@ -8383,6 +10307,8 @@ function BedWars.start(match, markers)
 		emeraldTier = 1,
 		protected = {},
 		displayTimer = 0,
+		ender = {},
+		sudden = false,
 	}
 	match.data = data
 	match.voidY = match.origin.Y - 30 * B
@@ -8405,7 +10331,10 @@ function BedWars.start(match, markers)
 			alive = 0,
 			started = #members > 0,
 			announcedOut = false,
-			upgrades = { sharpness = 0, protection = 0, forge = 0, healpool = 0 },
+			upgrades = { sharpness = 0, protection = 0, haste = 0, forge = 0, healpool = 0, dragon = 0 },
+			traps = {},
+			trapReady = 0,
+			chest = Containers.new(def.name .. " 팀 상자", BW.TeamChestSize),
 		}
 		data.teams[def.id] = team
 		table.insert(data.teamOrder, team)
@@ -8439,6 +10368,8 @@ function BedWars.start(match, markers)
 				gold = 0,
 				ironTimer = 0,
 				goldTimer = 0,
+				emerald = 0,
+				emeraldTimer = 0,
 				display = makeDisplay(match, genPos + Vector3.new(0, 1, 0), Items.TierColors.iron, 0.9, "자원 생성기"),
 			})
 			table.insert(data.protected, { gx, gy, gz, 1 })
@@ -8470,6 +10401,29 @@ function BedWars.start(match, markers)
 				BedWars.openShop(match, player, "upgrades")
 			end)
 			table.insert(data.protected, { upX, upY, upZ, 0 })
+
+			-- 팀 상자 (같은 팀만 열 수 있음) / 개인 상자
+			if marker.chest then
+				local cx, cy, cz = cell(marker.chest)
+				chestPrompt(match, cx, cy, cz, def.name .. " 팀 상자", function(player)
+					local pd = data.players[player]
+					if pd and pd.team == def.id then
+						Containers.open(player, team.chest)
+					else
+						Session.chat({ player }, '<font color="#FF5555">다른 팀의 상자는 열 수 없습니다.</font>')
+					end
+				end)
+				table.insert(data.protected, { cx, cy, cz, 0 })
+			end
+			if marker.ender then
+				local ex, ey, ez = cell(marker.ender)
+				chestPrompt(match, ex, ey, ez, "개인 상자", function(player)
+					if data.players[player] then
+						Containers.open(player, enderOf(match, player))
+					end
+				end)
+				table.insert(data.protected, { ex, ey, ez, 0 })
+			end
 		end
 		for _, player in members do
 			team.members[player] = true
@@ -8554,6 +10508,22 @@ local function applyEvent(match, event)
 			end
 		end
 		Session.title(match.players, '<font color="#FF5555">모든 침대 파괴!</font>', "이제 아무도 부활할 수 없습니다", 3)
+	elseif event.kind == "sudden" then
+		data.sudden = true
+		aliveTeams(match)
+		for _, team in data.teamOrder do
+			if team.alive > 0 and team.marker then
+				local count = 1 + team.upgrades.dragon
+				local x, y, z = cell(team.marker.center)
+				local base = match.world:cellCenter(x, y + 14, z)
+				for i = 1, count do
+					Mobs.spawn(match, "dragon", base + Vector3.new((i - 1) * 9, 0, 0), { team = team.id })
+				end
+			end
+		end
+		Session.title(match.players, '<font color="#AA55FF">서든데스!</font>', "용이 나타나 상대를 공격합니다", 3)
+		Session.chat(match.players, '<font color="#AA55FF"><b>서든데스</b></font> > 팀마다 용이 나타났습니다! "용의 가호" 강화를 산 팀은 용이 한 마리 더 있어요.')
+		Net.sendMany(match.players, "sound", "bed")
 	elseif event.kind == "end" then
 		local alive = aliveTeams(match)
 		table.sort(alive, function(a, b)
@@ -8587,9 +10557,17 @@ function BedWars.tick(match, dt: number)
 	for _, gen in data.gens do
 		if gen.kind == "island" then
 			local team = data.teams[gen.team]
-			local mult = 1 + 0.5 * (if team then team.upgrades.forge else 0)
+			local forge = if team then team.upgrades.forge else 0
+			local mult = FORGE_MULT[forge] or 1
 			gen.ironTimer += dt * mult
 			gen.goldTimer += dt * mult
+			if forge >= 3 then
+				gen.emeraldTimer += dt
+				if gen.emeraldTimer >= BW.ForgeEmeraldInterval then
+					gen.emeraldTimer = 0
+					gen.emerald = math.min(BW.ForgeEmeraldCap, gen.emerald + 1)
+				end
+			end
 			if gen.ironTimer >= BW.IronInterval then
 				gen.ironTimer -= BW.IronInterval
 				gen.iron = math.min(BW.IronCap, gen.iron + 1)
@@ -8610,6 +10588,8 @@ function BedWars.tick(match, dt: number)
 		end
 	end
 
+	BedWars.checkTraps(match)
+
 	-- 생성기 근처에 있으면 자동으로 줍기
 	for player, pd in data.players do
 		local state = Session.get(player)
@@ -8622,6 +10602,7 @@ function BedWars.tick(match, dt: number)
 					if gen.kind == "island" then
 						gen.iron = giveResource(player, "iron", gen.iron)
 						gen.gold = giveResource(player, "gold", gen.gold)
+						gen.emerald = giveResource(player, "emerald", gen.emerald)
 					else
 						gen.count = giveResource(player, gen.kind, gen.count)
 					end
@@ -8635,7 +10616,11 @@ function BedWars.tick(match, dt: number)
 		data.displayTimer = 0
 		for _, gen in data.gens do
 			if gen.kind == "island" then
-				gen.display.info.Text = string.format('<font color="#FFFFFF">철 %d</font>  <font color="#FFAA00">금 %d</font>', gen.iron, gen.gold)
+				local text = string.format('<font color="#FFFFFF">철 %d</font>  <font color="#FFAA00">금 %d</font>', gen.iron, gen.gold)
+				if gen.emerald > 0 then
+					text ..= string.format('  <font color="#55FF55">에메랄드 %d</font>', gen.emerald)
+				end
+				gen.display.info.Text = text
 			else
 				local intervals = if gen.kind == "diamond" then BW.DiamondIntervals else BW.EmeraldIntervals
 				local tier = if gen.kind == "diamond" then data.diamondTier else data.emeraldTier
@@ -8754,6 +10739,86 @@ function BedWars.sharpness(match, player: Player): number
 	return if team then team.upgrades.sharpness else 0
 end
 
+function BedWars.haste(match, player: Player): number
+	local team = teamOf(match, player)
+	return if team then team.upgrades.haste else 0
+end
+
+local function setHasteAttribute(team)
+	for member in team.members do
+		member:SetAttribute("Haste", team.upgrades.haste)
+	end
+end
+
+-- 함정: 적이 기지에 들어오면 줄의 맨 앞 함정이 발동
+local TRAP_TEXT = {
+	alarm = "경보 함정",
+	fatigue = "피로 함정",
+	blind = "어둠 함정",
+	counter = "반격 함정",
+}
+
+local function triggerTrap(match, team, intruder: Player)
+	local key = table.remove(team.traps, 1)
+	if not key then
+		return
+	end
+	team.trapReady = os.clock() + BW.TrapCooldown
+	local members = membersOf(team)
+	if key == "alarm" then
+		Status.remove(intruder, "invis")
+	elseif key == "fatigue" then
+		Status.add(intruder, "fatigue", 10)
+	elseif key == "blind" then
+		Status.add(intruder, "blind", 8)
+		Status.add(intruder, "slow", 8)
+	elseif key == "counter" then
+		local x, y, z = cell(team.marker.center)
+		local center = match.world:cellCenter(x, y, z)
+		for _, member in members do
+			local state = Session.get(member)
+			if state and state.alive and state.root and (state.root.Position - center).Magnitude < (BW.TrapRadius + 6) * B then
+				Status.add(member, "speed", 15)
+				Status.add(member, "jump", 15)
+			end
+		end
+	end
+	Session.title(members, '<font color="#FF5555">함정 발동!</font>', string.format("%s님이 %s에 걸렸습니다", intruder.DisplayName, TRAP_TEXT[key] or key), 2.5)
+	Session.chat(members, string.format('<font color="#FF5555">함정</font> > %s님이 기지에 들어와 <font color="#FFFF55">%s</font>이(가) 발동했습니다!', Matches.coloredName(intruder), TRAP_TEXT[key] or key))
+	Net.sendMany(members, "sound", "deny")
+	Session.title({ intruder }, "", '<font color="#FF5555">함정에 걸렸습니다!</font>', 2)
+	for _, member in members do
+		Net.send(member, "shopState", BedWars.shopState(match, member))
+	end
+end
+
+function BedWars.checkTraps(match)
+	local data = match.data
+	local now = os.clock()
+	for _, team in data.teamOrder do
+		if #team.traps > 0 and team.marker and now >= team.trapReady then
+			local x, y, z = cell(team.marker.center)
+			local center = match.world:cellCenter(x, y, z)
+			for player, pd in data.players do
+				if pd.team ~= team.id and not pd.eliminated then
+					local state = Session.get(player)
+					local root = state and state.root
+					if state and root and state.alive and not state.waitingRespawn and state.location == "match" then
+						local offset = root.Position - center
+						if math.abs(offset.Y) < 10 * B and Vector3.new(offset.X, 0, offset.Z).Magnitude < BW.TrapRadius * B then
+							if Status.has(player, "milk") then
+								continue
+							end
+							triggerTrap(match, team, player)
+							break
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
 function BedWars.regenInterval(match, player: Player): number
 	local team = teamOf(match, player)
 	local state = Session.get(player)
@@ -8778,7 +10843,7 @@ local function pay(player: Player, inv, cost): boolean
 	return true
 end
 
-local function shopState(match, player: Player)
+function BedWars.shopState(match, player: Player)
 	local pd = match.data.players[player]
 	local team = teamOf(match, player)
 	return {
@@ -8788,8 +10853,10 @@ local function shopState(match, player: Player)
 		axe = if pd then pd.axe else 0,
 		shears = if pd then pd.shears else false,
 		upgrades = if team then team.upgrades else {},
+		traps = if team then table.clone(team.traps) else {},
 	}
 end
+local shopState = BedWars.shopState
 
 function BedWars.openShop(match, player: Player, kind: string)
 	local state = Session.get(player)
@@ -8880,11 +10947,35 @@ function BedWars.upgrade(match, player: Player, key: string)
 		return
 	end
 	team.upgrades[key] = level + 1
-	local members = {}
-	for member in team.members do
-		table.insert(members, member)
+	if key == "haste" then
+		setHasteAttribute(team)
 	end
+	local members = membersOf(team)
 	Session.chat(members, string.format('%s님이 <font color="#55FFFF">%s %d단계</font>를 구매했습니다!', Matches.coloredName(player), def.name, level + 1))
+	Net.sendMany(members, "sound", "buy")
+	for _, member in members do
+		Net.send(member, "shopState", shopState(match, member))
+	end
+end
+
+function BedWars.buyTrap(match, player: Player, key: string)
+	local state = Session.get(player)
+	local team = teamOf(match, player)
+	local def = Shop.getTrap(key)
+	if not state or not team or not def or state.location ~= "match" then
+		return
+	end
+	local cost = Shop.trapCost(#team.traps)
+	if not cost or #team.traps >= Shop.MaxTraps then
+		Session.chat({ player }, string.format('<font color="#FF5555">함정은 %d개까지 줄 세울 수 있습니다.</font>', Shop.MaxTraps))
+		return
+	end
+	if not pay(player, state.inv, { item = "diamond", amount = cost }) then
+		return
+	end
+	table.insert(team.traps, key)
+	local members = membersOf(team)
+	Session.chat(members, string.format('%s님이 <font color="#55FFFF">%s</font>을(를) 설치했습니다! (%d/%d)', Matches.coloredName(player), def.name, #team.traps, Shop.MaxTraps))
 	Net.sendMany(members, "sound", "buy")
 	for _, member in members do
 		Net.send(member, "shopState", shopState(match, member))
@@ -8925,6 +11016,16 @@ function BedWars.sidebar(match, player: Player)
 end
 
 function BedWars.cleanup(match)
+	local data = match.data
+	for _, team in data.teamOrder or {} do
+		Containers.closeAll(team.chest)
+	end
+	for _, container in data.ender or {} do
+		Containers.closeAll(container)
+	end
+	for player in data.players or {} do
+		player:SetAttribute("Haste", nil)
+	end
 	match.data = {}
 end
 
@@ -8932,10 +11033,10 @@ return BedWars
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">SkyWars</string>
-            <string name="Source"><![CDATA[-- 스카이워즈: 유리관에서 시작, 상자에서 장비 수집, 마지막 한 명이 승리
+            <string name="Source"><![CDATA[-- 스카이워즈: 유리관에서 시작, 키트와 능력, 상자에서 장비 수집, 럭키 블록, 마지막 한 명이 승리
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage.Shared
@@ -8950,6 +11051,9 @@ local Inventory = require(Server.Logic.Inventory)
 local Loot = require(Server.Logic.Loot)
 local Containers = require(Server.Containers)
 local Drops = require(Server.Drops)
+local Combat = require(Server.Combat)
+local Lucky = require(Server.Lucky)
+local Kits = require(Shared.Kits)
 
 local B = Config.BlockSize
 local SW = Config.SkyWars
@@ -8990,6 +11094,34 @@ local function fillChest(chest, starter: boolean)
 		chest.container.slots[index] = stack
 	end
 	Containers.refresh(chest.container)
+end
+
+-- 키트 아이템 주기 (갑옷은 비어 있는 자리에 바로 입힘)
+local function giveKit(player: Player)
+	local state = Session.get(player)
+	if not state then
+		return
+	end
+	local kit = Kits.get(state.kit) or Kits.get(Kits.DefaultKit)
+	if not kit then
+		return
+	end
+	for _, stack in kit.items do
+		local def = Items.get(stack.id)
+		if def and def.kind == "armor" and def.armorSlot and not state.inv.armor[def.armorSlot] then
+			state.inv.armor[def.armorSlot] = stack.id
+			state.inv.dirty = true
+		else
+			Inventory.add(state.inv, stack.id, stack.count)
+		end
+	end
+	local perk = Kits.getPerk(state.perk)
+	Session.chat({ player }, string.format('키트 <font color="#55FF55">%s</font>와(과) 능력 <font color="#55FFFF">%s</font>을(를) 받았습니다.', kit.name, if perk then perk.name else "없음"))
+end
+
+local function perkOf(player: Player): string?
+	local state = Session.get(player)
+	return if state then state.perk else nil
 end
 
 local function aliveList(match): { Player }
@@ -9036,6 +11168,7 @@ function SkyWars.start(match, markers)
 		fightStart = 0,
 		refillIndex = 1,
 		cages = {},
+		lucky = 0,
 	}
 	match.data = data
 	match.voidY = match.origin.Y - 30 * B
@@ -9094,6 +11227,17 @@ function SkyWars.start(match, markers)
 		fillChest(chest, chest.starter)
 	end
 
+	-- 럭키 블록: 표시된 자리 중 바닥이 있고 비어 있는 곳에 확률로
+	for _, spot in markers.lucky or {} do
+		local record = world:get(spot.x, spot.y, spot.z)
+		local def = if record then Blocks.get(record.id) else nil
+		local free = record == nil or (def ~= nil and def.canCollide == false and not def.water and not def.burn)
+		if free and world:isSolid(spot.x, spot.y - 1, spot.z) and rand() < SW.LuckyChance then
+			world:set(spot.x, spot.y, spot.z, "lucky_block")
+			data.lucky += 1
+		end
+	end
+
 	for index, player in match.players do
 		local spawn = spawns[index]
 		if spawn then
@@ -9120,6 +11264,9 @@ function SkyWars.start(match, markers)
 	Session.chat(match.players, '<font color="#55FFFF">━━━━━━━━ 스카이워즈 ━━━━━━━━</font>')
 	Session.chat(match.players, "유리관이 열리면 상자(F)에서 장비를 챙기세요. 가운데 섬에 좋은 장비가 있습니다.")
 	Session.chat(match.players, "블록을 부수면 그 블록을 얻습니다. 마지막까지 살아남은 사람이 승리!")
+	if data.lucky > 0 then
+		Session.chat(match.players, string.format('<font color="#FFD24A">럭키 블록 %d개</font>가 섬 곳곳에 있어요. 부숴 보면 좋은 일이… 아니면 나쁜 일이!', data.lucky))
+	end
 end
 
 function SkyWars.tick(match, dt: number)
@@ -9146,6 +11293,14 @@ function SkyWars.tick(match, dt: number)
 			end
 			Session.title(match.players, '<font color="#FF5555">싸워라!</font>', "", 1.5)
 			Net.sendMany(match.players, "sound", "start")
+			for player, pd in data.players do
+				if not pd.eliminated then
+					giveKit(player)
+					if perkOf(player) == "bulwark" then
+						Combat.setAbsorption(player, 4, 90)
+					end
+				end
+			end
 		end
 		return
 	end
@@ -9174,6 +11329,12 @@ function SkyWars.onDeath(match, player: Player, killer: Player?, cause: string)
 		pd.eliminated = true
 		if killer and data.players[killer] then
 			data.players[killer].kills += 1
+			local perk = perkOf(killer)
+			if perk == "lifesteal" then
+				Combat.heal(killer, 8)
+			elseif perk == "bulwark" then
+				Combat.setAbsorption(killer, 4, 60)
+			end
 		end
 		-- 아이템 떨구기 (공허에 떨어진 경우는 없어짐)
 		if state and state.root and cause ~= "void" then
@@ -9216,10 +11377,32 @@ function SkyWars.canBreak(match, _player: Player, record): boolean
 	return match.data.phase == "fight" and def ~= nil and not def.unbreakable and not def.chest
 end
 
-function SkyWars.onBreak(_match, player: Player, record)
+function SkyWars.onBreak(match, player: Player, record)
+	local def = Blocks.get(record.id)
+	if def and def.lucky then
+		Lucky.open(match, player, record.x, record.y, record.z)
+		return
+	end
 	local state = Session.get(player)
 	if state and Items.get(record.id) then
-		Inventory.add(state.inv, record.id, 1)
+		local count = if perkOf(player) == "lucky_miner" and rand() < 0.25 then 2 else 1
+		Inventory.add(state.inv, record.id, count)
+	end
+end
+
+-- 능력: 깃털 낙하, 단단한 몸, 화살 회수
+function SkyWars.fallScale(_match, player: Player): number
+	return if perkOf(player) == "feather" then 0.5 else 1
+end
+
+function SkyWars.knockbackScale(_match, player: Player): number
+	return if perkOf(player) == "sturdy" then 0.65 else 1
+end
+
+function SkyWars.onArrowHit(_match, player: Player)
+	local state = Session.get(player)
+	if state and perkOf(player) == "arrow_return" and rand() < 0.3 then
+		Inventory.add(state.inv, "arrow", 1)
 	end
 end
 
@@ -9265,7 +11448,7 @@ return SkyWars
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">TntRun</string>
             <string name="Source"><![CDATA[-- TNT 런: 밟은 바닥이 잠시 뒤 사라집니다. 더블 점프 3번, 마지막까지 버틴 사람이 승리.
@@ -9529,7 +11712,7 @@ return TntRun
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">Monetization</string>
           <string name="Source"><![CDATA[-- 게임패스 (VIP, 커스텀 스킨): 가지고 있는지 확인, 구매 창 띄우기, 산 뒤 바로 지급
@@ -9659,7 +11842,7 @@ return Monetization
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">Net</string>
           <string name="Source"><![CDATA[-- 서버 <-> 클라이언트 통신. RemoteEvent 두 개만 씁니다.
@@ -9755,7 +11938,7 @@ return Net
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">Npc</string>
           <string name="Source"><![CDATA[-- 블록으로 만든 NPC (상점 주인, 로비 미니게임 안내원)
@@ -9862,7 +12045,7 @@ return Npc
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">PlayerData</string>
           <string name="Source"><![CDATA[-- 승리/처치 기록 저장 (DataStore). 스튜디오에서 API 접근을 꺼 두었으면 저장 없이 그냥 진행합니다.
@@ -10003,10 +12186,10 @@ return PlayerData
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">Projectiles</string>
-          <string name="Source"><![CDATA[-- 날아가는 물체 (화살, 눈덩이, 순간이동 진주, 화염구). 서버에서 직접 움직이며 레이캐스트로 맞았는지 확인합니다.
+          <string name="Source"><![CDATA[-- 날아가는 물체 (화살, 눈덩이, 순간이동 진주, 화염구, 다리 알, 좀벌레 알, 낚싯찌). 서버에서 직접 움직이며 레이캐스트로 맞았는지 확인합니다.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -10025,6 +12208,8 @@ export type Spec = {
 	light: boolean?,
 	onHitPlayer: (victim: Player, position: Vector3, velocity: Vector3) -> (),
 	onHitWorld: (position: Vector3, normal: Vector3, part: BasePart) -> (),
+	onHitMob: ((mob: any, position: Vector3, velocity: Vector3) -> ())?,
+	onStep: ((position: Vector3, velocity: Vector3) -> ())?, -- 매 프레임 (다리 알이 지나간 자리에 양털 놓기)
 	onExpire: ((position: Vector3) -> ())?,
 }
 
@@ -10041,6 +12226,11 @@ folder.Name = "Projectiles"
 folder.Parent = workspace
 
 local active: { Active } = {}
+
+-- 맞은 파트가 몹이면 그 몹을 돌려줌 (Mobs 가 채워 넣음)
+Projectiles.mobFromPart = function(_part: BasePart): any
+	return nil
+end
 
 function Projectiles.launch(spec: Spec)
 	local part = Instance.new("Part")
@@ -10109,6 +12299,13 @@ local function step(item: Active, dt: number): boolean
 			spec.onHitPlayer(victim, result.Position, item.velocity)
 			return false
 		end
+		local mob = Projectiles.mobFromPart(hitPart)
+		if mob then
+			if spec.onHitMob then
+				spec.onHitMob(mob, result.Position, item.velocity)
+			end
+			return false
+		end
 		if hitPart.CanCollide then
 			spec.onHitWorld(result.Position, result.Normal, hitPart)
 			return false
@@ -10124,6 +12321,9 @@ local function step(item: Active, dt: number): boolean
 
 	item.position += displacement
 	item.velocity += gravity * dt
+	if spec.onStep then
+		spec.onStep(item.position, item.velocity)
+	end
 	if item.velocity.Magnitude > 0.1 then
 		item.part.CFrame = CFrame.lookAt(item.position, item.position + item.velocity)
 	end
@@ -10165,7 +12365,7 @@ return Projectiles
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">Session</string>
           <string name="Source"><![CDATA[-- 플레이어별 상태(어디에 있는지, 가방, 팀, 마지막으로 때린 사람 등)와 캐릭터 생성/꾸미기
@@ -10178,6 +12378,7 @@ local Items = require(Shared.Items)
 local Skins = require(Shared.Skins)
 local CharacterRig = require(Shared.CharacterRig)
 local Preferences = require(Shared.Preferences)
+local Kits = require(Shared.Kits)
 local Inventory = require(script.Parent.Logic.Inventory)
 local Net = require(script.Parent.Net)
 
@@ -10216,6 +12417,9 @@ export type State = {
 	settings: { [string]: any },
 	passes: { [string]: boolean },
 	armorKey: string,
+	kit: string, -- 스카이워즈 키트
+	perk: string, -- 스카이워즈 능력
+	lastRod: number,
 }
 
 local states: { [Player]: State } = {}
@@ -10260,6 +12464,9 @@ function Session.create(player: Player): State
 		settings = Preferences.defaults(),
 		passes = {},
 		armorKey = "",
+		kit = Kits.DefaultKit,
+		perk = Kits.DefaultPerk,
+		lastRod = 0,
 	}
 	states[player] = state
 	player:SetAttribute("Skin", state.skin)
@@ -10429,7 +12636,7 @@ function Session.refreshHeld(state: State)
 		part.Size = Vector3.new(0.9, 0.9, 0.9)
 		part.Material = Enum.Material.SmoothPlastic
 		offset *= CFrame.new(0, -0.2, -0.3)
-	elseif def.kind == "sword" or def.kind == "pickaxe" or def.kind == "axe" or def.kind == "bow" then
+	elseif def.kind == "sword" or def.kind == "pickaxe" or def.kind == "axe" or def.kind == "bow" or def.kind == "stick" or def.kind == "rod" then
 		part.Size = Vector3.new(0.25, 0.35, 3)
 		part.Material = if def.kind == "bow" then Enum.Material.Wood else Enum.Material.Metal
 		offset *= CFrame.new(0, 0, -1.2)
@@ -10571,7 +12778,86 @@ return Session
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="55">
+        <Properties>
+          <string name="Name">Status</string>
+          <string name="Source"><![CDATA[-- 상태 효과 (물약, 함정, 불). 끝나는 시각을 플레이어 속성 "FX_<이름>" 에 서버 시각(GetServerTimeNow)으로 적어 두면
+-- 모든 클라이언트가 그 값을 보고 이동 속도, 점프, 화면 어둡게, 투명 같은 걸 맞춥니다.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+
+local Status = {}
+
+local effects: { [Player]: { [string]: number } } = {}
+
+local function now(): number
+	return workspace:GetServerTimeNow()
+end
+
+function Status.add(player: Player, name: string, duration: number)
+	if not Config.Effects[name] or duration <= 0 then
+		return
+	end
+	local list = effects[player]
+	if not list then
+		list = {}
+		effects[player] = list
+	end
+	local ends = math.max(list[name] or 0, now() + duration)
+	list[name] = ends
+	player:SetAttribute("FX_" .. name, ends)
+end
+
+function Status.has(player: Player, name: string): boolean
+	local list = effects[player]
+	local ends = list and list[name]
+	return ends ~= nil and ends > now()
+end
+
+function Status.remaining(player: Player, name: string): number
+	local list = effects[player]
+	local ends = list and list[name]
+	return if ends then math.max(0, ends - now()) else 0
+end
+
+function Status.remove(player: Player, name: string)
+	local list = effects[player]
+	if list then
+		list[name] = nil
+	end
+	player:SetAttribute("FX_" .. name, nil)
+end
+
+function Status.clear(player: Player)
+	effects[player] = nil
+	for name in Config.Effects do
+		player:SetAttribute("FX_" .. name, nil)
+	end
+end
+
+-- 끝난 효과 정리 (Combat 의 0.5초 반복에서 부름)
+function Status.sweep()
+	local t = now()
+	for player, list in effects do
+		if not player.Parent then
+			effects[player] = nil
+		else
+			for name, ends in list do
+				if ends <= t then
+					list[name] = nil
+					player:SetAttribute("FX_" .. name, nil)
+				end
+			end
+		end
+	end
+end
+
+return Status
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">World</string>
           <string name="Source"><![CDATA[-- 블록 월드: 격자 좌표(x, y, z)마다 블록 하나.
@@ -10736,15 +13022,28 @@ end
 
 local SMALL = { plant = true, grass = true, carpet = true, torch = true, lantern = true }
 
-local function buildPart(def: Blocks.BlockDef, x: number, y: number, z: number, center: Vector3): BasePart
+-- 사다리처럼 붙은 벽 쪽으로 돌아가는 블록: data.face = { dx, dz } (벽이 있는 방향)
+function World.faceRotation(data: { [string]: any }?): CFrame
+	local face = data and data.face
+	if type(face) == "table" and type(face[1]) == "number" and type(face[2]) == "number" then
+		return CFrame.Angles(0, math.atan2(face[1], face[2]), 0)
+	end
+	return CFrame.identity
+end
+
+local function buildPart(def: Blocks.BlockDef, x: number, y: number, z: number, center: Vector3, data: { [string]: any }?): BasePart
 	local shape = if def.shape then Blocks.Shapes[def.shape] else nil
 	local part = Instance.new("Part")
 	part.Name = def.id
 	part.Anchored = true
 	part.Size = (if shape then shape.size else Vector3.one) * B
 	local h = (x * 7919 + y * 104729 + z * 1299709) % 360
-	local rotation = if def.shape == "grass" then CFrame.Angles(0, math.rad(h), 0) else CFrame.identity
-	part.CFrame = CFrame.new(center + (if shape then shape.offset else Vector3.zero) * B) * rotation
+	if def.shape == "ladder" then
+		part.CFrame = CFrame.new(center) * World.faceRotation(data) * CFrame.new((if shape then shape.offset else Vector3.zero) * B)
+	else
+		local rotation = if def.shape == "grass" then CFrame.Angles(0, math.rad(h), 0) else CFrame.identity
+		part.CFrame = CFrame.new(center + (if shape then shape.offset else Vector3.zero) * B) * rotation
+	end
 	part.Color = Blocks.shade(def, x, y, z)
 	part.Material = def.material
 	part.Transparency = def.transparency or 0
@@ -10806,7 +13105,7 @@ function World.spawnPart(self: World, record: Record, mask: number?)
 	if not def or record.part then
 		return
 	end
-	local part = buildPart(def, record.x, record.y, record.z, self:cellCenter(record.x, record.y, record.z))
+	local part = buildPart(def, record.x, record.y, record.z, self:cellCenter(record.x, record.y, record.z), record.data)
 	if def.shape == nil then
 		part:SetAttribute("Occ", mask or self:mask(record.x, record.y, record.z))
 	end
@@ -10998,12 +13297,12 @@ return World
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="50">
+  <Item class="SoundService" referent="57">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="51">
+  <Item class="StarterPlayer" referent="58">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">12</float>
@@ -11014,11 +13313,11 @@ return World
       <bool name="EnableMouseLockOption">false</bool>
       <bool name="LoadCharacterAppearance">false</bool>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="52">
+    <Item class="StarterCharacterScripts" referent="59">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="53">
+      <Item class="LocalScript" referent="60">
         <Properties>
           <string name="Name">Animate</string>
           <string name="Source"><![CDATA[-- 로블록스 기본 걷기 애니메이션 스크립트를 대신합니다(비워 두면 기본 애니메이션이 꺼짐).
@@ -11026,7 +13325,7 @@ return World
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="54">
+      <Item class="Script" referent="61">
         <Properties>
           <string name="Name">Health</string>
           <token name="RunContext">0</token>
@@ -11036,15 +13335,15 @@ return World
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="55">
+    <Item class="StarterPlayerScripts" referent="62">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="56">
+      <Item class="Folder" referent="63">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">BlockTextures</string>
             <string name="Source"><![CDATA[-- 블록에 픽셀 텍스처 붙이기 (클라이언트)
@@ -11342,7 +13641,7 @@ return BlockTextures
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">CharacterVisuals</string>
             <string name="Source"><![CDATA[-- 캐릭터 꾸미기 (클라이언트): 픽셀 스킨 입히기, 입은 갑옷 보여 주기, 마인크래프트식 팔다리 흔들기
@@ -11388,6 +13687,8 @@ type Rig = {
 	phase: number,
 	seed: number,
 	swingStart: number?,
+	invisible: boolean,
+	local_: boolean,
 }
 local rigs: { [Model]: Rig } = {}
 
@@ -11599,12 +13900,29 @@ function CharacterVisuals.applyArmor(model: Model, key: string)
 	folder.Parent = model
 end
 
+local function isInvisible(model: Model): boolean
+	local player = Players:GetPlayerFromCharacter(model)
+	local ends = player and player:GetAttribute("FX_invis")
+	return type(ends) == "number" and ends > workspace:GetServerTimeNow()
+end
+
 local function setNametag(model: Model)
 	local head = model:FindFirstChild("Head")
 	local tag = head and head:FindFirstChild("Nametag")
 	if tag and tag:IsA("BillboardGui") then
-		tag.Enabled = nametagsVisible
+		tag.Enabled = nametagsVisible and not isInvisible(model)
 	end
+end
+
+-- 투명화 물약: 다른 사람 눈에는 몸, 갑옷, 손에 든 것, 이름표가 모두 안 보임
+local function applyInvisible(model: Model, invisible: boolean)
+	local value = if invisible then 1 else 0
+	for _, d in model:GetDescendants() do
+		if (d:IsA("BasePart") and d.Name ~= "HumanoidRootPart") or d:IsA("Decal") then
+			(d :: any).LocalTransparencyModifier = value
+		end
+	end
+	setNametag(model)
 end
 
 function CharacterVisuals.setNametagsVisible(visible: boolean)
@@ -11638,7 +13956,7 @@ local function setup(player: Player, model: Model)
 			motors[name] = m
 		end
 	end
-	rigs[model] = { model = model, root = root, motors = motors, phase = 0, seed = player.UserId % 100 }
+	rigs[model] = { model = model, root = root, motors = motors, phase = 0, seed = player.UserId % 100, invisible = false, local_ = player == localPlayer }
 	model.Destroying:Connect(function()
 		rigs[model] = nil
 	end)
@@ -11695,6 +14013,25 @@ function CharacterVisuals.init()
 		end
 	end)
 
+	-- 투명화 확인 (0.25초마다, 새로 붙은 갑옷도 다시 숨김)
+	local invisTimer = 0
+	RunService.Heartbeat:Connect(function(dt)
+		invisTimer += dt
+		if invisTimer < 0.25 then
+			return
+		end
+		invisTimer = 0
+		for model, rig in rigs do
+			if model.Parent and not rig.local_ then
+				local invisible = isInvisible(model)
+				if invisible or invisible ~= rig.invisible then
+					rig.invisible = invisible
+					applyInvisible(model, invisible)
+				end
+			end
+		end
+	end)
+
 	-- 마인크래프트처럼 걸을 때 팔다리를 앞뒤로 흔듦
 	RunService.Stepped:Connect(function(_, dt)
 		local now = os.clock()
@@ -11742,10 +14079,10 @@ return CharacterVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">Controls</string>
-            <string name="Source"><![CDATA[-- 조작: 조준(블록/사람), 왼쪽 클릭 공격·부수기, 오른쪽 클릭 설치·사용, 숫자키 핫바, 단축키, 모바일 버튼
+            <string name="Source"><![CDATA[-- 조작: 조준(블록/사람/몹), 왼쪽 클릭 공격·부수기, 오른쪽 클릭 설치·사용(물약/양동이/낚싯대), 숫자키 핫바, 단축키, 모바일 버튼
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -11781,9 +14118,11 @@ local selection: SelectionBox
 export type Target = {
 	kind: string,
 	player: Player?,
+	mobId: number?,
 	part: BasePart?,
 	cell: { number }?,
 	place: { number }?,
+	normal: { number }?,
 }
 local target: Target? = nil
 
@@ -11827,6 +14166,14 @@ local function playerFromPart(part: BasePart): Player?
 	return nil
 end
 
+-- 물/용암처럼 통과하는 블록은 조준할 때 건너뜀 (그 너머 블록에 놓거나 부술 수 있게)
+local FLUIDS = { water = true, water_source = true, lava = true, lava_flow = true }
+
+local function mobFromPart(part: BasePart): number?
+	local id = part:GetAttribute("MobId")
+	return if type(id) == "number" then id else nil
+end
+
 local function aimRay(): Ray
 	local camera = workspace.CurrentCamera
 	local size = camera.ViewportSize
@@ -11849,10 +14196,26 @@ local function updateTarget()
 	end
 	params.FilterDescendantsInstances = exclude
 	local result = workspace:Raycast(ray.Origin, ray.Direction * 60, params)
+	for _ = 1, 4 do
+		if result and (FLUIDS[result.Instance.Name] or FLUIDS[result.Instance:GetAttribute("BlockId") or ""]) then
+			params:AddToFilter(result.Instance)
+			result = workspace:Raycast(ray.Origin, ray.Direction * 60, params)
+		else
+			break
+		end
+	end
 	if not result then
 		return
 	end
 	local head = root.Position + Vector3.new(0, 1.5, 0)
+	local mobId = mobFromPart(result.Instance)
+	if mobId then
+		local reach = Config.Reach.Attack + (if result.Instance.Parent and result.Instance.Parent:GetAttribute("MobKind") == "dragon" then 5 else 1)
+		if (result.Position - head).Magnitude <= reach then
+			target = { kind = "mob", mobId = mobId }
+		end
+		return
+	end
 	local other = playerFromPart(result.Instance)
 	if other and other ~= player then
 		local otherRoot = other.Character and other.Character:FindFirstChild("HumanoidRootPart")
@@ -11874,6 +14237,7 @@ local function updateTarget()
 		part = block,
 		cell = { x, y, z },
 		place = { x + math.round(n.X), y + math.round(n.Y), z + math.round(n.Z) },
+		normal = { math.round(n.X), math.round(n.Y), math.round(n.Z) },
 	}
 end
 
@@ -11904,23 +14268,40 @@ local function tryAttack()
 		CharacterVisuals.swing(player)
 		Net.send("attack", target.player)
 		return true
+	elseif target and target.kind == "mob" and target.mobId and State.context.pvp then
+		lastAttack = os.clock()
+		CharacterVisuals.swing(player)
+		Net.send("attackMob", target.mobId)
+		return true
 	end
 	return false
 end
 
+-- 블록처럼 조준한 칸에 놓는 아이템 (블록, 양동이, 팝업 타워, 골렘 알)
+local PLACEABLE = { block = true, bucket = true, deploy = true }
+
 local function tryPlace()
 	local def = selectedDef()
-	if not def or def.kind ~= "block" or not State.context.build then
+	if not def or not PLACEABLE[def.kind] or not State.context.build then
 		return false
 	end
 	if target and target.kind == "block" and target.place then
 		local p = target.place
+		local n = target.normal or { 0, 1, 0 }
 		CharacterVisuals.swing(player)
-		Net.send("place", p[1], p[2], p[3])
+		Net.send("place", p[1], p[2], p[3], n[1], n[2], n[3])
 		lastPlace = os.clock()
 		return true
 	end
 	return false
+end
+
+-- 광부의 손 강화와 피로 함정을 반영한 부수기 속도
+local function breakSpeed(): number
+	local haste = player:GetAttribute("Haste")
+	local fatigue = player:GetAttribute("FX_fatigue")
+	local fatigued = type(fatigue) == "number" and fatigue > workspace:GetServerTimeNow()
+	return Rules.breakSpeed(if type(haste) == "number" then haste else 0, fatigued)
 end
 
 local function useStart()
@@ -11928,11 +14309,14 @@ local function useStart()
 	if not def then
 		return
 	end
-	if def.kind == "block" then
+	if PLACEABLE[def.kind] then
 		tryPlace()
 	elseif def.kind == "bow" then
 		bowStart = os.clock()
-	elseif def.kind == "menu" or def.kind == "food" or def.kind == "armor" or def.kind == "throwable" then
+	elseif def.kind == "menu" or def.kind == "food" or def.kind == "armor" or def.kind == "throwable" or def.kind == "potion" or def.kind == "rod" then
+		if def.kind == "rod" or def.kind == "throwable" then
+			CharacterVisuals.swing(player)
+		end
 		Net.send("use", workspace.CurrentCamera.CFrame.LookVector)
 	end
 end
@@ -12140,7 +14524,7 @@ function Controls.init()
 
 		local now = os.clock()
 		-- 꾹 누르고 있으면 반복 동작 (모바일 공격, 블록 연속 설치)
-		if attackHeld and target and target.kind == "player" and now - lastAttack > 0.18 and not UserInputService.KeyboardEnabled then
+		if attackHeld and target and (target.kind == "player" or target.kind == "mob") and now - lastAttack > 0.18 and not UserInputService.KeyboardEnabled then
 			tryAttack()
 		end
 		if useHeld and now - lastPlace > 0.22 then
@@ -12169,7 +14553,7 @@ function Controls.init()
 				Net.send("breakStart", c[1], c[2], c[3])
 			end
 			local stack = State.selectedStack()
-			local need = Rules.breakTime(target.part.Name, if stack then stack.id else nil)
+			local need = Rules.breakTime(target.part.Name, if stack then stack.id else nil, breakSpeed())
 			if need and breaking then
 				breaking.progress += dt / need
 				if breaking.progress >= 1 then
@@ -12190,7 +14574,7 @@ return Controls
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[-- 꾸밈 효과: 생성기 블록 회전, 효과음
@@ -12263,7 +14647,7 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">Flight</string>
             <string name="Source"><![CDATA[-- VIP 로비 날기: 스페이스를 빠르게 두 번 누르면 날기 켜기/끄기.
@@ -12454,7 +14838,7 @@ return Flight
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="62">
+        <Item class="LocalScript" referent="69">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- 클라이언트 시작점: 화면을 만들고 서버 메시지를 화면에 연결합니다.
@@ -12564,8 +14948,8 @@ end)
 
 local HINTS = {
 	lobby = "F: NPC  ·  우클릭: 아이템 사용  ·  V: 시점  ·  1~9: 핫바",
-	waiting = "우클릭: 맵 투표 / 나가기  ·  L 두 번: 로비로  ·  V: 시점",
-	match = "E: 가방  ·  Q: 버리기  ·  Shift: 웅크리기  ·  Ctrl: 달리기  ·  V: 시점  ·  L 두 번: 로비로",
+	waiting = "우클릭: 맵 선택 / 키트 고르기(스카이워즈) / 나가기  ·  L 두 번: 로비로  ·  V: 시점",
+	match = "E: 가방  ·  Q: 버리기  ·  Shift: 웅크리기  ·  Ctrl: 달리기  ·  F: 상점/상자  ·  V: 시점  ·  L 두 번: 로비로",
 	respawn = "곧 부활합니다...",
 	spectate = "관전 중  ·  L 두 번: 로비로",
 }
@@ -12687,6 +15071,20 @@ Net.on("needVip", function()
 	Windows.openStore()
 end)
 
+Net.on("openKits", function(data)
+	if type(data) == "table" then
+		State.kit = { kit = data.kit, perk = data.perk }
+	end
+	Windows.openKits()
+end)
+
+Net.on("kitState", function(data)
+	if type(data) == "table" then
+		State.kit = { kit = data.kit, perk = data.perk }
+		Windows.updateKits()
+	end
+end)
+
 Net.on("crit", function()
 	Hud.actionbar('<font color="#FFAA00">치명타!</font>', 0.8)
 end)
@@ -12696,10 +15094,11 @@ Hud.setStatusVisible(false)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">Movement</string>
-            <string name="Source"><![CDATA[-- 움직임: 달리기(Ctrl), 웅크리기(Shift, 가장자리에서 안 떨어짐), 더블 점프(TNT 런), 낙하 피해, 넉백
+            <string name="Source"><![CDATA[-- 움직임: 달리기(Ctrl), 웅크리기(Shift, 가장자리에서 안 떨어짐), 더블 점프(TNT 런), 낙하 피해, 넉백,
+-- 물약 효과(신속/도약/느림), 사다리 타기, 물에서 헤엄치기(물에 떨어지면 낙하 피해 없음)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -12733,6 +15132,41 @@ local function parts(): (Humanoid?, BasePart?)
 		return humanoid, root
 	end
 	return nil, nil
+end
+
+-- 서버가 적어 둔 효과 끝나는 시각(FX_이름)이 아직 안 지났는지
+local function effect(name: string): boolean
+	local ends = player:GetAttribute("FX_" .. name)
+	return type(ends) == "number" and ends > workspace:GetServerTimeNow()
+end
+Movement.effect = effect
+
+local overlap = OverlapParams.new()
+overlap.FilterType = Enum.RaycastFilterType.Exclude
+
+-- 몸이 닿은 블록 중 사다리/물/용암이 있는지
+local function touching(root: BasePart, char: Model): (boolean, boolean, boolean)
+	overlap.FilterDescendantsInstances = { char }
+	local parts = workspace:GetPartBoundsInBox(root.CFrame * CFrame.new(0, -0.6, 0), Vector3.new(2.4, 4.6, 2.4), overlap)
+	local ladder, water, lava = false, false, false
+	for _, part in parts do
+		local folder = part.Parent
+		if folder and folder.Name == "Blocks" then
+			local name = part.Name
+			if name == "ladder" then
+				ladder = true
+			elseif name == "water" or name == "water_source" then
+				water = true
+			elseif name == "lava_flow" then
+				lava = true
+			end
+		end
+	end
+	return ladder, water, lava
+end
+
+local function jumpHeld(humanoid: Humanoid): boolean
+	return UserInputService:IsKeyDown(Enum.KeyCode.Space) or humanoid.Jump
 end
 
 local function sneaking(): boolean
@@ -12832,12 +15266,48 @@ function Movement.init()
 		if humanoid.MoveDirection.Magnitude < 0.1 then
 			sprinting = false
 		end
+		local speed
 		if sneak then
-			humanoid.WalkSpeed = Config.Movement.Sneak
+			speed = Config.Movement.Sneak
 		elseif sprinting then
-			humanoid.WalkSpeed = Config.Movement.Sprint
+			speed = Config.Movement.Sprint
 		else
-			humanoid.WalkSpeed = Config.Movement.Walk
+			speed = Config.Movement.Walk
+		end
+		if effect("speed") then
+			speed *= Config.Effects.speed.walk
+		end
+		if effect("slow") then
+			speed *= Config.Effects.slow.walk
+		end
+		local char0 = player.Character :: Model
+		local onLadder, inWater, inLava = touching(root, char0)
+		if inWater then
+			speed *= 0.6
+		elseif inLava then
+			speed *= 0.5
+		end
+		humanoid.WalkSpeed = speed
+		humanoid.JumpHeight = Config.Movement.JumpHeight * (if effect("jump") then Config.Effects.jump.jump else 1)
+
+		-- 사다리: 앞으로 가거나 점프하면 올라가고, 웅크리면 멈춤, 가만히 있으면 천천히 내려감
+		local velocity = root.AssemblyLinearVelocity
+		if onLadder and State.context.location == "match" then
+			local vy
+			if humanoid.MoveDirection.Magnitude > 0.1 or jumpHeld(humanoid) then
+				vy = 9
+			elseif sneak then
+				vy = 0
+			else
+				vy = math.max(velocity.Y, -5)
+			end
+			root.AssemblyLinearVelocity = Vector3.new(velocity.X, vy, velocity.Z)
+			peakY = nil
+		elseif inWater or inLava then
+			-- 헤엄치기: 점프를 누르고 있으면 떠오르고, 아니면 천천히 가라앉음
+			local vy = if jumpHeld(humanoid) then 8 else math.max(velocity.Y, -6)
+			root.AssemblyLinearVelocity = Vector3.new(velocity.X, vy, velocity.Z)
+			peakY = nil
 		end
 		-- 순간이동(진주, 서버 이동)은 낙하로 치지 않음
 		if lastPosition and (root.Position - lastPosition).Magnitude > 25 then
@@ -12874,7 +15344,7 @@ return Movement
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[-- 클라이언트 통신: 서버 메시지를 종류별로 나눠 전달하고, 요청을 보냅니다.
@@ -12914,7 +15384,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">State</string>
             <string name="Source"><![CDATA[-- 클라이언트가 알고 있는 현재 상태 (가방, 어디에 있는지, 투표 정보 등)
@@ -12935,6 +15405,7 @@ State.chest = nil :: { id: number, title: string, slots: { [number]: Stack? } }?
 State.passes = {} :: { [string]: { owned: boolean, price: number, available: boolean, studioTest: boolean } }
 State.settings = {} :: { [string]: any } -- Main 에서 기본값으로 채움
 State.skinCode = "" -- 저장된 내 스킨
+State.kit = { kit = "explorer", perk = "lifesteal" } :: { kit: string?, perk: string? } -- 스카이워즈 키트/능력
 
 local listeners: { [string]: { () -> () } } = {}
 
@@ -12981,18 +15452,21 @@ return State
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="66">
+        <Item class="Folder" referent="73">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="67">
+          <Item class="ModuleScript" referent="74">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- 게임 화면: 조준점, 핫바, 하트, 갑옷, 오른쪽 점수판, 가운데 큰 글씨, 채팅 알림, 액션바
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
 local Items = require(Shared:WaitForChild("Items"))
 local Rules = require(Shared:WaitForChild("Rules"))
 local Theme = require(script.Parent.Theme)
@@ -13024,6 +15498,9 @@ local actionLabel: TextLabel
 local itemNameLabel: TextLabel
 local hintLabel: TextLabel
 local crosshair: Frame
+local effectsLabel: TextLabel
+local blindOverlay: Frame
+local fireOverlay: Frame
 local titleToken = 0
 local actionToken = 0
 local itemNameToken = 0
@@ -13316,6 +15793,74 @@ function Hud.init(playerGui: Instance)
 		Parent = gui,
 	})
 
+	-- 받고 있는 효과 목록 (물약, 함정, 불)과 어둠/불 화면 효과
+	effectsLabel = create("TextLabel", {
+		Name = "Effects",
+		Position = UDim2.fromOffset(12, 128),
+		Size = UDim2.fromOffset(220, 120),
+		BackgroundTransparency = 1,
+		Font = Theme.Font,
+		TextSize = 15,
+		RichText = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextColor3 = C.White,
+		TextStrokeTransparency = 0.4,
+		Text = "",
+		Parent = gui,
+	})
+	blindOverlay = create("Frame", {
+		Name = "Blind",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.08,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 0,
+		Parent = gui,
+	})
+	fireOverlay = create("Frame", {
+		Name = "Fire",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.fromScale(1, 0.35),
+		BackgroundColor3 = Color3.fromRGB(255, 120, 20),
+		BackgroundTransparency = 0.6,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 0,
+		Parent = gui,
+	})
+	create("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }),
+		Parent = fireOverlay,
+	})
+	local localPlayer = Players.LocalPlayer
+	local effectTimer = 0
+	RunService.Heartbeat:Connect(function(dt)
+		effectTimer += dt
+		if effectTimer < 0.25 then
+			return
+		end
+		effectTimer = 0
+		local now = workspace:GetServerTimeNow()
+		local lines = {}
+		local blind, fire = false, false
+		for name, def in Config.Effects do
+			local ends = localPlayer:GetAttribute("FX_" .. name)
+			if type(ends) == "number" and ends > now then
+				table.insert(lines, string.format('<font color="%s">%s</font> %d초', def.color, def.name, math.ceil(ends - now)))
+				blind = blind or name == "blind"
+				fire = fire or name == "fire"
+			end
+		end
+		table.sort(lines)
+		effectsLabel.Text = table.concat(lines, "\n")
+		blindOverlay.Visible = blind
+		fireOverlay.Visible = fire
+	end)
+
 	local camera = workspace.CurrentCamera
 	local function rescale()
 		local size = camera.ViewportSize
@@ -13503,7 +16048,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="68">
+          <Item class="ModuleScript" referent="75">
             <Properties>
               <string name="Name">IconRender</string>
               <string name="Source"><![CDATA[-- 픽셀 아이콘 그리기: 같은 색이 이어지는 칸은 한 프레임으로 합쳐서 프레임 수를 줄입니다.
@@ -13633,7 +16178,7 @@ return IconRender
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="69">
+          <Item class="ModuleScript" referent="76">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[-- 마인크래프트 느낌의 화면 부품: 회색 입체 창, 움푹 들어간 칸, 그림자 글씨, 버튼
@@ -13861,10 +16406,10 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="70">
+          <Item class="ModuleScript" referent="77">
             <Properties>
               <string name="Name">Windows</string>
-              <string name="Source"><![CDATA[-- 마인크래프트식 창: 가방(E), 상자, 상점, 팀 강화, 맵 투표, 게임 선택
+              <string name="Source"><![CDATA[-- 마인크래프트식 창: 가방(E), 상자, 상점(빠른 구매), 팀 강화·함정, 키트, 맵 투표, 게임 선택
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -13876,6 +16421,7 @@ local Shop = require(Shared:WaitForChild("Shop"))
 local Skins = require(Shared:WaitForChild("Skins"))
 local CharacterRig = require(Shared:WaitForChild("CharacterRig"))
 local Preferences = require(Shared:WaitForChild("Preferences"))
+local Kits = require(Shared:WaitForChild("Kits"))
 local Theme = require(script.Parent.Theme)
 local IconRender = require(script.Parent.IconRender)
 local State = require(script.Parent.Parent.State)
@@ -14227,65 +16773,140 @@ local function shopEntry(item: Shop.ShopItem, shop): (string, number, Shop.Cost?
 	return Shop.resolve(id, team), item.count or 1, item.cost, lore
 end
 
+local function smallLabel(parent: Instance, x: number, y: number, w: number, text: string): TextLabel
+	return create("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(w, 16),
+		Font = Theme.Font,
+		TextSize = 13,
+		RichText = true,
+		TextColor3 = C.Text,
+		Text = text,
+		Parent = parent,
+	}) :: TextLabel
+end
+
+local ROMAN = { "I", "II", "III", "IV", "V" }
+
+-- 팀 강화(위 줄 6개) + 함정(아래 줄 4개) + 함정 줄(오른쪽 3칸)
+local function openUpgrades(width: number)
+	local frame = window("팀 강화와 함정 (다이아몬드)", width, 262)
+	local BIG = SLOT + 8
+	local STEP = BIG + 8
+	local upgradeSlots, levelLabels = {}, {}
+	heading(frame, '<font color="#555555">팀 강화</font>', 30, width)
+	for i, upgrade in Shop.Upgrades do
+		local slot = Theme.slot(BIG)
+		slot.Position = UDim2.fromOffset(12 + (i - 1) * STEP, 52)
+		slot.Parent = frame
+		upgradeSlots[i] = slot
+		levelLabels[i] = smallLabel(frame, 12 + (i - 1) * STEP, 52 + BIG + 2, BIG, "")
+		slot.MouseButton1Click:Connect(function()
+			Net.send("upgrade", upgrade.key)
+		end)
+		attachTooltip(slot, function()
+			local s = State.shop or {}
+			local level = (s.upgrades or {})[upgrade.key] or 0
+			local lines = { string.format("%s (%d/%d단계)", upgrade.name, level, #upgrade.costs) }
+			for n, line in upgrade.levels do
+				local color = if n <= level then "#55FF55" elseif n == level + 1 then "#FFFFFF" else "#777777"
+				local prefix = if #upgrade.levels > 1 then (ROMAN[n] or tostring(n)) .. "단계: " else ""
+				table.insert(lines, string.format('<font color="%s">%s%s (다이아 %d)</font>', color, prefix, line, upgrade.costs[n] or 0))
+			end
+			local cost = upgrade.costs[level + 1]
+			if cost then
+				table.insert(lines, costText({ item = "diamond", amount = cost }))
+				table.insert(lines, '<font color="#FFFF55">클릭해서 구매</font>')
+			else
+				table.insert(lines, '<font color="#55FF55">최고 단계입니다</font>')
+			end
+			return lines
+		end)
+	end
+
+	local trapY = 52 + BIG + 26
+	heading(frame, '<font color="#555555">함정 (적이 기지에 들어오면 하나씩 발동)</font>', trapY, width)
+	local trapSlots = {}
+	for i, trap in Shop.Traps do
+		local slot = Theme.slot(BIG)
+		slot.Position = UDim2.fromOffset(12 + (i - 1) * STEP, trapY + 22)
+		slot.Parent = frame
+		trapSlots[i] = slot
+		slot.MouseButton1Click:Connect(function()
+			Net.send("trap", trap.key)
+		end)
+		attachTooltip(slot, function()
+			local s = State.shop or {}
+			local queued = #(s.traps or {})
+			local lines = { trap.name }
+			for _, line in trap.lore do
+				table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
+			end
+			local cost = Shop.trapCost(queued)
+			if cost and queued < Shop.MaxTraps then
+				table.insert(lines, costText({ item = "diamond", amount = cost }))
+				table.insert(lines, '<font color="#AAAAAA">함정이 많을수록 다음 함정이 비싸져요 (1 → 2 → 4)</font>')
+				table.insert(lines, '<font color="#FFFF55">클릭해서 줄에 넣기</font>')
+			else
+				table.insert(lines, '<font color="#FF5555">함정 줄이 가득 찼습니다</font>')
+			end
+			return lines
+		end)
+	end
+	local queueX = 12 + #Shop.Traps * STEP + 12
+	smallLabel(frame, queueX, trapY + 22 - 2, 3 * (SLOT + GAP), '<font color="#555555">함정 줄</font>').TextXAlignment = Enum.TextXAlignment.Left
+	local queueSlots = {}
+	for i = 1, Shop.MaxTraps do
+		local slot = Theme.slot(SLOT)
+		slot.Position = UDim2.fromOffset(queueX + (i - 1) * (SLOT + GAP), trapY + 22 + 14)
+		slot.Parent = frame
+		queueSlots[i] = slot
+		attachTooltip(slot, function()
+			local key = ((State.shop or {}).traps or {})[i]
+			local trap = if key then Shop.getTrap(key) else nil
+			if not trap then
+				return { '<font color="#AAAAAA">빈 자리</font>' }
+			end
+			return { string.format("%d번째: %s", i, trap.name) }
+		end)
+	end
+	heading(frame, '<font color="#555555">다이아몬드는 다이아몬드 섬 생성기에서 모아요.</font>', trapY + 22 + BIG + 10, width)
+
+	table.insert(refreshers, function()
+		local s = State.shop or {}
+		for i, upgrade in Shop.Upgrades do
+			IconRender.fill(upgradeSlots[i], { id = upgrade.icon, count = 1 })
+			local level = (s.upgrades or {})[upgrade.key] or 0
+			local maxed = level >= #upgrade.costs
+			levelLabels[i].Text = string.format('<font color="%s">%d/%d</font>', if maxed then "#55FF55" else "#FFFFFF", level, #upgrade.costs)
+			upgradeSlots[i].BackgroundColor3 = if maxed then C.SlotHover else C.Slot
+		end
+		for i, trap in Shop.Traps do
+			IconRender.fill(trapSlots[i], { id = trap.icon, count = 1 })
+		end
+		for i, slot in queueSlots do
+			local key = (s.traps or {})[i]
+			local trap = if key then Shop.getTrap(key) else nil
+			IconRender.fill(slot, if trap then { id = trap.icon, count = 1 } else nil)
+		end
+	end)
+	open("upgrades", frame)
+	Windows.refresh()
+end
+
+local SHOP_ROWS = 2
+
 function Windows.openShop(kind: string, shop)
 	State.shop = shop
 	local width = GRID_WIDTH + 24
 	if kind == "upgrades" then
-		local frame = window("팀 강화 (다이아몬드)", width, 200)
-		local slots = {}
-		for i, upgrade in Shop.Upgrades do
-			local slot = Theme.slot(SLOT + 8)
-			slot.Position = UDim2.fromOffset(12 + (i - 1) * (SLOT + 20), 44)
-			slot.Parent = frame
-			slots[i] = slot
-			slot.MouseButton1Click:Connect(function()
-				Net.send("upgrade", upgrade.key)
-			end)
-			attachTooltip(slot, function()
-				local s = State.shop or {}
-				local level = (s.upgrades or {})[upgrade.key] or 0
-				local lines = { string.format("%s (%d/%d단계)", upgrade.name, level, #upgrade.costs) }
-				for _, line in upgrade.lore do
-					table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
-				end
-				local cost = upgrade.costs[level + 1]
-				if cost then
-					table.insert(lines, costText({ item = "diamond", amount = cost }))
-					table.insert(lines, '<font color="#FFFF55">클릭해서 구매</font>')
-				else
-					table.insert(lines, '<font color="#55FF55">최고 단계입니다</font>')
-				end
-				return lines
-			end)
-		end
-		local levelLabels = {}
-		for i in Shop.Upgrades do
-			levelLabels[i] = create("TextLabel", {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(12 + (i - 1) * (SLOT + 20), 44 + SLOT + 12),
-				Size = UDim2.fromOffset(SLOT + 8, 18),
-				Font = Theme.Font,
-				TextSize = 14,
-				TextColor3 = C.Text,
-				Text = "",
-				Parent = frame,
-			})
-		end
-		table.insert(refreshers, function()
-			local s = State.shop or {}
-			for i, upgrade in Shop.Upgrades do
-				IconRender.fill(slots[i], { id = upgrade.icon, count = 1 })
-				local level = (s.upgrades or {})[upgrade.key] or 0
-				levelLabels[i].Text = string.format("%d/%d", level, #upgrade.costs)
-			end
-		end)
-		heading(frame, '<font color="#555555">마우스를 올리면 설명이 보여요. 다이아몬드는 가운데 쪽 섬에서 모아요.</font>', 140, width)
-		open("upgrades", frame)
-		Windows.refresh()
+		openUpgrades(width)
 		return
 	end
 
-	local frame = window("아이템 상점", width, 250)
+	local itemsY = 34 + SLOT + 28
+	local frame = window("아이템 상점", width, itemsY + SHOP_ROWS * (SLOT + GAP) + 44)
 	local tabs = {}
 	for i, category in Shop.Categories do
 		local tab = Theme.slot(SLOT)
@@ -14301,9 +16922,11 @@ function Windows.openShop(kind: string, shop)
 		end)
 	end
 	local itemSlots = {}
-	for i = 1, 9 do
+	for i = 1, 9 * SHOP_ROWS do
 		local slot = Theme.slot(SLOT)
-		slot.Position = UDim2.fromOffset(12 + (i - 1) * (SLOT + GAP), 34 + SLOT + 28)
+		local row = (i - 1) // 9
+		local col = (i - 1) % 9
+		slot.Position = UDim2.fromOffset(12 + col * (SLOT + GAP), itemsY + row * (SLOT + GAP))
 		slot.Parent = frame
 		itemSlots[i] = slot
 		slot.MouseButton1Click:Connect(function()
@@ -14326,6 +16949,11 @@ function Windows.openShop(kind: string, shop)
 			for _, line in lore do
 				table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
 			end
+			if not item.lore and def then
+				for _, line in def.lore or {} do
+					table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
+				end
+			end
 			if cost then
 				table.insert(lines, costText(cost))
 				table.insert(lines, '<font color="#FFFF55">클릭해서 구매</font>')
@@ -14334,7 +16962,7 @@ function Windows.openShop(kind: string, shop)
 		end)
 	end
 	local categoryLabel = heading(frame, "", 34 + SLOT + 6, width)
-	heading(frame, '<font color="#555555">철·금은 우리 섬, 에메랄드는 가운데 섬 생성기에서 모아요.</font>', 34 + 2 * SLOT + 40, width)
+	heading(frame, '<font color="#555555">철·금은 우리 섬, 다이아·에메랄드는 생성기 섬에서 모아요.</font>', itemsY + SHOP_ROWS * (SLOT + GAP) + 10, width)
 	table.insert(refreshers, function()
 		local s = State.shop or {}
 		for i, category in Shop.Categories do
@@ -14356,6 +16984,83 @@ function Windows.openShop(kind: string, shop)
 	end)
 	open("shop", frame)
 	Windows.refresh()
+end
+
+-- 스카이워즈 키트/능력 고르기 (대기실에서 상자 아이템 우클릭)
+function Windows.openKits()
+	local width = GRID_WIDTH + 24
+	local BIG = SLOT + 8
+	local STEP = BIG + 8
+	local perRow = 6
+	local kitRows = math.ceil(#Kits.List / perRow)
+	local perkY = 52 + kitRows * (BIG + 22) + 6
+	local frame = window("키트와 능력 고르기", width, perkY + 22 + BIG + 52)
+	heading(frame, '<font color="#555555">키트: 유리관이 열릴 때 받는 시작 장비</font>', 30, width)
+	local kitSlots, perkSlots = {}, {}
+	for i, kit in Kits.List do
+		local row = (i - 1) // perRow
+		local col = (i - 1) % perRow
+		local slot = Theme.slot(BIG)
+		slot.Position = UDim2.fromOffset(12 + col * STEP, 52 + row * (BIG + 22))
+		slot.Parent = frame
+		kitSlots[i] = slot
+		smallLabel(frame, 12 + col * STEP - 4, 52 + row * (BIG + 22) + BIG + 2, BIG + 8, kit.name)
+		slot.MouseButton1Click:Connect(function()
+			Net.send("kit", kit.id, nil)
+		end)
+		attachTooltip(slot, function()
+			local lines = { kit.name }
+			for _, line in kit.lore do
+				table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
+			end
+			table.insert(lines, if State.kit.kit == kit.id then '<font color="#55FF55">선택됨</font>' else '<font color="#FFFF55">클릭해서 고르기</font>')
+			return lines
+		end)
+	end
+	heading(frame, '<font color="#555555">능력: 게임 내내 붙는 효과 (하나만)</font>', perkY, width)
+	for i, perk in Kits.Perks do
+		local slot = Theme.slot(BIG)
+		slot.Position = UDim2.fromOffset(12 + (i - 1) * STEP, perkY + 22)
+		slot.Parent = frame
+		perkSlots[i] = slot
+		slot.MouseButton1Click:Connect(function()
+			Net.send("kit", nil, perk.id)
+		end)
+		attachTooltip(slot, function()
+			local lines = { perk.name }
+			for _, line in perk.lore do
+				table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
+			end
+			table.insert(lines, if State.kit.perk == perk.id then '<font color="#55FF55">선택됨</font>' else '<font color="#FFFF55">클릭해서 고르기</font>')
+			return lines
+		end)
+	end
+	local summary = heading(frame, "", perkY + 22 + BIG + 12, width)
+	table.insert(refreshers, function()
+		for i, kit in Kits.List do
+			IconRender.fill(kitSlots[i], { id = kit.icon, count = 1 })
+			kitSlots[i].BackgroundColor3 = if State.kit.kit == kit.id then C.SlotHover else C.Slot
+		end
+		for i, perk in Kits.Perks do
+			IconRender.fill(perkSlots[i], { id = perk.icon, count = 1 })
+			perkSlots[i].BackgroundColor3 = if State.kit.perk == perk.id then C.SlotHover else C.Slot
+		end
+		local kit = Kits.get(State.kit.kit)
+		local perk = Kits.getPerk(State.kit.perk)
+		summary.Text = string.format(
+			'고른 키트: <font color="#00AA00">%s</font>  ·  능력: <font color="#0088AA">%s</font>',
+			if kit then kit.name else "-",
+			if perk then perk.name else "-"
+		)
+	end)
+	open("kits", frame)
+	Windows.refresh()
+end
+
+function Windows.updateKits()
+	if currentKind == "kits" then
+		Windows.refresh()
+	end
 end
 
 function Windows.updateShop(shop)
@@ -14887,7 +17592,7 @@ return Windows
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="71">
+  <Item class="Workspace" referent="78">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">130</float>

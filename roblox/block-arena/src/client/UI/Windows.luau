@@ -1,4 +1,4 @@
--- 마인크래프트식 창: 가방(E), 상자, 상점, 팀 강화, 맵 투표, 게임 선택
+-- 마인크래프트식 창: 가방(E), 상자, 상점(빠른 구매), 팀 강화·함정, 키트, 맵 투표, 게임 선택
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -10,6 +10,7 @@ local Shop = require(Shared:WaitForChild("Shop"))
 local Skins = require(Shared:WaitForChild("Skins"))
 local CharacterRig = require(Shared:WaitForChild("CharacterRig"))
 local Preferences = require(Shared:WaitForChild("Preferences"))
+local Kits = require(Shared:WaitForChild("Kits"))
 local Theme = require(script.Parent.Theme)
 local IconRender = require(script.Parent.IconRender)
 local State = require(script.Parent.Parent.State)
@@ -361,65 +362,140 @@ local function shopEntry(item: Shop.ShopItem, shop): (string, number, Shop.Cost?
 	return Shop.resolve(id, team), item.count or 1, item.cost, lore
 end
 
+local function smallLabel(parent: Instance, x: number, y: number, w: number, text: string): TextLabel
+	return create("TextLabel", {
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(w, 16),
+		Font = Theme.Font,
+		TextSize = 13,
+		RichText = true,
+		TextColor3 = C.Text,
+		Text = text,
+		Parent = parent,
+	}) :: TextLabel
+end
+
+local ROMAN = { "I", "II", "III", "IV", "V" }
+
+-- 팀 강화(위 줄 6개) + 함정(아래 줄 4개) + 함정 줄(오른쪽 3칸)
+local function openUpgrades(width: number)
+	local frame = window("팀 강화와 함정 (다이아몬드)", width, 262)
+	local BIG = SLOT + 8
+	local STEP = BIG + 8
+	local upgradeSlots, levelLabels = {}, {}
+	heading(frame, '<font color="#555555">팀 강화</font>', 30, width)
+	for i, upgrade in Shop.Upgrades do
+		local slot = Theme.slot(BIG)
+		slot.Position = UDim2.fromOffset(12 + (i - 1) * STEP, 52)
+		slot.Parent = frame
+		upgradeSlots[i] = slot
+		levelLabels[i] = smallLabel(frame, 12 + (i - 1) * STEP, 52 + BIG + 2, BIG, "")
+		slot.MouseButton1Click:Connect(function()
+			Net.send("upgrade", upgrade.key)
+		end)
+		attachTooltip(slot, function()
+			local s = State.shop or {}
+			local level = (s.upgrades or {})[upgrade.key] or 0
+			local lines = { string.format("%s (%d/%d단계)", upgrade.name, level, #upgrade.costs) }
+			for n, line in upgrade.levels do
+				local color = if n <= level then "#55FF55" elseif n == level + 1 then "#FFFFFF" else "#777777"
+				local prefix = if #upgrade.levels > 1 then (ROMAN[n] or tostring(n)) .. "단계: " else ""
+				table.insert(lines, string.format('<font color="%s">%s%s (다이아 %d)</font>', color, prefix, line, upgrade.costs[n] or 0))
+			end
+			local cost = upgrade.costs[level + 1]
+			if cost then
+				table.insert(lines, costText({ item = "diamond", amount = cost }))
+				table.insert(lines, '<font color="#FFFF55">클릭해서 구매</font>')
+			else
+				table.insert(lines, '<font color="#55FF55">최고 단계입니다</font>')
+			end
+			return lines
+		end)
+	end
+
+	local trapY = 52 + BIG + 26
+	heading(frame, '<font color="#555555">함정 (적이 기지에 들어오면 하나씩 발동)</font>', trapY, width)
+	local trapSlots = {}
+	for i, trap in Shop.Traps do
+		local slot = Theme.slot(BIG)
+		slot.Position = UDim2.fromOffset(12 + (i - 1) * STEP, trapY + 22)
+		slot.Parent = frame
+		trapSlots[i] = slot
+		slot.MouseButton1Click:Connect(function()
+			Net.send("trap", trap.key)
+		end)
+		attachTooltip(slot, function()
+			local s = State.shop or {}
+			local queued = #(s.traps or {})
+			local lines = { trap.name }
+			for _, line in trap.lore do
+				table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
+			end
+			local cost = Shop.trapCost(queued)
+			if cost and queued < Shop.MaxTraps then
+				table.insert(lines, costText({ item = "diamond", amount = cost }))
+				table.insert(lines, '<font color="#AAAAAA">함정이 많을수록 다음 함정이 비싸져요 (1 → 2 → 4)</font>')
+				table.insert(lines, '<font color="#FFFF55">클릭해서 줄에 넣기</font>')
+			else
+				table.insert(lines, '<font color="#FF5555">함정 줄이 가득 찼습니다</font>')
+			end
+			return lines
+		end)
+	end
+	local queueX = 12 + #Shop.Traps * STEP + 12
+	smallLabel(frame, queueX, trapY + 22 - 2, 3 * (SLOT + GAP), '<font color="#555555">함정 줄</font>').TextXAlignment = Enum.TextXAlignment.Left
+	local queueSlots = {}
+	for i = 1, Shop.MaxTraps do
+		local slot = Theme.slot(SLOT)
+		slot.Position = UDim2.fromOffset(queueX + (i - 1) * (SLOT + GAP), trapY + 22 + 14)
+		slot.Parent = frame
+		queueSlots[i] = slot
+		attachTooltip(slot, function()
+			local key = ((State.shop or {}).traps or {})[i]
+			local trap = if key then Shop.getTrap(key) else nil
+			if not trap then
+				return { '<font color="#AAAAAA">빈 자리</font>' }
+			end
+			return { string.format("%d번째: %s", i, trap.name) }
+		end)
+	end
+	heading(frame, '<font color="#555555">다이아몬드는 다이아몬드 섬 생성기에서 모아요.</font>', trapY + 22 + BIG + 10, width)
+
+	table.insert(refreshers, function()
+		local s = State.shop or {}
+		for i, upgrade in Shop.Upgrades do
+			IconRender.fill(upgradeSlots[i], { id = upgrade.icon, count = 1 })
+			local level = (s.upgrades or {})[upgrade.key] or 0
+			local maxed = level >= #upgrade.costs
+			levelLabels[i].Text = string.format('<font color="%s">%d/%d</font>', if maxed then "#55FF55" else "#FFFFFF", level, #upgrade.costs)
+			upgradeSlots[i].BackgroundColor3 = if maxed then C.SlotHover else C.Slot
+		end
+		for i, trap in Shop.Traps do
+			IconRender.fill(trapSlots[i], { id = trap.icon, count = 1 })
+		end
+		for i, slot in queueSlots do
+			local key = (s.traps or {})[i]
+			local trap = if key then Shop.getTrap(key) else nil
+			IconRender.fill(slot, if trap then { id = trap.icon, count = 1 } else nil)
+		end
+	end)
+	open("upgrades", frame)
+	Windows.refresh()
+end
+
+local SHOP_ROWS = 2
+
 function Windows.openShop(kind: string, shop)
 	State.shop = shop
 	local width = GRID_WIDTH + 24
 	if kind == "upgrades" then
-		local frame = window("팀 강화 (다이아몬드)", width, 200)
-		local slots = {}
-		for i, upgrade in Shop.Upgrades do
-			local slot = Theme.slot(SLOT + 8)
-			slot.Position = UDim2.fromOffset(12 + (i - 1) * (SLOT + 20), 44)
-			slot.Parent = frame
-			slots[i] = slot
-			slot.MouseButton1Click:Connect(function()
-				Net.send("upgrade", upgrade.key)
-			end)
-			attachTooltip(slot, function()
-				local s = State.shop or {}
-				local level = (s.upgrades or {})[upgrade.key] or 0
-				local lines = { string.format("%s (%d/%d단계)", upgrade.name, level, #upgrade.costs) }
-				for _, line in upgrade.lore do
-					table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
-				end
-				local cost = upgrade.costs[level + 1]
-				if cost then
-					table.insert(lines, costText({ item = "diamond", amount = cost }))
-					table.insert(lines, '<font color="#FFFF55">클릭해서 구매</font>')
-				else
-					table.insert(lines, '<font color="#55FF55">최고 단계입니다</font>')
-				end
-				return lines
-			end)
-		end
-		local levelLabels = {}
-		for i in Shop.Upgrades do
-			levelLabels[i] = create("TextLabel", {
-				BackgroundTransparency = 1,
-				Position = UDim2.fromOffset(12 + (i - 1) * (SLOT + 20), 44 + SLOT + 12),
-				Size = UDim2.fromOffset(SLOT + 8, 18),
-				Font = Theme.Font,
-				TextSize = 14,
-				TextColor3 = C.Text,
-				Text = "",
-				Parent = frame,
-			})
-		end
-		table.insert(refreshers, function()
-			local s = State.shop or {}
-			for i, upgrade in Shop.Upgrades do
-				IconRender.fill(slots[i], { id = upgrade.icon, count = 1 })
-				local level = (s.upgrades or {})[upgrade.key] or 0
-				levelLabels[i].Text = string.format("%d/%d", level, #upgrade.costs)
-			end
-		end)
-		heading(frame, '<font color="#555555">마우스를 올리면 설명이 보여요. 다이아몬드는 가운데 쪽 섬에서 모아요.</font>', 140, width)
-		open("upgrades", frame)
-		Windows.refresh()
+		openUpgrades(width)
 		return
 	end
 
-	local frame = window("아이템 상점", width, 250)
+	local itemsY = 34 + SLOT + 28
+	local frame = window("아이템 상점", width, itemsY + SHOP_ROWS * (SLOT + GAP) + 44)
 	local tabs = {}
 	for i, category in Shop.Categories do
 		local tab = Theme.slot(SLOT)
@@ -435,9 +511,11 @@ function Windows.openShop(kind: string, shop)
 		end)
 	end
 	local itemSlots = {}
-	for i = 1, 9 do
+	for i = 1, 9 * SHOP_ROWS do
 		local slot = Theme.slot(SLOT)
-		slot.Position = UDim2.fromOffset(12 + (i - 1) * (SLOT + GAP), 34 + SLOT + 28)
+		local row = (i - 1) // 9
+		local col = (i - 1) % 9
+		slot.Position = UDim2.fromOffset(12 + col * (SLOT + GAP), itemsY + row * (SLOT + GAP))
 		slot.Parent = frame
 		itemSlots[i] = slot
 		slot.MouseButton1Click:Connect(function()
@@ -460,6 +538,11 @@ function Windows.openShop(kind: string, shop)
 			for _, line in lore do
 				table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
 			end
+			if not item.lore and def then
+				for _, line in def.lore or {} do
+					table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
+				end
+			end
 			if cost then
 				table.insert(lines, costText(cost))
 				table.insert(lines, '<font color="#FFFF55">클릭해서 구매</font>')
@@ -468,7 +551,7 @@ function Windows.openShop(kind: string, shop)
 		end)
 	end
 	local categoryLabel = heading(frame, "", 34 + SLOT + 6, width)
-	heading(frame, '<font color="#555555">철·금은 우리 섬, 에메랄드는 가운데 섬 생성기에서 모아요.</font>', 34 + 2 * SLOT + 40, width)
+	heading(frame, '<font color="#555555">철·금은 우리 섬, 다이아·에메랄드는 생성기 섬에서 모아요.</font>', itemsY + SHOP_ROWS * (SLOT + GAP) + 10, width)
 	table.insert(refreshers, function()
 		local s = State.shop or {}
 		for i, category in Shop.Categories do
@@ -490,6 +573,83 @@ function Windows.openShop(kind: string, shop)
 	end)
 	open("shop", frame)
 	Windows.refresh()
+end
+
+-- 스카이워즈 키트/능력 고르기 (대기실에서 상자 아이템 우클릭)
+function Windows.openKits()
+	local width = GRID_WIDTH + 24
+	local BIG = SLOT + 8
+	local STEP = BIG + 8
+	local perRow = 6
+	local kitRows = math.ceil(#Kits.List / perRow)
+	local perkY = 52 + kitRows * (BIG + 22) + 6
+	local frame = window("키트와 능력 고르기", width, perkY + 22 + BIG + 52)
+	heading(frame, '<font color="#555555">키트: 유리관이 열릴 때 받는 시작 장비</font>', 30, width)
+	local kitSlots, perkSlots = {}, {}
+	for i, kit in Kits.List do
+		local row = (i - 1) // perRow
+		local col = (i - 1) % perRow
+		local slot = Theme.slot(BIG)
+		slot.Position = UDim2.fromOffset(12 + col * STEP, 52 + row * (BIG + 22))
+		slot.Parent = frame
+		kitSlots[i] = slot
+		smallLabel(frame, 12 + col * STEP - 4, 52 + row * (BIG + 22) + BIG + 2, BIG + 8, kit.name)
+		slot.MouseButton1Click:Connect(function()
+			Net.send("kit", kit.id, nil)
+		end)
+		attachTooltip(slot, function()
+			local lines = { kit.name }
+			for _, line in kit.lore do
+				table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
+			end
+			table.insert(lines, if State.kit.kit == kit.id then '<font color="#55FF55">선택됨</font>' else '<font color="#FFFF55">클릭해서 고르기</font>')
+			return lines
+		end)
+	end
+	heading(frame, '<font color="#555555">능력: 게임 내내 붙는 효과 (하나만)</font>', perkY, width)
+	for i, perk in Kits.Perks do
+		local slot = Theme.slot(BIG)
+		slot.Position = UDim2.fromOffset(12 + (i - 1) * STEP, perkY + 22)
+		slot.Parent = frame
+		perkSlots[i] = slot
+		slot.MouseButton1Click:Connect(function()
+			Net.send("kit", nil, perk.id)
+		end)
+		attachTooltip(slot, function()
+			local lines = { perk.name }
+			for _, line in perk.lore do
+				table.insert(lines, '<font color="#AAAAAA">' .. line .. "</font>")
+			end
+			table.insert(lines, if State.kit.perk == perk.id then '<font color="#55FF55">선택됨</font>' else '<font color="#FFFF55">클릭해서 고르기</font>')
+			return lines
+		end)
+	end
+	local summary = heading(frame, "", perkY + 22 + BIG + 12, width)
+	table.insert(refreshers, function()
+		for i, kit in Kits.List do
+			IconRender.fill(kitSlots[i], { id = kit.icon, count = 1 })
+			kitSlots[i].BackgroundColor3 = if State.kit.kit == kit.id then C.SlotHover else C.Slot
+		end
+		for i, perk in Kits.Perks do
+			IconRender.fill(perkSlots[i], { id = perk.icon, count = 1 })
+			perkSlots[i].BackgroundColor3 = if State.kit.perk == perk.id then C.SlotHover else C.Slot
+		end
+		local kit = Kits.get(State.kit.kit)
+		local perk = Kits.getPerk(State.kit.perk)
+		summary.Text = string.format(
+			'고른 키트: <font color="#00AA00">%s</font>  ·  능력: <font color="#0088AA">%s</font>',
+			if kit then kit.name else "-",
+			if perk then perk.name else "-"
+		)
+	end)
+	open("kits", frame)
+	Windows.refresh()
+end
+
+function Windows.updateKits()
+	if currentKind == "kits" then
+		Windows.refresh()
+	end
 end
 
 function Windows.updateShop(shop)

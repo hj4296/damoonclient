@@ -189,7 +189,77 @@ for _, team in Config.Teams do
 end
 for _, upgrade in Shop.Upgrades do
 	check(Items.get(upgrade.icon) ~= nil, "강화 아이콘 " .. upgrade.icon)
+	check(#upgrade.levels == #upgrade.costs, upgrade.key .. " 단계 설명 수 = 가격 수")
 end
+local upgradeKeys = {}
+for _, upgrade in Shop.Upgrades do
+	upgradeKeys[upgrade.key] = true
+end
+for _, key in { "sharpness", "protection", "haste", "forge", "healpool", "dragon" } do
+	check(upgradeKeys[key] == true, "팀 강화 " .. key)
+end
+check(#Shop.getUpgrade("forge").costs == 4, "강화 용광로 4단계")
+check(#Shop.getUpgrade("protection").costs == 4, "강화 갑옷 4단계")
+for _, trap in Shop.Traps do
+	check(Items.get(trap.icon) ~= nil, "함정 아이콘 " .. trap.icon)
+	check(Shop.getTrap(trap.key) == trap, "함정 찾기 " .. trap.key)
+end
+check(#Shop.Traps == 4, "함정 4종")
+check(Shop.trapCost(0) == 1 and Shop.trapCost(1) == 2 and Shop.trapCost(2) == 4 and Shop.trapCost(3) == nil, "함정 가격 1 -> 2 -> 4")
+local quick = Shop.Categories[1]
+check(quick.quick == true and #quick.items == #Shop.QuickBuy, "빠른 구매 탭")
+check(#quick.items <= 18, "빠른 구매는 두 줄(18칸) 안")
+for _, category in Shop.Categories do
+	check(#category.items <= 18, category.id .. " 물건이 두 줄(18칸) 안")
+end
+check(#Shop.Categories <= 9, "상점 탭 9개 이하")
+local shopKeys = {}
+for _, category in Shop.Categories do
+	for _, item in category.items do
+		shopKeys[item.key] = true
+	end
+end
+for _, key in { "ladder", "hardstone", "water_bucket", "sponge", "bridge_egg", "popup_tower", "kb_stick", "bow_power", "bow_punch", "speed_potion", "jump_potion", "invis_potion", "magic_milk", "golem_egg", "bed_bug" } do
+	check(shopKeys[key] == true, "상점에 " .. key)
+end
+
+-- 아이템 종류별 필수 값
+local EFFECTS = Config.Effects
+for id, item in Items.defs do
+	if item.kind == "potion" then
+		check(item.effect == "heal" or EFFECTS[item.effect] ~= nil, id .. " 물약 효과 " .. tostring(item.effect))
+	elseif item.kind == "bucket" then
+		local block = Blocks.get(item.liquid or "")
+		check(block ~= nil and (block.water == true or block.burn == true), id .. " 양동이 액체")
+	elseif item.kind == "deploy" then
+		check(item.deploy == "tower" or item.deploy == "golem", id .. " 설치 종류")
+	elseif item.kind == "throwable" then
+		local known = { pearl = true, fireball = true, snowball = true, bridge_egg = true, bed_bug = true }
+		check(known[item.projectile or ""] == true, id .. " 던지기 종류")
+	end
+end
+for kind, mob in Config.Mobs do
+	check(mob.health > 0 and mob.damage > 0 and mob.speed > 0 and mob.attackInterval > 0, kind .. " 몹 수치")
+end
+
+local Kits = requireModule(Shared.Kits)
+check(Kits.get(Kits.DefaultKit) ~= nil and Kits.getPerk(Kits.DefaultPerk) ~= nil, "기본 키트/능력")
+local kitIds = {}
+for _, kit in Kits.List do
+	check(not kitIds[kit.id], "키트 id 겹침 " .. kit.id)
+	kitIds[kit.id] = true
+	check(Items.get(kit.icon) ~= nil, "키트 아이콘 " .. kit.icon)
+	check(#kit.items > 0, kit.id .. " 키트 아이템")
+	for _, stack in kit.items do
+		local def = Items.get(stack.id)
+		check(def ~= nil and stack.count >= 1 and stack.count <= def.stack, kit.id .. " 키트 아이템 " .. stack.id)
+	end
+end
+check(#Kits.List <= 12, "키트 창 두 줄(12칸) 안")
+for _, perk in Kits.Perks do
+	check(Items.get(perk.icon) ~= nil, "능력 아이콘 " .. perk.icon)
+end
+check(#Kits.Perks <= 6, "능력 한 줄(6칸) 안")
 
 section("계산식")
 check(Rules.breakTime("wool_red", "shears") < Rules.breakTime("wool_red", nil), "가위로 양털이 더 빨리 부서짐")
@@ -205,6 +275,13 @@ local health, absorption = Rules.applyDamage(10, 20, 4, 0, 0)
 check(health == 14 and absorption == 0, "보호막 먼저 깎임")
 local h2 = Rules.applyDamage(10, 20, 0, 20, 0)
 check(math.abs(h2 - 18) < 1e-9, "다이아 갑옷이면 10 -> 2")
+check(math.abs(Rules.breakTime("wool_red", nil, 1.5) - Rules.breakTime("wool_red", nil) / 1.5) < 1e-9, "광부의 손 2단계는 1.5배 빠름")
+check(Rules.breakSpeed(0, false) == 1 and Rules.breakSpeed(2, false) == 1.5, "부수기 속도 배율")
+check(Rules.breakSpeed(0, true) < 0.5, "피로 함정은 아주 느림")
+check(Rules.knockbackMultiplier("kb_stick") > 1 and Rules.knockbackMultiplier("wood_sword") == 1, "넉백 막대기")
+check(Rules.arrowDamage(1, "bow_power") > Rules.arrowDamage(1, "bow"), "힘 마법 활이 더 셈")
+check(Rules.meleeDamage("diamond_sword_sharp", 0) > Rules.meleeDamage("diamond_sword", 0), "날카로움 검")
+check(Rules.armorPoints({ chestplate = "iron_chestplate_prot" }) > Rules.armorPoints({ chestplate = "iron_chestplate" }), "보호 갑옷")
 
 section("난수/투표/팀/상자")
 local r1, r2 = Util.rng(5), Util.rng(5)
@@ -244,6 +321,23 @@ for tableName, def in Loot.Tables do
 		return math.random()
 	end)
 	check(#rolled >= def.rolls[1], tableName .. " 상자 개수")
+end
+local LuckyTable = requireModule(Server.Logic.LuckyTable)
+for _, outcome in LuckyTable.Outcomes do
+	check(outcome.weight > 0, "럭키 블록 확률 " .. outcome.id)
+	for _, stack in outcome.items or {} do
+		check(Items.get(stack.id) ~= nil, "럭키 블록 아이템 " .. stack.id)
+	end
+	for _, effect in outcome.effects or {} do
+		check(Config.Effects[effect.name] ~= nil, "럭키 블록 효과 " .. effect.name)
+	end
+	local kinds = { items = true, tnt = true, mobs = true, effect = true, launch = true, lightning = true, nothing = true }
+	check(kinds[outcome.kind] == true, "럭키 블록 결과 종류 " .. outcome.kind)
+end
+for _, r in { 0, 0.3, 0.6, 0.999 } do
+	check(LuckyTable.pick(function()
+		return r
+	end) ~= nil, "럭키 블록 뽑기")
 end
 local scattered = Loot.scatter({ { id = "planks", count = 3 }, { id = "bow", count = 1 } }, 27, math.random)
 local n = 0
@@ -375,6 +469,12 @@ for _, map in requireModule(Server.Maps.BedWarsMaps) do
 			local x, y, z = xyz(cell)
 			check(solid(api, x, y - 1, z) and free(api, x, y, z), map.id .. " " .. t.team .. " 침대/생성기 자리")
 		end
+		-- 팀 상자 / 개인 상자
+		local chestX, chestY, chestZ = xyz(t.chest)
+		check(api.get(chestX, chestY, chestZ) == "chest" and solid(api, chestX, chestY - 1, chestZ), map.id .. " " .. t.team .. " 팀 상자")
+		local enderX, enderY, enderZ = xyz(t.ender)
+		check(api.get(enderX, enderY, enderZ) == "ender_chest" and solid(api, enderX, enderY - 1, enderZ), map.id .. " " .. t.team .. " 개인 상자")
+		check(free(api, chestX, chestY + 1, chestZ) and free(api, enderX, enderY + 1, enderZ), map.id .. " 상자 위가 비어 있음")
 		for _, cell in { t.shop, t.upgrades } do
 			local x, y, z = xyz(cell)
 			check(solid(api, x, y - 1, z) and free(api, x, y, z) and free(api, x, y + 1, z) and free(api, x, y + 2, z), map.id .. " " .. t.team .. " NPC 자리")
@@ -428,6 +528,20 @@ for _, map in requireModule(Server.Maps.SkyWarsMaps) do
 		check(api.get(c.x, c.y, c.z) == "chest", map.id .. string.format(" 상자 블록이 남아 있음 (%d,%d,%d)", c.x, c.y, c.z))
 		check(solid(api, c.x, c.y - 1, c.z), map.id .. " 상자 바닥")
 	end
+	-- 럭키 블록 자리: 대부분 바닥이 있고 비어 있어야 함 (아닌 자리는 경기 때 건너뜀)
+	local luckyOk = 0
+	for _, l in markers.lucky or {} do
+		local id = api.get(l.x, l.y, l.z)
+		local def = if id then Blocks.get(id) else nil
+		if solid(api, l.x, l.y - 1, l.z) and (id == nil or (def and def.canCollide == false)) then
+			luckyOk += 1
+		end
+		for _, s in markers.spawn or {} do
+			check(math.abs(l.x - s.x) > 1 or math.abs(l.z - s.z) > 1, map.id .. " 럭키 블록이 유리관 자리에 없음")
+		end
+	end
+	check(#(markers.lucky or {}) >= 20, map.id .. " 럭키 블록 자리 수")
+	check(luckyOk >= #(markers.lucky or {}) * 0.6, string.format("%s 럭키 블록 자리 %d/%d 가 쓸 수 있음", map.id, luckyOk, #(markers.lucky or {})))
 end
 
 section("TNT 런 맵")
@@ -608,6 +722,55 @@ do
 	check(world:get(2, 3, 2).part:GetAttribute("Occ") == 63 - 4, "유리는 면을 가리지 않음")
 	world:set(2, 5, 2, "stone", true)
 	check(world:get(2, 5, 2).part:GetAttribute("Occ") == 8 - 8, "유리 위 돌")
+	-- 사다리는 붙은 벽 쪽으로 붙어 있어야 함
+	for _, face in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+		world:set(10, 0, 10, "ladder", true, { face = face })
+		local ladder = world:get(10, 0, 10).part
+		local offset = ladder.CFrame.Position - world:cellCenter(10, 0, 10)
+		check(math.abs(offset.X - face[1] * 0.44 * 3) < 0.01 and math.abs(offset.Z - face[2] * 0.44 * 3) < 0.01, string.format("사다리 방향 (%d,%d)", face[1], face[2]))
+		world:remove(10, 0, 10)
+	end
+	world:destroy()
+end
+
+section("몹 움직임")
+do
+	local World = requireModule(Server.World)
+	local MobMotion = requireModule(Server.Logic.MobMotion)
+	local V = roblox.Vector3
+	local world = World.new(V.new(0, 0, 0), "MobTest")
+	local api = world:builder({})
+	api.fill(0, 0, -2, 20, 0, 2, "stone")
+	api.set(8, 1, 0, "stone") -- 한 칸 턱: 올라감
+	api.fill(14, 1, -2, 14, 3, 2, "stone") -- 세 칸 벽: 막힘
+	local B = 3
+	local feet = world:cellCenter(2, 0, 0) + V.new(0, B / 2, 0)
+	local velocity = V.new(0, 0, 0)
+	local wish = V.new(9, 0, 0)
+	local climbed = false
+	for _ = 1, 600 do
+		feet, velocity = MobMotion.ground(world, feet, velocity, wish, 1 / 30, B)
+		if math.abs(feet.X - 8 * B) < 1 and feet.Y > world:cellCenter(0, 1, 0).Y + 1 then
+			climbed = true
+		end
+	end
+	check(climbed, "한 칸 턱을 올라감")
+	check(feet.X < 14 * B - B / 2 + 0.01 and feet.X > 12 * B, string.format("세 칸 벽 앞에서 멈춤 (x=%.2f)", feet.X))
+	check(math.abs(feet.Y - (world:cellCenter(0, 0, 0).Y + B / 2)) < 0.01, string.format("벽 앞 바닥에 서 있음 (y=%.2f)", feet.Y))
+	-- 높은 곳에서 떨어지면 바닥에 착지
+	local fall = world:cellCenter(4, 12, 0)
+	local fv = V.new(0, 0, 0)
+	for _ = 1, 120 do
+		fall, fv = MobMotion.ground(world, fall, fv, V.new(0, 0, 0), 1 / 30, B)
+	end
+	check(math.abs(fall.Y - (world:cellCenter(4, 0, 0).Y + B / 2)) < 0.01 and fv.Y == 0, string.format("떨어져서 착지 (y=%.2f)", fall.Y))
+	-- 넉백은 마찰로 멈춤
+	local kb = world:cellCenter(4, 0, 0) + V.new(0, B / 2, 0)
+	local kv = V.new(20, 0, 0)
+	for _ = 1, 60 do
+		kb, kv = MobMotion.ground(world, kb, kv, V.new(0, 0, 0), 1 / 30, B)
+	end
+	check(V.new(kv.X, 0, kv.Z).Magnitude < 0.5, "넉백 속도가 줄어듦")
 	world:destroy()
 end
 

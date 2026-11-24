@@ -886,6 +886,96 @@ function G.bed_side(rng)
 	return px
 end
 
+-- 사다리, 강화 석재, 스펀지, 럭키 블록, 개인 상자
+function G.ladder(rng)
+	local px = table.create(N * N * 4, 0)
+	local wood = { 150, 116, 64 }
+	for y = 0, N - 1 do
+		for _, x in { 2, 13 } do
+			put(px, x, y, mul(wood, 0.85 + rng:next() * 0.15))
+			put(px, x + (if x == 2 then -1 else 1), y, mul(wood, 0.7))
+		end
+	end
+	for _, y in { 2, 6, 10, 14 } do
+		for x = 2, 13 do
+			put(px, x, y, mul(wood, 0.95 + rng:next() * 0.1))
+		end
+	end
+	return px
+end
+function G.hardstone(rng)
+	local px = base({ 224, 222, 172 }, rng, 0.04)
+	specks(px, rng, 0.12, { 196, 192, 140 })
+	local split = cells(rng, 5)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local _, edge = split(x, y)
+			if edge and rng:next() < 0.5 then
+				put(px, x, y, { 200, 196, 146 })
+			end
+		end
+	end
+	return px
+end
+function G.sponge(rng)
+	local px = base({ 204, 194, 72 }, rng, 0.06)
+	for _ = 1, 14 do
+		local x, y = rng:int(0, N - 2), rng:int(0, N - 2)
+		put(px, x, y, { 150, 140, 40 })
+		if rng:next() < 0.5 then
+			put(px, x + 1, y, { 170, 160, 50 })
+		end
+	end
+	return px
+end
+local QUESTION = {
+	"..####..",
+	".##..##.",
+	".....##.",
+	"....##..",
+	"...##...",
+	"...##...",
+	"........",
+	"...##...",
+}
+function G.lucky_block(rng)
+	local px = base({ 250, 206, 46 }, rng, 0.03)
+	bevel(px, { 255, 236, 120 }, { 190, 140, 20 })
+	for row, line in QUESTION do
+		for col = 1, 8 do
+			if string.sub(line, col, col) == "#" then
+				put(px, 3 + col, 3 + row, { 90, 50, 10 })
+			end
+		end
+	end
+	return px
+end
+local function enderBase(rng)
+	local px = base({ 40, 30, 64 }, rng, 0.08)
+	specks(px, rng, 0.08, { 60, 46, 90 })
+	bevel(px, { 30, 140, 120 }, { 20, 90, 80 })
+	return px
+end
+function G.ender_chest_top(rng)
+	return enderBase(rng)
+end
+function G.ender_chest_side(rng)
+	local px = enderBase(rng)
+	for x = 0, N - 1 do
+		put(px, x, 5, { 20, 90, 80 })
+	end
+	return px
+end
+function G.ender_chest_front(rng)
+	local px = G.ender_chest_side(rng)
+	for y = 4, 7 do
+		for x = 7, 8 do
+			put(px, x, y, if y == 4 or y == 7 then { 20, 90, 80 } else { 60, 220, 190 })
+		end
+	end
+	return px
+end
+
 -- 색 블록들 (양털: 뜨개 무늬, 테라코타: 부드러운 흙, 콘크리트: 매끈)
 local function knit(rng, c: Color)
 	local px = base(c, rng, 0.03)

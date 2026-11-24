@@ -1,8 +1,11 @@
 -- 게임 화면: 조준점, 핫바, 하트, 갑옷, 오른쪽 점수판, 가운데 큰 글씨, 채팅 알림, 액션바
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
 local Items = require(Shared:WaitForChild("Items"))
 local Rules = require(Shared:WaitForChild("Rules"))
 local Theme = require(script.Parent.Theme)
@@ -34,6 +37,9 @@ local actionLabel: TextLabel
 local itemNameLabel: TextLabel
 local hintLabel: TextLabel
 local crosshair: Frame
+local effectsLabel: TextLabel
+local blindOverlay: Frame
+local fireOverlay: Frame
 local titleToken = 0
 local actionToken = 0
 local itemNameToken = 0
@@ -325,6 +331,74 @@ function Hud.init(playerGui: Instance)
 		Text = "",
 		Parent = gui,
 	})
+
+	-- 받고 있는 효과 목록 (물약, 함정, 불)과 어둠/불 화면 효과
+	effectsLabel = create("TextLabel", {
+		Name = "Effects",
+		Position = UDim2.fromOffset(12, 128),
+		Size = UDim2.fromOffset(220, 120),
+		BackgroundTransparency = 1,
+		Font = Theme.Font,
+		TextSize = 15,
+		RichText = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextColor3 = C.White,
+		TextStrokeTransparency = 0.4,
+		Text = "",
+		Parent = gui,
+	})
+	blindOverlay = create("Frame", {
+		Name = "Blind",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		BackgroundTransparency = 0.08,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 0,
+		Parent = gui,
+	})
+	fireOverlay = create("Frame", {
+		Name = "Fire",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.fromScale(1, 0.35),
+		BackgroundColor3 = Color3.fromRGB(255, 120, 20),
+		BackgroundTransparency = 0.6,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 0,
+		Parent = gui,
+	})
+	create("UIGradient", {
+		Rotation = 90,
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0) }),
+		Parent = fireOverlay,
+	})
+	local localPlayer = Players.LocalPlayer
+	local effectTimer = 0
+	RunService.Heartbeat:Connect(function(dt)
+		effectTimer += dt
+		if effectTimer < 0.25 then
+			return
+		end
+		effectTimer = 0
+		local now = workspace:GetServerTimeNow()
+		local lines = {}
+		local blind, fire = false, false
+		for name, def in Config.Effects do
+			local ends = localPlayer:GetAttribute("FX_" .. name)
+			if type(ends) == "number" and ends > now then
+				table.insert(lines, string.format('<font color="%s">%s</font> %d초', def.color, def.name, math.ceil(ends - now)))
+				blind = blind or name == "blind"
+				fire = fire or name == "fire"
+			end
+		end
+		table.sort(lines)
+		effectsLabel.Text = table.concat(lines, "\n")
+		blindOverlay.Visible = blind
+		fireOverlay.Visible = fire
+	end)
 
 	local camera = workspace.CurrentCamera
 	local function rescale()

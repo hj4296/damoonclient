@@ -1,4 +1,4 @@
--- 날아가는 물체 (화살, 눈덩이, 순간이동 진주, 화염구). 서버에서 직접 움직이며 레이캐스트로 맞았는지 확인합니다.
+-- 날아가는 물체 (화살, 눈덩이, 순간이동 진주, 화염구, 다리 알, 좀벌레 알, 낚싯찌). 서버에서 직접 움직이며 레이캐스트로 맞았는지 확인합니다.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
@@ -17,6 +17,8 @@ export type Spec = {
 	light: boolean?,
 	onHitPlayer: (victim: Player, position: Vector3, velocity: Vector3) -> (),
 	onHitWorld: (position: Vector3, normal: Vector3, part: BasePart) -> (),
+	onHitMob: ((mob: any, position: Vector3, velocity: Vector3) -> ())?,
+	onStep: ((position: Vector3, velocity: Vector3) -> ())?, -- 매 프레임 (다리 알이 지나간 자리에 양털 놓기)
 	onExpire: ((position: Vector3) -> ())?,
 }
 
@@ -33,6 +35,11 @@ folder.Name = "Projectiles"
 folder.Parent = workspace
 
 local active: { Active } = {}
+
+-- 맞은 파트가 몹이면 그 몹을 돌려줌 (Mobs 가 채워 넣음)
+Projectiles.mobFromPart = function(_part: BasePart): any
+	return nil
+end
 
 function Projectiles.launch(spec: Spec)
 	local part = Instance.new("Part")
@@ -101,6 +108,13 @@ local function step(item: Active, dt: number): boolean
 			spec.onHitPlayer(victim, result.Position, item.velocity)
 			return false
 		end
+		local mob = Projectiles.mobFromPart(hitPart)
+		if mob then
+			if spec.onHitMob then
+				spec.onHitMob(mob, result.Position, item.velocity)
+			end
+			return false
+		end
 		if hitPart.CanCollide then
 			spec.onHitWorld(result.Position, result.Normal, hitPart)
 			return false
@@ -116,6 +130,9 @@ local function step(item: Active, dt: number): boolean
 
 	item.position += displacement
 	item.velocity += gravity * dt
+	if spec.onStep then
+		spec.onStep(item.position, item.velocity)
+	end
 	if item.velocity.Magnitude > 0.1 then
 		item.part.CFrame = CFrame.lookAt(item.position, item.position + item.velocity)
 	end

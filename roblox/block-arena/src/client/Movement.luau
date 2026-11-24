@@ -1,4 +1,5 @@
--- 움직임: 달리기(Ctrl), 웅크리기(Shift, 가장자리에서 안 떨어짐), 더블 점프(TNT 런), 낙하 피해, 넉백
+-- 움직임: 달리기(Ctrl), 웅크리기(Shift, 가장자리에서 안 떨어짐), 더블 점프(TNT 런), 낙하 피해, 넉백,
+-- 물약 효과(신속/도약/느림), 사다리 타기, 물에서 헤엄치기(물에 떨어지면 낙하 피해 없음)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -32,6 +33,41 @@ local function parts(): (Humanoid?, BasePart?)
 		return humanoid, root
 	end
 	return nil, nil
+end
+
+-- 서버가 적어 둔 효과 끝나는 시각(FX_이름)이 아직 안 지났는지
+local function effect(name: string): boolean
+	local ends = player:GetAttribute("FX_" .. name)
+	return type(ends) == "number" and ends > workspace:GetServerTimeNow()
+end
+Movement.effect = effect
+
+local overlap = OverlapParams.new()
+overlap.FilterType = Enum.RaycastFilterType.Exclude
+
+-- 몸이 닿은 블록 중 사다리/물/용암이 있는지
+local function touching(root: BasePart, char: Model): (boolean, boolean, boolean)
+	overlap.FilterDescendantsInstances = { char }
+	local parts = workspace:GetPartBoundsInBox(root.CFrame * CFrame.new(0, -0.6, 0), Vector3.new(2.4, 4.6, 2.4), overlap)
+	local ladder, water, lava = false, false, false
+	for _, part in parts do
+		local folder = part.Parent
+		if folder and folder.Name == "Blocks" then
+			local name = part.Name
+			if name == "ladder" then
+				ladder = true
+			elseif name == "water" or name == "water_source" then
+				water = true
+			elseif name == "lava_flow" then
+				lava = true
+			end
+		end
+	end
+	return ladder, water, lava
+end
+
+local function jumpHeld(humanoid: Humanoid): boolean
+	return UserInputService:IsKeyDown(Enum.KeyCode.Space) or humanoid.Jump
 end
 
 local function sneaking(): boolean
@@ -131,12 +167,48 @@ function Movement.init()
 		if humanoid.MoveDirection.Magnitude < 0.1 then
 			sprinting = false
 		end
+		local speed
 		if sneak then
-			humanoid.WalkSpeed = Config.Movement.Sneak
+			speed = Config.Movement.Sneak
 		elseif sprinting then
-			humanoid.WalkSpeed = Config.Movement.Sprint
+			speed = Config.Movement.Sprint
 		else
-			humanoid.WalkSpeed = Config.Movement.Walk
+			speed = Config.Movement.Walk
+		end
+		if effect("speed") then
+			speed *= Config.Effects.speed.walk
+		end
+		if effect("slow") then
+			speed *= Config.Effects.slow.walk
+		end
+		local char0 = player.Character :: Model
+		local onLadder, inWater, inLava = touching(root, char0)
+		if inWater then
+			speed *= 0.6
+		elseif inLava then
+			speed *= 0.5
+		end
+		humanoid.WalkSpeed = speed
+		humanoid.JumpHeight = Config.Movement.JumpHeight * (if effect("jump") then Config.Effects.jump.jump else 1)
+
+		-- 사다리: 앞으로 가거나 점프하면 올라가고, 웅크리면 멈춤, 가만히 있으면 천천히 내려감
+		local velocity = root.AssemblyLinearVelocity
+		if onLadder and State.context.location == "match" then
+			local vy
+			if humanoid.MoveDirection.Magnitude > 0.1 or jumpHeld(humanoid) then
+				vy = 9
+			elseif sneak then
+				vy = 0
+			else
+				vy = math.max(velocity.Y, -5)
+			end
+			root.AssemblyLinearVelocity = Vector3.new(velocity.X, vy, velocity.Z)
+			peakY = nil
+		elseif inWater or inLava then
+			-- 헤엄치기: 점프를 누르고 있으면 떠오르고, 아니면 천천히 가라앉음
+			local vy = if jumpHeld(humanoid) then 8 else math.max(velocity.Y, -6)
+			root.AssemblyLinearVelocity = Vector3.new(velocity.X, vy, velocity.Z)
+			peakY = nil
 		end
 		-- 순간이동(진주, 서버 이동)은 낙하로 치지 않음
 		if lastPosition and (root.Position - lastPosition).Magnitude > 25 then

@@ -1,4 +1,4 @@
--- 폭발 (TNT, 화염구): 주변 블록 파괴 + 피해 + 넉백
+-- 폭발 (TNT, 화염구): 주변 블록 파괴 + 피해 + 넉백 (몹 포함)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -17,7 +17,11 @@ export type Options = {
 	source: Player?,
 	radius: number, -- 블록 단위
 	power: number, -- 가운데에서 받는 최대 피해
+	match: any?,
 }
+
+-- 몹(골렘, 좀벌레, 용)도 폭발에 다치게 Mobs 가 채워 넣음
+Explosion.hurtMobs = function(_match: any, _position: Vector3, _reach: number, _power: number, _source: Player?) end
 
 function Explosion.explode(position: Vector3, opts: Options)
 	local effect = Instance.new("Explosion")
@@ -48,6 +52,9 @@ function Explosion.explode(position: Vector3, opts: Options)
 	end
 
 	local reach = opts.radius * B * 1.4
+	if opts.match then
+		Explosion.hurtMobs(opts.match, position, reach, opts.power, opts.source)
+	end
 	for _, player in opts.players do
 		local state = Session.get(player)
 		local root = state and state.root
