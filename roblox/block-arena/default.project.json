@@ -1,0 +1,82 @@
+{
+  "name": "BlockArena",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$properties": {
+        "CharacterJumpHeight": 4.4,
+        "CharacterUseJumpPower": false,
+        "CharacterWalkSpeed": 16,
+        "LoadCharacterAppearance": false,
+        "EnableMouseLockOption": false,
+        "CameraMode": "LockFirstPerson",
+        "CameraMaxZoomDistance": 12
+      },
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": {
+          "$path": "src/client"
+        }
+      },
+      "StarterCharacterScripts": {
+        "$className": "StarterCharacterScripts",
+        "Health": {
+          "$path": "src/character/Health.server.luau"
+        }
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "Gravity": 130,
+        "StreamingEnabled": false
+      }
+    },
+    "Players": {
+      "$className": "Players",
+      "$properties": {
+        "CharacterAutoLoads": false
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "Technology": "ShadowMap",
+        "TimeOfDay": "14:00:00",
+        "Brightness": 2.6,
+        "GlobalShadows": true,
+        "Ambient": [0.38, 0.38, 0.42],
+        "OutdoorAmbient": [0.55, 0.55, 0.6],
+        "EnvironmentDiffuseScale": 0.6,
+        "EnvironmentSpecularScale": 0.3
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.28,
+          "Offset": 0.2,
+          "Color": [0.78, 0.86, 1.0],
+          "Decay": [0.42, 0.46, 0.55],
+          "Glare": 0,
+          "Haze": 0.8
+        }
+      }
+    },
+    "SoundService": {
+      "$className": "SoundService"
+    }
+  }
+}
