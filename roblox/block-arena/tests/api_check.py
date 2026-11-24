@@ -51,6 +51,7 @@ ALLOWED_METHODS = {
     # our modules
     "set", "get", "remove", "builder", "cellCenter", "standCFrame", "toCell",
     "show", "destroy", "isSolid", "next", "int", "chance", "pick", "shuffle",
+    "mask", "spawnPart", "refresh", "decor", "materialize",
 }
 
 errors = []

@@ -121,7 +121,7 @@ function SkyWars.start(match, markers)
 			starter = false,
 		}
 		table.insert(data.chests, chest)
-		if record then
+		if record and record.part then
 			local prompt = Instance.new("ProximityPrompt")
 			prompt.ActionText = "열기"
 			prompt.ObjectText = chest.container.title
@@ -129,7 +129,7 @@ function SkyWars.start(match, markers)
 			prompt.HoldDuration = 0
 			prompt.MaxActivationDistance = 10
 			prompt.RequiresLineOfSight = false
-			prompt.Parent = record.part
+			prompt.Parent = record.part :: BasePart
 			prompt.Triggered:Connect(function(player)
 				local state = Session.get(player)
 				if state and state.match == match and state.location == "match" and state.alive and data.phase == "fight" then

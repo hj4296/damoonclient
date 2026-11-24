@@ -261,7 +261,7 @@ function BedWars.start(match, markers)
 				local hx, hy, hz = cell(marker.bedHead)
 				world:set(fx, fy, fz, "bed_" .. def.id, false, { team = def.id })
 				local head = world:set(hx, hy, hz, "bed_" .. def.id, false, { team = def.id })
-				if head then
+				if head and head.part then
 					local pillow = Instance.new("Part")
 					pillow.Name = "Pillow"
 					pillow.Anchored = true

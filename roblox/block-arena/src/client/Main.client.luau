@@ -9,6 +9,7 @@ local Windows = require(script.Parent.UI.Windows)
 local Controls = require(script.Parent.Controls)
 local Movement = require(script.Parent.Movement)
 local Effects = require(script.Parent.Effects)
+local BlockTextures = require(script.Parent.BlockTextures)
 
 local player = Players.LocalPlayer
 
@@ -26,11 +27,13 @@ task.spawn(function()
 	end
 end)
 
+BlockTextures.load() -- 핫바 아이콘이 블록 텍스처를 쓰므로 화면보다 먼저
 Hud.init(player:WaitForChild("PlayerGui"))
 Windows.init(Hud.gui())
 Controls.init()
 Movement.init()
 Effects.init()
+task.spawn(BlockTextures.init)
 
 local HINTS = {
 	lobby = "F: NPC  ·  우클릭: 아이템 사용  ·  V: 시점  ·  1~9: 핫바",

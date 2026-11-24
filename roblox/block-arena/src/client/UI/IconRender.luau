@@ -4,6 +4,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Icons = require(Shared:WaitForChild("Icons"))
 local Items = require(Shared:WaitForChild("Items"))
+local Blocks = require(Shared:WaitForChild("Blocks"))
+local BlockTextures = require(script.Parent.Parent.BlockTextures)
 
 local IconRender = {}
 
@@ -49,10 +51,45 @@ function IconRender.draw(name: string, color: Color3): Frame
 	return template:Clone()
 end
 
-function IconRender.item(id: string): Frame
+-- 블록 아이템은 실제 블록 텍스처를 또렷하게(Pixelated) 보여 줍니다.
+local function blockImage(blockId: string): GuiObject?
+	local block = Blocks.get(blockId)
+	if not block then
+		return nil
+	end
+	local name = Blocks.faceTexture(block, "side")
+	local source = if name then BlockTextures.source(name) else nil
+	if not source then
+		return nil
+	end
+	local image = Instance.new("ImageLabel")
+	image.Name = "Pixels"
+	image.BackgroundTransparency = 1
+	image.Size = UDim2.fromScale(1, 1)
+	image.ResampleMode = Enum.ResamplerMode.Pixelated
+	image.BackgroundColor3 = block.color
+	if source.content then
+		image.ImageContent = source.content
+	elseif source.id then
+		image.Image = source.id
+	end
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(20, 20, 20)
+	stroke.Thickness = 1
+	stroke.Parent = image
+	return image
+end
+
+function IconRender.item(id: string): GuiObject
 	local def = Items.get(id)
 	if not def then
 		return IconRender.draw("question", Color3.new(1, 1, 1))
+	end
+	if def.kind == "block" and def.block then
+		local image = blockImage(def.block)
+		if image then
+			return image
+		end
 	end
 	return IconRender.draw(def.icon, def.color)
 end

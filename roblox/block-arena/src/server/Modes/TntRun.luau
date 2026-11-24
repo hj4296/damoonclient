@@ -144,7 +144,11 @@ function TntRun.tick(match, dt: number)
 						local key = x .. "," .. y .. "," .. z
 						if not data.scheduled[key] then
 							data.scheduled[key] = { time = now + TR.RemoveDelay, x = x, y = y, z = z }
-							record.part.Color = record.part.Color:Lerp(Color3.fromRGB(255, 60, 40), 0.45)
+							local part = record.part
+							if part then
+								part.Color = part.Color:Lerp(Color3.fromRGB(255, 60, 40), 0.45)
+								part:SetAttribute("Warn", true)
+							end
 						end
 					end
 				end
@@ -154,6 +158,11 @@ function TntRun.tick(match, dt: number)
 	for key, entry in data.scheduled do
 		if now >= entry.time then
 			world:remove(entry.x, entry.y, entry.z)
+			-- 바닥 밑에 깔린 TNT 도 같이 사라짐
+			local below = world:get(entry.x, entry.y - 1, entry.z)
+			if below and below.id == "tnt" then
+				world:remove(entry.x, entry.y - 1, entry.z)
+			end
 			data.scheduled[key] = nil
 		end
 	end

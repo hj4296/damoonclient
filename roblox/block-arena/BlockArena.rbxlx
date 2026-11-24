@@ -56,8 +56,11 @@
       <Item class="ModuleScript" referent="5">
         <Properties>
           <string name="Name">Blocks</string>
-          <string name="Source"><![CDATA[-- 블록 종류 정의. 색, 재질, 부수는 데 걸리는 시간(초, 맨손 기준), 알맞은 도구를 정합니다.
--- textureId 를 넣으면 블록 여섯 면에 그 이미지를 붙입니다(직접 만든 픽셀 텍스처를 올려 쓰세요).
+          <string name="Source"><![CDATA[-- 블록 종류 정의.
+--  color    : 텍스처가 없을 때 보이는 색 (텍스처의 평균색)
+--  tex      : 면마다 붙일 픽셀 텍스처 이름 (Textures.luau 에서 그림). 문자열이면 여섯 면 모두 같음
+--  shape    : nil(정육면체), slab, slab_top, carpet, fence, wall, plant, grass, lantern, torch, chest, bed
+--  hardness : 맨손으로 부수는 시간(초), tool: 알맞은 도구
 local Config = require(script.Parent.Config)
 
 local Blocks = {}
@@ -69,18 +72,22 @@ export type BlockDef = {
 	material: Enum.Material,
 	hardness: number,
 	tool: string?,
+	tex: any,
+	shape: string?,
 	transparency: number?,
 	canCollide: boolean?,
 	unbreakable: boolean?,
 	blastProof: boolean?,
 	kill: boolean?,
 	light: number?,
-	size: Vector3?, -- 블록 단위 크기(기본 1,1,1)
+	lightColor: Color3?,
 	team: string?,
 	bed: boolean?,
 	tnt: boolean?,
 	chest: boolean?,
-	noItem: boolean?, -- 아이템으로 존재하지 않는 블록
+	noItem: boolean?,
+	occludes: boolean,
+	bloom: Color3?,
 	textureId: string?,
 }
 
@@ -92,114 +99,182 @@ local function rgb(r: number, g: number, b: number): Color3
 	return Color3.fromRGB(r, g, b)
 end
 
+-- 모양별 크기와 위치(블록 단위, 칸 중심 기준)
+Blocks.Shapes = {
+	slab = { size = Vector3.new(1, 0.5, 1), offset = Vector3.new(0, -0.25, 0) },
+	slab_top = { size = Vector3.new(1, 0.5, 1), offset = Vector3.new(0, 0.25, 0) },
+	carpet = { size = Vector3.new(1, 0.07, 1), offset = Vector3.new(0, -0.465, 0) },
+	fence = { size = Vector3.new(0.26, 1, 0.26), offset = Vector3.zero },
+	wall = { size = Vector3.new(0.5, 1, 0.5), offset = Vector3.zero },
+	plant = { size = Vector3.new(0.1, 0.5, 0.1), offset = Vector3.new(0, -0.25, 0) },
+	grass = { size = Vector3.new(0.75, 0.55, 0.05), offset = Vector3.new(0, -0.225, 0) },
+	lantern = { size = Vector3.new(0.34, 0.42, 0.34), offset = Vector3.new(0, -0.29, 0) },
+	torch = { size = Vector3.new(0.12, 0.55, 0.12), offset = Vector3.new(0, -0.225, 0) },
+	chest = { size = Vector3.new(0.86, 0.86, 0.86), offset = Vector3.new(0, -0.07, 0) },
+	bed = { size = Vector3.new(1, 0.56, 1), offset = Vector3.new(0, -0.22, 0) },
+}
+
 local function add(id: string, data: { [string]: any })
 	data.id = id
 	data.hardness = data.hardness or 1
 	data.material = data.material or M.SmoothPlastic
+	if data.tex == nil then
+		data.tex = id
+	end
+	local transparent = (data.transparency or 0) > 0.02
+	data.occludes = data.shape == nil and not transparent and data.canCollide ~= false and not data.chest and not data.bed
 	defs[id] = data :: any
 end
 
--- 자연 블록
-add("grass", { name = "잔디 블록", color = rgb(95, 159, 53), hardness = 0.6 })
+-- 땅
+add("grass", { name = "잔디 블록", color = rgb(96, 150, 58), hardness = 0.6, tex = { top = "grass_top", side = "grass_side", bottom = "dirt" } })
 add("dirt", { name = "흙", color = rgb(134, 96, 67), hardness = 0.5 })
-add("stone", { name = "돌", color = rgb(128, 128, 128), hardness = 2.2, tool = "pickaxe" })
-add("cobble", { name = "조약돌", color = rgb(108, 108, 110), hardness = 2.2, tool = "pickaxe" })
-add("stone_bricks", { name = "석재 벽돌", color = rgb(120, 120, 122), hardness = 2.2, tool = "pickaxe" })
-add("bricks", { name = "벽돌", color = rgb(150, 76, 60), hardness = 2.2, tool = "pickaxe", material = M.Brick })
-add("planks", { name = "나무 판자", color = rgb(168, 135, 84), hardness = 1.4, tool = "axe", material = M.WoodPlanks })
-add("dark_planks", { name = "짙은 나무 판자", color = rgb(92, 66, 40), hardness = 1.4, tool = "axe", material = M.WoodPlanks })
-add("log", { name = "원목", color = rgb(104, 82, 50), hardness = 1.8, tool = "axe", material = M.Wood })
-add("leaves", { name = "나뭇잎", color = rgb(58, 130, 42), hardness = 0.25, tool = "shears" })
-add("sakura_leaves", { name = "벚꽃잎", color = rgb(244, 172, 206), hardness = 0.25, tool = "shears" })
-add("sand", { name = "모래", color = rgb(222, 210, 160), hardness = 0.5 })
-add("sandstone", { name = "사암", color = rgb(214, 196, 140), hardness = 1.2, tool = "pickaxe" })
-add("red_sandstone", { name = "붉은 사암", color = rgb(190, 110, 60), hardness = 1.2, tool = "pickaxe" })
-add("cactus", { name = "선인장", color = rgb(76, 140, 52), hardness = 0.4 })
-add("gravel", { name = "자갈", color = rgb(140, 130, 128), hardness = 0.6 })
-add("snow", { name = "눈 블록", color = rgb(242, 248, 252), hardness = 0.3 })
-add("ice", { name = "얼음", color = rgb(150, 190, 245), hardness = 0.5, transparency = 0.2, material = M.Ice })
-add("packed_ice", { name = "단단한 얼음", color = rgb(125, 165, 230), hardness = 0.8, tool = "pickaxe" })
-add("quartz", { name = "석영 블록", color = rgb(236, 230, 222), hardness = 1.6, tool = "pickaxe" })
-add("basalt", { name = "현무암", color = rgb(66, 64, 70), hardness = 2.2, tool = "pickaxe" })
-add("magma", { name = "마그마 블록", color = rgb(160, 62, 28), hardness = 1, tool = "pickaxe", material = M.CrackedLava })
-add("mushroom_red", { name = "붉은 버섯 블록", color = rgb(196, 44, 40), hardness = 0.4, tool = "axe" })
-add("mushroom_stem", { name = "버섯 줄기", color = rgb(224, 214, 196), hardness = 0.4, tool = "axe" })
-add("hay", { name = "건초 더미", color = rgb(204, 172, 52), hardness = 0.5 })
-add("lamp", { name = "조명 블록", color = rgb(255, 222, 140), hardness = 0.5, material = M.Neon, light = 16 })
-add("iron_block", { name = "철 블록", color = rgb(218, 218, 222), hardness = 3, tool = "pickaxe", material = M.Metal })
-add("gold_block", { name = "금 블록", color = rgb(250, 208, 60), hardness = 3, tool = "pickaxe", material = M.Metal })
-add("diamond_block", { name = "다이아몬드 블록", color = rgb(98, 225, 215), hardness = 3, tool = "pickaxe" })
-add("emerald_block", { name = "에메랄드 블록", color = rgb(40, 200, 90), hardness = 3, tool = "pickaxe" })
+add("path", { name = "흙길", color = rgb(148, 122, 74), hardness = 0.5, tex = { top = "path_top", side = "dirt", bottom = "dirt" } })
+add("snow_grass", { name = "눈 덮인 잔디", color = rgb(236, 244, 248), hardness = 0.6, tex = { top = "snow", side = "snow_side", bottom = "dirt" } })
+add("mycelium", { name = "균사체", color = rgb(118, 100, 118), hardness = 0.6, tex = { top = "mycelium_top", side = "mycelium_side", bottom = "dirt" } })
+add("sand", { name = "모래", color = rgb(220, 208, 158), hardness = 0.5 })
+add("red_sand", { name = "붉은 모래", color = rgb(190, 104, 50), hardness = 0.5 })
+add("gravel", { name = "자갈", color = rgb(132, 125, 122), hardness = 0.6 })
+add("snow", { name = "눈 블록", color = rgb(240, 247, 252), hardness = 0.3 })
+add("ice", { name = "얼음", color = rgb(150, 192, 245), hardness = 0.5, transparency = 0.15 })
+add("packed_ice", { name = "단단한 얼음", color = rgb(130, 170, 232), hardness = 0.8, tool = "pickaxe" })
+add("clay_block", { name = "점토", color = rgb(160, 166, 178), hardness = 0.6 })
 
--- 장애물/특수 블록
-add("glass", { name = "유리", color = rgb(210, 235, 250), hardness = 0.3, transparency = 0.6, material = M.Glass })
-add("blast_glass", {
-	name = "방폭 유리",
-	color = rgb(185, 215, 240),
-	hardness = 0.6,
-	transparency = 0.45,
-	material = M.Glass,
-	blastProof = true,
-})
-add("cage_glass", {
-	name = "출발 유리관",
-	color = rgb(200, 230, 255),
-	transparency = 0.55,
-	material = M.Glass,
-	unbreakable = true,
-	noItem = true,
-})
-add("obsidian", { name = "흑요석", color = rgb(34, 24, 48), hardness = 25, tool = "pickaxe", blastProof = true })
-add("bedrock", { name = "기반암", color = rgb(52, 52, 56), unbreakable = true, blastProof = true, noItem = true })
-add("lava", {
-	name = "용암",
-	color = rgb(255, 112, 20),
-	material = M.Neon,
-	transparency = 0.05,
-	canCollide = false,
-	unbreakable = true,
-	blastProof = true,
-	kill = true,
-	noItem = true,
-})
-add("water", {
-	name = "물",
-	color = rgb(55, 110, 220),
-	material = M.Glass,
-	transparency = 0.45,
-	canCollide = false,
-	unbreakable = true,
-	blastProof = true,
-	noItem = true,
-})
-add("tnt", { name = "TNT", color = rgb(214, 52, 40), hardness = 0.05, tnt = true })
+-- 돌
+add("stone", { name = "돌", color = rgb(125, 125, 125), hardness = 2.2, tool = "pickaxe" })
+add("cobble", { name = "조약돌", color = rgb(115, 115, 115), hardness = 2.2, tool = "pickaxe" })
+add("mossy_cobble", { name = "이끼 낀 조약돌", color = rgb(100, 118, 92), hardness = 2.2, tool = "pickaxe" })
+add("stone_bricks", { name = "석재 벽돌", color = rgb(120, 120, 122), hardness = 2.2, tool = "pickaxe" })
+add("mossy_stone_bricks", { name = "이끼 낀 석재 벽돌", color = rgb(104, 118, 96), hardness = 2.2, tool = "pickaxe" })
+add("polished_stone", { name = "매끈한 돌", color = rgb(160, 160, 162), hardness = 2.2, tool = "pickaxe" })
+add("polished_granite", { name = "매끈한 화강암", color = rgb(160, 110, 92), hardness = 2.2, tool = "pickaxe" })
+add("polished_diorite", { name = "매끈한 섬록암", color = rgb(196, 196, 198), hardness = 2.2, tool = "pickaxe" })
+add("coal_ore", { name = "석탄 광석", color = rgb(110, 110, 110), hardness = 2.4, tool = "pickaxe" })
+add("iron_ore", { name = "철 광석", color = rgb(132, 124, 118), hardness = 2.6, tool = "pickaxe" })
+add("gold_ore", { name = "금 광석", color = rgb(140, 132, 110), hardness = 2.6, tool = "pickaxe" })
+add("bricks", { name = "벽돌", color = rgb(150, 82, 66), hardness = 2.2, tool = "pickaxe" })
+add("quartz", { name = "석영 블록", color = rgb(234, 228, 220), hardness = 1.6, tool = "pickaxe" })
+add("quartz_pillar", { name = "석영 기둥", color = rgb(232, 226, 218), hardness = 1.6, tool = "pickaxe", tex = { top = "quartz_pillar_top", side = "quartz_pillar", bottom = "quartz_pillar_top" } })
+add("sandstone", { name = "사암", color = rgb(214, 198, 144), hardness = 1.2, tool = "pickaxe", tex = { top = "sandstone_top", side = "sandstone_side", bottom = "sandstone_top" } })
+add("smooth_sandstone", { name = "매끈한 사암", color = rgb(216, 202, 150), hardness = 1.2, tool = "pickaxe", tex = "sandstone_top" })
+add("carved_sandstone", { name = "조각된 사암", color = rgb(210, 192, 136), hardness = 1.2, tool = "pickaxe", tex = { top = "sandstone_top", side = "sandstone_carved", bottom = "sandstone_top" } })
+add("red_sandstone", { name = "붉은 사암", color = rgb(186, 100, 46), hardness = 1.2, tool = "pickaxe", tex = { top = "red_sandstone_top", side = "red_sandstone_side", bottom = "red_sandstone_top" } })
+add("basalt", { name = "현무암", color = rgb(72, 70, 76), hardness = 2.2, tool = "pickaxe", tex = { top = "basalt_top", side = "basalt_side", bottom = "basalt_top" } })
+add("dark_stone", { name = "흑암", color = rgb(46, 42, 50), hardness = 2.2, tool = "pickaxe" })
+add("dark_bricks", { name = "흑암 벽돌", color = rgb(52, 46, 56), hardness = 2.2, tool = "pickaxe" })
+add("magma", { name = "마그마 블록", color = rgb(150, 58, 26), hardness = 1, tool = "pickaxe" })
+add("obsidian", { name = "흑요석", color = rgb(30, 22, 44), hardness = 25, tool = "pickaxe", blastProof = true })
+add("bedrock", { name = "기반암", color = rgb(56, 56, 58), unbreakable = true, blastProof = true, noItem = true })
+
+-- 나무
+add("planks", { name = "참나무 판자", color = rgb(162, 130, 80), hardness = 1.4, tool = "axe" })
+add("dark_planks", { name = "짙은 판자", color = rgb(88, 62, 38), hardness = 1.4, tool = "axe" })
+add("birch_planks", { name = "자작나무 판자", color = rgb(196, 178, 124), hardness = 1.4, tool = "axe" })
+add("cherry_planks", { name = "벚나무 판자", color = rgb(222, 170, 166), hardness = 1.4, tool = "axe" })
+add("log", { name = "참나무 원목", color = rgb(104, 82, 50), hardness = 1.8, tool = "axe", tex = { top = "log_top", side = "log_side", bottom = "log_top" } })
+add("dark_log", { name = "짙은 원목", color = rgb(62, 46, 30), hardness = 1.8, tool = "axe", tex = { top = "dark_log_top", side = "dark_log_side", bottom = "dark_log_top" } })
+add("birch_log", { name = "자작나무 원목", color = rgb(216, 212, 200), hardness = 1.8, tool = "axe", tex = { top = "birch_log_top", side = "birch_log_side", bottom = "birch_log_top" } })
+add("cherry_log", { name = "벚나무 원목", color = rgb(70, 42, 50), hardness = 1.8, tool = "axe", tex = { top = "cherry_log_top", side = "cherry_log_side", bottom = "cherry_log_top" } })
+add("bookshelf", { name = "책장", color = rgb(130, 100, 70), hardness = 1.4, tool = "axe", tex = { top = "planks", side = "bookshelf", bottom = "planks" } })
+add("hay", { name = "건초 더미", color = rgb(196, 166, 50), hardness = 0.5, tex = { top = "hay_top", side = "hay_side", bottom = "hay_top" } })
+
+-- 잎과 식물 블록
+add("leaves", { name = "참나무 잎", color = rgb(62, 128, 44), hardness = 0.25, tool = "shears" })
+add("dark_leaves", { name = "짙은 잎", color = rgb(46, 92, 46), hardness = 0.25, tool = "shears" })
+add("birch_leaves", { name = "자작나무 잎", color = rgb(110, 150, 70), hardness = 0.25, tool = "shears" })
+add("sakura_leaves", { name = "벚꽃잎", color = rgb(240, 172, 204), hardness = 0.25, tool = "shears" })
+add("palm_leaves", { name = "야자 잎", color = rgb(92, 160, 56), hardness = 0.25, tool = "shears" })
+add("cactus", { name = "선인장", color = rgb(70, 128, 48), hardness = 0.4, tex = { top = "cactus_top", side = "cactus_side", bottom = "cactus_top" } })
+add("mushroom_red", { name = "붉은 버섯 블록", color = rgb(190, 44, 40), hardness = 0.4, tool = "axe" })
+add("mushroom_brown", { name = "갈색 버섯 블록", color = rgb(150, 112, 80), hardness = 0.4, tool = "axe" })
+add("mushroom_stem", { name = "버섯 줄기", color = rgb(220, 212, 196), hardness = 0.4, tool = "axe" })
+
+-- 광물/장식 블록
+add("iron_block", { name = "철 블록", color = rgb(216, 216, 220), hardness = 3, tool = "pickaxe" })
+add("gold_block", { name = "금 블록", color = rgb(246, 206, 62), hardness = 3, tool = "pickaxe" })
+add("diamond_block", { name = "다이아몬드 블록", color = rgb(100, 222, 212), hardness = 3, tool = "pickaxe" })
+add("emerald_block", { name = "에메랄드 블록", color = rgb(48, 196, 96), hardness = 3, tool = "pickaxe" })
+add("lamp", { name = "조명 블록", color = rgb(255, 214, 140), hardness = 0.5, material = M.Neon, light = 16, tex = false })
+add("crystal_lamp", { name = "수정 조명", color = rgb(160, 230, 230), hardness = 0.5, material = M.Neon, light = 16, tex = false })
+add("shroomlight", { name = "버섯 조명", color = rgb(250, 160, 80), hardness = 0.5, material = M.Neon, light = 14, tex = false })
+
+-- 유리
+add("glass", { name = "유리", color = rgb(214, 236, 248), hardness = 0.3, transparency = 0.55, material = M.Glass, tex = "glass" })
+add("blast_glass", { name = "방폭 유리", color = rgb(190, 216, 236), hardness = 0.6, transparency = 0.45, material = M.Glass, tex = "glass", blastProof = true })
+add("cage_glass", { name = "출발 유리관", color = rgb(200, 230, 255), transparency = 0.55, material = M.Glass, tex = "glass", unbreakable = true, noItem = true })
+local STAINED = {
+	red = rgb(200, 60, 60),
+	blue = rgb(60, 90, 200),
+	yellow = rgb(230, 200, 60),
+	lime = rgb(120, 200, 60),
+	purple = rgb(140, 70, 190),
+	orange = rgb(230, 130, 50),
+	pink = rgb(236, 140, 180),
+	cyan = rgb(60, 170, 190),
+	white = rgb(236, 236, 236),
+}
+for name, color in STAINED do
+	add("stained_" .. name, { name = "색유리", color = color, hardness = 0.3, transparency = 0.4, material = M.Glass, tex = "glass" })
+end
+
+-- 액체 (통과, 부서지지 않음)
+add("water", { name = "물", color = rgb(56, 108, 214), material = M.Glass, transparency = 0.4, canCollide = false, unbreakable = true, blastProof = true, noItem = true })
+add("lava", { name = "용암", color = rgb(255, 110, 20), material = M.Neon, transparency = 0.02, canCollide = false, unbreakable = true, blastProof = true, kill = true, noItem = true, tex = false })
+
+-- 특수
+add("tnt", { name = "TNT", color = rgb(204, 56, 44), hardness = 0.05, tnt = true, tex = { top = "tnt_top", side = "tnt_side", bottom = "tnt_bottom" } })
 add("chest", {
 	name = "상자",
-	color = rgb(160, 110, 50),
-	material = M.WoodPlanks,
+	color = rgb(158, 110, 52),
+	shape = "chest",
 	unbreakable = true,
 	blastProof = true,
 	chest = true,
 	noItem = true,
-	size = Vector3.new(0.86, 0.86, 0.86),
+	tex = { top = "chest_top", side = "chest_side", front = "chest_front", bottom = "chest_top" },
 })
 
--- 팀 색 블록(양털, 단단한 점토)과 침대
+-- 양털 (팀 색 + 장식 색), 테라코타, 콘크리트(색 블록), 카펫
+local DYES: { [string]: Color3 } = {
+	white = rgb(234, 236, 236),
+	black = rgb(30, 30, 36),
+	gray = rgb(80, 84, 88),
+	brown = rgb(116, 74, 42),
+	red = rgb(176, 46, 38),
+	orange = rgb(236, 120, 24),
+	yellow = rgb(246, 196, 40),
+	lime = rgb(110, 184, 26),
+	green = rgb(84, 110, 28),
+	cyan = rgb(22, 144, 152),
+	blue = rgb(52, 56, 168),
+	purple = rgb(122, 44, 170),
+	pink = rgb(236, 140, 172),
+}
+Blocks.Dyes = DYES
+for name, color in DYES do
+	add("wool_" .. name, { name = "양털", color = color, hardness = 0.7, tool = "shears", tex = "wool_" .. name })
+	add("terracotta_" .. name, { name = "테라코타", color = color:Lerp(rgb(150, 95, 70), 0.45), hardness = 1.4, tool = "pickaxe", tex = "terracotta_" .. name })
+	add("carpet_" .. name, { name = "카펫", color = color, hardness = 0.1, shape = "carpet", canCollide = false, tex = "wool_" .. name })
+end
+add("petals", { name = "꽃잎", color = rgb(244, 178, 210), hardness = 0.05, shape = "carpet", canCollide = false, noItem = true, tex = "petals" })
+
+-- 팀 블록: 양털은 Config 팀 색을 따르고, 점토와 침대도 팀마다
 for _, team in Config.Teams do
-	add("wool_" .. team.id, {
-		name = team.name .. " 양털",
-		color = team.color,
-		hardness = 0.7,
-		tool = "shears",
-		material = M.Fabric,
-		team = team.id,
-	})
+	local wool = defs["wool_" .. team.id]
+	if wool then
+		wool.name = team.name .. " 양털"
+		wool.team = team.id
+		wool.color = team.color
+	else
+		add("wool_" .. team.id, { name = team.name .. " 양털", color = team.color, hardness = 0.7, tool = "shears", team = team.id })
+	end
 	add("clay_" .. team.id, {
 		name = team.name .. " 단단한 점토",
-		color = team.color:Lerp(Color3.new(0.35, 0.3, 0.3), 0.35),
+		color = team.color:Lerp(rgb(150, 95, 70), 0.35),
 		hardness = 1.6,
 		tool = "pickaxe",
 		team = team.id,
+		tex = "terracotta_" .. team.id,
 	})
 	add("bed_" .. team.id, {
 		name = team.name .. " 침대",
@@ -209,42 +284,82 @@ for _, team in Config.Teams do
 		team = team.id,
 		noItem = true,
 		blastProof = true,
-		size = Vector3.new(1, 0.56, 1),
+		shape = "bed",
+		tex = { top = "wool_" .. team.id, side = "bed_side", bottom = "planks" },
 	})
 end
-add("wool_white", { name = "흰 양털", color = rgb(234, 236, 236), hardness = 0.7, tool = "shears", material = M.Fabric })
+Blocks.TeamTextureColors = {}
+for _, team in Config.Teams do
+	Blocks.TeamTextureColors[team.id] = team.color
+end
 
--- TNT 런 바닥에 쓰는 색 블록
-local COLORS: { { string } } = {
-	{ "white", "흰색" },
-	{ "black", "검은색" },
-	{ "red", "빨간색" },
-	{ "orange", "주황색" },
-	{ "yellow", "노란색" },
-	{ "lime", "연두색" },
-	{ "cyan", "청록색" },
-	{ "blue", "파란색" },
-	{ "purple", "보라색" },
-	{ "pink", "분홍색" },
-}
-local COLOR_VALUES: { [string]: Color3 } = {
-	white = rgb(232, 234, 235),
-	black = rgb(32, 34, 40),
-	red = rgb(220, 50, 48),
-	orange = rgb(240, 130, 30),
-	yellow = rgb(245, 205, 40),
-	lime = rgb(120, 205, 40),
-	cyan = rgb(30, 160, 170),
-	blue = rgb(50, 70, 190),
-	purple = rgb(130, 50, 180),
-	pink = rgb(235, 130, 170),
+-- TNT 런 바닥 색 블록
+local COLORS = {
+	{ "white", "흰색", rgb(232, 234, 235) },
+	{ "black", "검은색", rgb(30, 32, 38) },
+	{ "red", "빨간색", rgb(196, 40, 40) },
+	{ "orange", "주황색", rgb(236, 120, 20) },
+	{ "yellow", "노란색", rgb(242, 196, 30) },
+	{ "lime", "연두색", rgb(110, 186, 30) },
+	{ "cyan", "청록색", rgb(22, 140, 150) },
+	{ "blue", "파란색", rgb(46, 52, 160) },
+	{ "purple", "보라색", rgb(112, 36, 160) },
+	{ "pink", "분홍색", rgb(220, 112, 150) },
 }
 Blocks.ColorNames = {}
+Blocks.ColorValues = {}
 for _, entry in COLORS do
-	local id = "color_" .. entry[1]
-	add(id, { name = entry[2] .. " 블록", color = COLOR_VALUES[entry[1]], hardness = 0.6 })
+	add("color_" .. entry[1], { name = entry[2] .. " 콘크리트", color = entry[3], hardness = 0.6, tex = "concrete_" .. entry[1] })
 	table.insert(Blocks.ColorNames, entry[1])
+	Blocks.ColorValues[entry[1]] = entry[3]
 end
+
+-- 반 블록 (아래/위)
+for _, base in { "planks", "dark_planks", "birch_planks", "cherry_planks", "stone_bricks", "polished_stone", "sandstone", "smooth_sandstone", "red_sandstone", "quartz", "bricks", "cobble", "dark_bricks", "basalt" } do
+	local d = defs[base]
+	for _, variant in { "slab", "slab_top" } do
+		add(base .. "_" .. variant, {
+			name = d.name .. " 반 블록",
+			color = d.color,
+			hardness = d.hardness,
+			tool = d.tool,
+			shape = variant,
+			tex = d.tex,
+			noItem = variant == "slab_top",
+		})
+	end
+end
+
+-- 울타리, 담장
+add("fence", { name = "울타리", color = rgb(162, 130, 80), hardness = 1, tool = "axe", shape = "fence", tex = "planks" })
+add("dark_fence", { name = "짙은 울타리", color = rgb(88, 62, 38), hardness = 1, tool = "axe", shape = "fence", tex = "dark_planks" })
+add("cobble_wall", { name = "조약돌 담장", color = rgb(115, 115, 115), hardness = 2, tool = "pickaxe", shape = "wall", tex = "cobble" })
+add("sandstone_wall", { name = "사암 담장", color = rgb(214, 198, 144), hardness = 1.2, tool = "pickaxe", shape = "wall", tex = "sandstone_top" })
+add("quartz_wall", { name = "석영 담장", color = rgb(234, 228, 220), hardness = 1.2, tool = "pickaxe", shape = "wall", tex = "quartz" })
+
+-- 조명
+add("lantern", { name = "랜턴", color = rgb(255, 196, 110), hardness = 0.3, shape = "lantern", canCollide = false, light = 14, lightColor = rgb(255, 190, 120), material = M.Neon, tex = false, noItem = true })
+add("soul_lantern", { name = "푸른 랜턴", color = rgb(120, 220, 230), hardness = 0.3, shape = "lantern", canCollide = false, light = 12, lightColor = rgb(120, 220, 240), material = M.Neon, tex = false, noItem = true })
+add("torch", { name = "횃불", color = rgb(120, 86, 50), hardness = 0.05, shape = "torch", canCollide = false, light = 12, lightColor = rgb(255, 170, 80), tex = false, noItem = true })
+
+-- 꽃과 풀 (작은 장식, 통과 가능)
+local FLOWERS = {
+	flower_red = rgb(220, 40, 40),
+	flower_yellow = rgb(250, 220, 50),
+	flower_blue = rgb(70, 110, 230),
+	flower_white = rgb(245, 245, 245),
+	flower_pink = rgb(245, 150, 200),
+	flower_purple = rgb(160, 80, 220),
+}
+for id, color in FLOWERS do
+	add(id, { name = "꽃", color = rgb(60, 140, 40), bloom = color, hardness = 0.02, shape = "plant", canCollide = false, tex = false, noItem = true })
+end
+add("tall_grass", { name = "풀", color = rgb(84, 150, 52), hardness = 0.02, shape = "grass", canCollide = false, tex = false, noItem = true })
+add("dead_bush", { name = "마른 덤불", color = rgb(140, 100, 52), hardness = 0.02, shape = "grass", canCollide = false, tex = false, noItem = true })
+add("fern", { name = "고사리", color = rgb(60, 120, 50), hardness = 0.02, shape = "grass", canCollide = false, tex = false, noItem = true })
+add("small_mushroom", { name = "작은 버섯", color = rgb(220, 210, 190), bloom = rgb(200, 40, 40), hardness = 0.02, shape = "plant", canCollide = false, tex = false, noItem = true })
+
+-- 팀 색 양털/침대 등은 위에서 만들었고, 그 밖의 팀 이름(red 등)은 DYES 와 겹칩니다.
 
 function Blocks.get(id: string): BlockDef?
 	return defs[id]
@@ -254,18 +369,30 @@ function Blocks.exists(id: string): boolean
 	return defs[id] ~= nil
 end
 
--- 블록 위치마다 색을 살짝 다르게 해서 픽셀 블록 느낌을 냅니다.
+-- 면 이름(top/bottom/side/front)에 맞는 텍스처 이름
+function Blocks.faceTexture(def: BlockDef, face: string): string?
+	local tex = def.tex
+	if tex == false or tex == nil then
+		return nil
+	end
+	if type(tex) == "string" then
+		return tex
+	end
+	if face == "front" then
+		return tex.front or tex.side
+	end
+	return tex[face] or tex.side
+end
+
+-- 블록 위치마다 색을 살짝 다르게 해서 텍스처가 없을 때도 픽셀 블록 느낌을 냅니다.
 function Blocks.shade(def: BlockDef, x: number, y: number, z: number): Color3
 	local h = (x * 73856093 + y * 19349663 + z * 83492791) % 1000
-	if h < 0 then
-		h += 1000
-	end
-	local t = h / 1000 -- 0..1
+	local t = h / 1000
 	local color = def.color
 	if t < 0.5 then
-		return color:Lerp(Color3.new(0, 0, 0), (0.5 - t) * 0.16)
+		return color:Lerp(Color3.new(0, 0, 0), (0.5 - t) * 0.14)
 	end
-	return color:Lerp(Color3.new(1, 1, 1), (t - 0.5) * 0.12)
+	return color:Lerp(Color3.new(1, 1, 1), (t - 0.5) * 0.1)
 end
 
 return Blocks
@@ -1239,6 +1366,1016 @@ return Shop
       </Item>
       <Item class="ModuleScript" referent="11">
         <Properties>
+          <string name="Name">TextureIds</string>
+          <string name="Source"><![CDATA[-- (선택) 직접 올린 텍스처 이미지 ID.
+-- 게임은 텍스처를 코드로 직접 그려서 붙이므로 보통은 비워 둬도 됩니다.
+-- 만약 텍스처가 안 보이면 textures/ 폴더의 PNG 를 로블록스에 올리고(에셋 관리자 → 일괄 가져오기),
+-- 아래처럼 "텍스처 이름" = "rbxassetid://숫자" 로 적어 주세요. 여기 적힌 것이 먼저 쓰입니다.
+--
+-- 예)
+--   grass_top = "rbxassetid://1234567890",
+--   grass_side = "rbxassetid://1234567891",
+return {}
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="12">
+        <Properties>
+          <string name="Name">Textures</string>
+          <string name="Source"><![CDATA[-- 블록 픽셀 텍스처 (16x16). 이미지 파일 없이 코드로 직접 그린 이 게임만의 텍스처입니다.
+-- Textures.get(이름) 은 {r, g, b, a, r, g, b, a, ...} (0~255, 1024개) 배열을 돌려줍니다.
+local Blocks = require(script.Parent.Blocks)
+local Util = require(script.Parent.Util)
+
+local Textures = {}
+
+local N = 16
+Textures.Size = N
+
+type Color = { number }
+type Pixels = { number }
+
+local function clamp8(v: number): number
+	return math.clamp(math.floor(v + 0.5), 0, 255)
+end
+
+local function c3(color: Color3): Color
+	return { color.R * 255, color.G * 255, color.B * 255 }
+end
+
+local function mul(c: Color, f: number): Color
+	return { c[1] * f, c[2] * f, c[3] * f }
+end
+
+local function put(px: Pixels, x: number, y: number, c: Color, a: number?)
+	local i = ((y % N) * N + (x % N)) * 4
+	px[i + 1] = clamp8(c[1])
+	px[i + 2] = clamp8(c[2])
+	px[i + 3] = clamp8(c[3])
+	px[i + 4] = a or 255
+end
+
+local function get(px: Pixels, x: number, y: number): Color
+	local i = ((y % N) * N + (x % N)) * 4
+	return { px[i + 1], px[i + 2], px[i + 3] }
+end
+
+local function alpha(px: Pixels, x: number, y: number, a: number)
+	px[((y % N) * N + (x % N)) * 4 + 4] = a
+end
+
+-- 기본 색에 픽셀마다 밝기 흔들림을 준 바탕
+local function base(c: Color, rng, amount: number): Pixels
+	local px = table.create(N * N * 4, 255)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local f = 1 + (rng:next() - 0.5) * 2 * amount
+			put(px, x, y, mul(c, f))
+		end
+	end
+	return px
+end
+
+local function shadeAt(px: Pixels, x: number, y: number, f: number)
+	put(px, x, y, mul(get(px, x, y), f))
+end
+
+-- 작은 얼룩 여러 개
+local function blobs(px: Pixels, rng, count: number, color: Color, minSize: number, maxSize: number)
+	for _ = 1, count do
+		local cx, cy = rng:int(0, N - 1), rng:int(0, N - 1)
+		local size = rng:int(minSize, maxSize)
+		for dy = 0, size - 1 do
+			for dx = 0, size - 1 do
+				if rng:next() < 0.8 then
+					put(px, cx + dx, cy + dy, mul(color, 0.92 + rng:next() * 0.16))
+				end
+			end
+		end
+	end
+end
+
+local function specks(px: Pixels, rng, chance: number, color: Color)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			if rng:next() < chance then
+				put(px, x, y, mul(color, 0.9 + rng:next() * 0.2))
+			end
+		end
+	end
+end
+
+-- 바둑판처럼 이어지는 보로노이 조각 (조약돌, 마그마 금)
+local function cells(rng, count: number): (number, number) -> (number, boolean)
+	local seeds = {}
+	for i = 1, count do
+		seeds[i] = { rng:next() * N, rng:next() * N }
+	end
+	local function nearest(x: number, y: number): number
+		local best, bestD = 1, math.huge
+		for i, s in seeds do
+			local dx = math.abs(x + 0.5 - s[1])
+			local dy = math.abs(y + 0.5 - s[2])
+			dx = math.min(dx, N - dx)
+			dy = math.min(dy, N - dy)
+			local d = dx * dx + dy * dy
+			if d < bestD then
+				best, bestD = i, d
+			end
+		end
+		return best
+	end
+	return function(x: number, y: number): (number, boolean)
+		local id = nearest(x, y)
+		local edge = nearest(x + 1, y) ~= id or nearest(x, y + 1) ~= id
+		return id, edge
+	end
+end
+
+local function bevel(px: Pixels, light: Color, dark: Color)
+	for i = 0, N - 1 do
+		put(px, i, 0, light)
+		put(px, 0, i, light)
+		put(px, i, N - 1, dark)
+		put(px, N - 1, i, dark)
+	end
+end
+
+local function fringe(px: Pixels, rng, color: Color, minDepth: number, maxDepth: number, amount: number)
+	for x = 0, N - 1 do
+		local depth = rng:int(minDepth, maxDepth)
+		for y = 0, depth - 1 do
+			put(px, x, y, mul(color, 1 + (rng:next() - 0.5) * 2 * amount))
+		end
+	end
+end
+
+-- 3x5 픽셀 글자
+local FONT = {
+	T = { "###", ".#.", ".#.", ".#.", ".#." },
+	N = { "#..#", "##.#", "#.##", "#..#", "#..#" },
+}
+local function text(px: Pixels, word: string, x0: number, y0: number, c: Color)
+	local x = x0
+	for i = 1, #word do
+		local glyph = FONT[string.sub(word, i, i)]
+		if glyph then
+			for row, line in glyph do
+				for col = 1, #line do
+					if string.sub(line, col, col) == "#" then
+						put(px, x + col - 1, y0 + row - 1, c)
+					end
+				end
+			end
+			x += #glyph[1] + 1
+		end
+	end
+end
+
+local G = {}
+
+-- 땅
+function G.dirt(rng)
+	local px = base({ 134, 96, 67 }, rng, 0.08)
+	specks(px, rng, 0.12, { 98, 70, 48 })
+	specks(px, rng, 0.06, { 162, 122, 88 })
+	return px
+end
+function G.grass_top(rng)
+	local px = base({ 96, 150, 58 }, rng, 0.1)
+	specks(px, rng, 0.16, { 76, 128, 44 })
+	specks(px, rng, 0.08, { 124, 178, 72 })
+	return px
+end
+function G.grass_side(rng)
+	local px = G.dirt(rng)
+	fringe(px, rng, { 96, 150, 58 }, 2, 4, 0.1)
+	for x = 0, N - 1 do
+		if rng:next() < 0.25 then
+			put(px, x, rng:int(3, 5), { 88, 140, 52 })
+		end
+	end
+	return px
+end
+function G.path_top(rng)
+	local px = base({ 150, 124, 76 }, rng, 0.07)
+	specks(px, rng, 0.14, { 126, 100, 60 })
+	return px
+end
+function G.mycelium_top(rng)
+	local px = base({ 118, 98, 118 }, rng, 0.1)
+	specks(px, rng, 0.12, { 150, 136, 150 })
+	specks(px, rng, 0.08, { 92, 76, 92 })
+	return px
+end
+function G.mycelium_side(rng)
+	local px = G.dirt(rng)
+	fringe(px, rng, { 118, 98, 118 }, 2, 4, 0.1)
+	return px
+end
+function G.snow(rng)
+	local px = base({ 242, 248, 252 }, rng, 0.025)
+	specks(px, rng, 0.08, { 222, 234, 246 })
+	return px
+end
+function G.snow_side(rng)
+	local px = G.dirt(rng)
+	fringe(px, rng, { 242, 248, 252 }, 3, 5, 0.025)
+	return px
+end
+function G.sand(rng)
+	local px = base({ 220, 208, 158 }, rng, 0.05)
+	specks(px, rng, 0.1, { 200, 186, 136 })
+	specks(px, rng, 0.05, { 236, 226, 184 })
+	return px
+end
+function G.red_sand(rng)
+	local px = base({ 190, 104, 50 }, rng, 0.06)
+	specks(px, rng, 0.12, { 166, 88, 40 })
+	return px
+end
+function G.gravel(rng)
+	local palette = { { 112, 106, 104 }, { 138, 130, 126 }, { 160, 154, 150 }, { 92, 88, 86 } }
+	local px = base({ 130, 124, 120 }, rng, 0)
+	for y = 0, N - 1, 2 do
+		for x = 0, N - 1, 2 do
+			local c = palette[rng:int(1, #palette)]
+			for dy = 0, 1 do
+				for dx = 0, 1 do
+					put(px, x + dx, y + dy, mul(c, 0.92 + rng:next() * 0.16))
+				end
+			end
+		end
+	end
+	return px
+end
+function G.ice(rng)
+	local px = base({ 150, 192, 245 }, rng, 0.03)
+	for i = 0, N - 1 do
+		if i % 5 ~= 0 then
+			put(px, i, (i * 2) % N, { 200, 226, 255 })
+		end
+	end
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			alpha(px, x, y, 220)
+		end
+	end
+	return px
+end
+function G.packed_ice(rng)
+	local px = base({ 130, 170, 232 }, rng, 0.05)
+	local split = cells(rng, 6)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local _, edge = split(x, y)
+			if edge then
+				put(px, x, y, { 176, 206, 250 })
+			end
+		end
+	end
+	return px
+end
+function G.clay_block(rng)
+	return base({ 160, 166, 178 }, rng, 0.03)
+end
+
+-- 돌
+function G.stone(rng)
+	local px = base({ 126, 126, 126 }, rng, 0.06)
+	blobs(px, rng, 8, { 104, 104, 104 }, 1, 3)
+	blobs(px, rng, 5, { 146, 146, 146 }, 1, 2)
+	return px
+end
+function G.cobble(rng)
+	local px = base({ 120, 120, 120 }, rng, 0)
+	local split = cells(rng, 9)
+	local shades = {}
+	for i = 1, 9 do
+		shades[i] = 0.78 + rng:next() * 0.42
+	end
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local id, edge = split(x, y)
+			if edge then
+				put(px, x, y, { 68, 68, 70 })
+			else
+				put(px, x, y, mul({ 124, 124, 124 }, shades[id] * (0.94 + rng:next() * 0.12)))
+			end
+		end
+	end
+	return px
+end
+local function moss(px: Pixels, rng, amount: number)
+	for _ = 1, amount do
+		local x, y = rng:int(0, N - 1), rng:int(0, N - 1)
+		for dy = 0, 2 do
+			for dx = 0, 2 do
+				if rng:next() < 0.55 then
+					put(px, x + dx, y + dy, mul({ 86, 118, 56 }, 0.9 + rng:next() * 0.2))
+				end
+			end
+		end
+	end
+end
+function G.mossy_cobble(rng)
+	local px = G.cobble(rng)
+	moss(px, rng, 7)
+	return px
+end
+local function brickRows(px: Pixels, rng, rowHeight: number, brickWidth: number, brick: Color, mortar: Color, jitter: number)
+	for y = 0, N - 1 do
+		local row = y // rowHeight
+		local offset = if row % 2 == 0 then 0 else brickWidth // 2
+		for x = 0, N - 1 do
+			local inRow = y % rowHeight
+			local col = (x + offset) % brickWidth
+			if inRow == rowHeight - 1 or col == brickWidth - 1 then
+				put(px, x, y, mul(mortar, 0.95 + rng:next() * 0.1))
+			else
+				local f = 1 + (rng:next() - 0.5) * jitter
+				if inRow == 0 then
+					f *= 1.08
+				end
+				put(px, x, y, mul(brick, f))
+			end
+		end
+	end
+end
+function G.stone_bricks(rng)
+	local px = base({ 122, 122, 122 }, rng, 0)
+	brickRows(px, rng, 8, 16, { 124, 124, 124 }, { 80, 80, 82 }, 0.12)
+	blobs(px, rng, 4, { 108, 108, 108 }, 1, 2)
+	return px
+end
+function G.mossy_stone_bricks(rng)
+	local px = G.stone_bricks(rng)
+	moss(px, rng, 6)
+	return px
+end
+function G.dark_bricks(rng)
+	local px = base({ 52, 46, 56 }, rng, 0)
+	brickRows(px, rng, 4, 8, { 58, 52, 62 }, { 30, 26, 32 }, 0.16)
+	return px
+end
+function G.bricks(rng)
+	local px = base({ 170, 160, 150 }, rng, 0)
+	brickRows(px, rng, 4, 8, { 150, 72, 56 }, { 178, 168, 158 }, 0.2)
+	return px
+end
+function G.polished_stone(rng)
+	local px = base({ 160, 160, 162 }, rng, 0.025)
+	bevel(px, { 184, 184, 186 }, { 128, 128, 130 })
+	return px
+end
+function G.polished_granite(rng)
+	local px = base({ 160, 110, 92 }, rng, 0.06)
+	specks(px, rng, 0.12, { 184, 132, 112 })
+	specks(px, rng, 0.08, { 126, 84, 70 })
+	bevel(px, { 182, 132, 112 }, { 128, 84, 70 })
+	return px
+end
+function G.polished_diorite(rng)
+	local px = base({ 198, 198, 200 }, rng, 0.04)
+	specks(px, rng, 0.1, { 140, 140, 144 })
+	bevel(px, { 222, 222, 224 }, { 160, 160, 164 })
+	return px
+end
+local function ore(rng, color: Color)
+	local px = G.stone(rng)
+	for _ = 1, 4 do
+		local x, y = rng:int(1, N - 3), rng:int(1, N - 3)
+		put(px, x, y, color)
+		put(px, x + 1, y, mul(color, 0.85))
+		put(px, x, y + 1, mul(color, 0.9))
+		if rng:next() < 0.6 then
+			put(px, x + 1, y + 1, mul(color, 1.1))
+		end
+	end
+	return px
+end
+function G.coal_ore(rng)
+	return ore(rng, { 40, 40, 42 })
+end
+function G.iron_ore(rng)
+	return ore(rng, { 214, 176, 146 })
+end
+function G.gold_ore(rng)
+	return ore(rng, { 250, 214, 70 })
+end
+function G.quartz(rng)
+	local px = base({ 236, 230, 222 }, rng, 0.015)
+	bevel(px, { 246, 242, 236 }, { 214, 208, 200 })
+	return px
+end
+function G.quartz_pillar(rng)
+	local px = base({ 234, 228, 220 }, rng, 0.015)
+	for y = 0, N - 1 do
+		for _, x in { 0, 3, 12, 15 } do
+			put(px, x, y, { 212, 206, 198 })
+		end
+	end
+	return px
+end
+function G.quartz_pillar_top(rng)
+	local px = base({ 234, 228, 220 }, rng, 0.015)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local d = math.max(math.abs(x - 7.5), math.abs(y - 7.5))
+			if d > 7 or (d > 3 and d < 4) then
+				put(px, x, y, { 212, 206, 198 })
+			end
+		end
+	end
+	return px
+end
+function G.sandstone_top(rng)
+	local px = base({ 218, 204, 150 }, rng, 0.03)
+	specks(px, rng, 0.06, { 204, 188, 136 })
+	return px
+end
+local function bandedSide(rng, c: Color)
+	local px = base(c, rng, 0.03)
+	for x = 0, N - 1 do
+		put(px, x, 0, mul(c, 1.08))
+		put(px, x, 1, mul(c, 1.05))
+		put(px, x, 3, mul(c, 0.86))
+		put(px, x, 12, mul(c, 0.86))
+		for _, y in { 6, 9 } do
+			if rng:next() < 0.5 then
+				put(px, x, y, mul(c, 0.94))
+			end
+		end
+	end
+	return px
+end
+function G.sandstone_side(rng)
+	return bandedSide(rng, { 214, 198, 144 })
+end
+function G.sandstone_carved(rng)
+	local c = { 214, 198, 144 }
+	local px = bandedSide(rng, c)
+	local dark = mul(c, 0.78)
+	-- 해 무늬: 가운데 원과 네 방향 빛살
+	for y = 4, 11 do
+		for x = 4, 11 do
+			local dx, dy = x - 7.5, y - 7.5
+			local d = math.sqrt(dx * dx + dy * dy)
+			if d > 2.2 and d < 3.4 then
+				put(px, x, y, dark)
+			end
+		end
+	end
+	for _, p in { { 7, 4 }, { 8, 4 }, { 7, 11 }, { 8, 11 }, { 4, 7 }, { 4, 8 }, { 11, 7 }, { 11, 8 } } do
+		put(px, p[1], p[2], dark)
+	end
+	put(px, 7, 7, dark)
+	put(px, 8, 8, dark)
+	return px
+end
+function G.red_sandstone_top(rng)
+	local px = base({ 188, 102, 48 }, rng, 0.04)
+	specks(px, rng, 0.06, { 168, 88, 40 })
+	return px
+end
+function G.red_sandstone_side(rng)
+	return bandedSide(rng, { 186, 100, 46 })
+end
+function G.basalt_side(rng)
+	local px = base({ 72, 70, 76 }, rng, 0)
+	for x = 0, N - 1 do
+		local f = 0.82 + rng:next() * 0.3
+		for y = 0, N - 1 do
+			put(px, x, y, mul({ 72, 70, 76 }, f * (0.95 + rng:next() * 0.1)))
+		end
+	end
+	return px
+end
+function G.basalt_top(rng)
+	local px = base({ 72, 70, 76 }, rng, 0.05)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local d = math.max(math.abs(x - 7.5), math.abs(y - 7.5))
+			if math.floor(d) % 3 == 0 then
+				shadeAt(px, x, y, 0.82)
+			end
+		end
+	end
+	return px
+end
+function G.dark_stone(rng)
+	local px = base({ 46, 42, 50 }, rng, 0.1)
+	specks(px, rng, 0.1, { 62, 58, 68 })
+	return px
+end
+function G.magma(rng)
+	local px = base({ 112, 38, 22 }, rng, 0.08)
+	local split = cells(rng, 7)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local _, edge = split(x, y)
+			if edge then
+				put(px, x, y, if rng:next() < 0.4 then { 255, 200, 90 } else { 250, 130, 40 })
+			end
+		end
+	end
+	return px
+end
+function G.obsidian(rng)
+	local px = base({ 30, 22, 44 }, rng, 0.1)
+	specks(px, rng, 0.08, { 70, 48, 104 })
+	specks(px, rng, 0.03, { 110, 80, 150 })
+	return px
+end
+function G.bedrock(rng)
+	local palette = { { 40, 40, 42 }, { 70, 70, 72 }, { 96, 96, 98 }, { 56, 56, 58 } }
+	local px = base({ 60, 60, 62 }, rng, 0)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			put(px, x, y, palette[rng:int(1, #palette)])
+		end
+	end
+	return px
+end
+
+-- 나무
+local function planks(rng, c: Color)
+	local px = base(c, rng, 0)
+	for board = 0, 3 do
+		local f = 0.92 + rng:next() * 0.16
+		local seam = rng:int(2, 13)
+		for y = board * 4, board * 4 + 3 do
+			for x = 0, N - 1 do
+				local v = f * (0.95 + rng:next() * 0.1)
+				if y == board * 4 + 3 then
+					v *= 0.72
+				elseif x == seam then
+					v *= 0.76
+				elseif rng:next() < 0.08 then
+					v *= 0.86
+				end
+				put(px, x, y, mul(c, v))
+			end
+		end
+	end
+	return px
+end
+function G.planks(rng)
+	return planks(rng, { 164, 132, 82 })
+end
+function G.dark_planks(rng)
+	return planks(rng, { 90, 64, 40 })
+end
+function G.birch_planks(rng)
+	return planks(rng, { 198, 180, 126 })
+end
+function G.cherry_planks(rng)
+	return planks(rng, { 224, 172, 168 })
+end
+local function bark(rng, c: Color)
+	local px = base(c, rng, 0)
+	for x = 0, N - 1 do
+		local f = 0.8 + rng:next() * 0.32
+		for y = 0, N - 1 do
+			local v = f * (0.94 + rng:next() * 0.12)
+			if rng:next() < 0.05 then
+				v *= 0.7
+			end
+			put(px, x, y, mul(c, v))
+		end
+	end
+	return px
+end
+local function rings(rng, wood: Color, barkColor: Color)
+	local px = base(wood, rng, 0.03)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local d = math.max(math.abs(x - 7.5), math.abs(y - 7.5))
+			if d > 6.6 then
+				put(px, x, y, mul(barkColor, 0.9 + rng:next() * 0.2))
+			elseif math.floor(d) % 2 == 1 then
+				shadeAt(px, x, y, 0.84)
+			end
+		end
+	end
+	return px
+end
+function G.log_side(rng)
+	return bark(rng, { 104, 82, 50 })
+end
+function G.log_top(rng)
+	return rings(rng, { 172, 138, 86 }, { 104, 82, 50 })
+end
+function G.dark_log_side(rng)
+	return bark(rng, { 62, 46, 30 })
+end
+function G.dark_log_top(rng)
+	return rings(rng, { 110, 80, 50 }, { 62, 46, 30 })
+end
+function G.cherry_log_side(rng)
+	return bark(rng, { 72, 42, 52 })
+end
+function G.cherry_log_top(rng)
+	return rings(rng, { 220, 160, 160 }, { 72, 42, 52 })
+end
+function G.birch_log_side(rng)
+	local px = base({ 220, 218, 208 }, rng, 0.04)
+	for _ = 1, 9 do
+		local y = rng:int(0, N - 1)
+		local x = rng:int(0, N - 1)
+		for dx = 0, rng:int(1, 4) do
+			put(px, x + dx, y, { 46, 44, 42 })
+		end
+	end
+	return px
+end
+function G.birch_log_top(rng)
+	return rings(rng, { 206, 190, 136 }, { 220, 218, 208 })
+end
+function G.bookshelf(rng)
+	local px = G.planks(rng)
+	local colors = { { 150, 40, 40 }, { 40, 70, 150 }, { 50, 120, 50 }, { 140, 100, 40 }, { 120, 50, 130 }, { 200, 170, 60 } }
+	for _, rowStart in { 2, 9 } do
+		local x = 1
+		while x < N - 1 do
+			local width = rng:int(1, 2)
+			local c = colors[rng:int(1, #colors)]
+			local top = rowStart + rng:int(0, 1)
+			for dx = 0, width - 1 do
+				if x + dx < N - 1 then
+					for y = top, rowStart + 4 do
+						put(px, x + dx, y, mul(c, if y == top then 1.2 else 0.95 + rng:next() * 0.1))
+					end
+				end
+			end
+			x += width
+		end
+	end
+	return px
+end
+function G.hay_side(rng)
+	local px = base({ 196, 166, 50 }, rng, 0)
+	for x = 0, N - 1 do
+		local f = 0.86 + rng:next() * 0.26
+		for y = 0, N - 1 do
+			put(px, x, y, mul({ 196, 166, 50 }, f * (0.95 + rng:next() * 0.1)))
+		end
+	end
+	for _, y in { 3, 4, 11, 12 } do
+		for x = 0, N - 1 do
+			put(px, x, y, mul({ 150, 70, 36 }, 0.9 + rng:next() * 0.2))
+		end
+	end
+	return px
+end
+function G.hay_top(rng)
+	local px = base({ 200, 170, 56 }, rng, 0.12)
+	specks(px, rng, 0.2, { 160, 130, 40 })
+	return px
+end
+
+-- 잎, 식물
+local function leaves(rng, c: Color)
+	local px = base(c, rng, 0.12)
+	specks(px, rng, 0.2, mul(c, 0.75))
+	specks(px, rng, 0.08, mul(c, 1.2))
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			if rng:next() < 0.14 then
+				alpha(px, x, y, 0)
+			end
+		end
+	end
+	return px
+end
+function G.leaves(rng)
+	return leaves(rng, { 62, 128, 44 })
+end
+function G.dark_leaves(rng)
+	return leaves(rng, { 46, 92, 46 })
+end
+function G.birch_leaves(rng)
+	return leaves(rng, { 110, 150, 70 })
+end
+function G.palm_leaves(rng)
+	return leaves(rng, { 92, 160, 56 })
+end
+function G.sakura_leaves(rng)
+	local px = leaves(rng, { 240, 172, 204 })
+	specks(px, rng, 0.06, { 252, 220, 236 })
+	return px
+end
+function G.cactus_side(rng)
+	local px = base({ 70, 128, 48 }, rng, 0.05)
+	for _, x in { 1, 5, 10, 14 } do
+		for y = 0, N - 1 do
+			put(px, x, y, { 52, 100, 36 })
+			if rng:next() < 0.18 then
+				put(px, x, y, { 214, 226, 180 })
+			end
+		end
+	end
+	return px
+end
+function G.cactus_top(rng)
+	local px = base({ 76, 134, 52 }, rng, 0.05)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local d = math.max(math.abs(x - 7.5), math.abs(y - 7.5))
+			if math.floor(d) == 5 then
+				put(px, x, y, { 98, 156, 70 })
+			end
+		end
+	end
+	return px
+end
+function G.mushroom_red(rng)
+	local px = base({ 190, 44, 40 }, rng, 0.06)
+	for _ = 1, 5 do
+		local cx, cy = rng:int(0, N - 1), rng:int(0, N - 1)
+		for dy = -1, 1 do
+			for dx = -1, 1 do
+				if math.abs(dx) + math.abs(dy) < 2 or rng:next() < 0.3 then
+					put(px, cx + dx, cy + dy, { 238, 234, 226 })
+				end
+			end
+		end
+	end
+	return px
+end
+function G.mushroom_brown(rng)
+	local px = base({ 150, 112, 80 }, rng, 0.08)
+	specks(px, rng, 0.1, { 126, 92, 64 })
+	return px
+end
+function G.mushroom_stem(rng)
+	local px = base({ 222, 214, 198 }, rng, 0.03)
+	for x = 0, N - 1, 3 do
+		for y = 0, N - 1 do
+			shadeAt(px, x, y, 0.93)
+		end
+	end
+	return px
+end
+function G.petals(rng)
+	local px = table.create(N * N * 4, 0)
+	for _ = 1, 18 do
+		local x, y = rng:int(0, N - 1), rng:int(0, N - 1)
+		put(px, x, y, { 246, 176, 208 }, 255)
+		if rng:next() < 0.6 then
+			put(px, x + 1, y, { 236, 156, 192 }, 255)
+		end
+	end
+	return px
+end
+
+-- 광물 블록
+local function metal(rng, c: Color)
+	local px = base(c, rng, 0.03)
+	bevel(px, mul(c, 1.15), mul(c, 0.78))
+	for i = 2, N - 3 do
+		put(px, i, 2, mul(c, 0.9))
+		put(px, 2, i, mul(c, 0.9))
+		put(px, i, N - 3, mul(c, 1.08))
+		put(px, N - 3, i, mul(c, 1.08))
+	end
+	return px
+end
+function G.iron_block(rng)
+	return metal(rng, { 216, 216, 220 })
+end
+function G.gold_block(rng)
+	local px = metal(rng, { 246, 206, 62 })
+	specks(px, rng, 0.05, { 255, 238, 140 })
+	return px
+end
+function G.diamond_block(rng)
+	local px = metal(rng, { 100, 222, 212 })
+	for i = 4, 11 do
+		put(px, i, i, { 200, 252, 246 })
+		put(px, i, N - 1 - i, { 160, 244, 236 })
+	end
+	return px
+end
+function G.emerald_block(rng)
+	local px = metal(rng, { 48, 196, 96 })
+	for y = 4, 11 do
+		for x = 4, 11 do
+			if math.abs(x - 7.5) + math.abs(y - 7.5) < 3.5 then
+				put(px, x, y, { 120, 236, 150 })
+			end
+		end
+	end
+	return px
+end
+
+-- 유리, 물
+function G.glass(_rng)
+	local px = table.create(N * N * 4, 0)
+	for i = 0, N - 1 do
+		put(px, i, 0, { 236, 246, 252 }, 230)
+		put(px, 0, i, { 236, 246, 252 }, 230)
+		put(px, i, N - 1, { 200, 220, 232 }, 230)
+		put(px, N - 1, i, { 200, 220, 232 }, 230)
+	end
+	for _, p in { { 3, 6 }, { 4, 5 }, { 5, 4 }, { 6, 3 }, { 4, 8 }, { 5, 7 }, { 6, 6 }, { 7, 5 }, { 8, 4 } } do
+		put(px, p[1], p[2], { 250, 252, 255 }, 170)
+	end
+	return px
+end
+function G.water(rng)
+	local px = base({ 56, 108, 214 }, rng, 0.04)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			if (x + y * 3) % 11 == 0 then
+				put(px, x, y, { 110, 160, 240 })
+			end
+			alpha(px, x, y, 190)
+		end
+	end
+	return px
+end
+
+-- TNT, 상자, 침대
+function G.tnt_side(rng)
+	local px = base({ 204, 56, 44 }, rng, 0.05)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			if x % 4 == 3 then
+				shadeAt(px, x, y, 0.72)
+			end
+		end
+	end
+	for y = 4, 11 do
+		for x = 0, N - 1 do
+			put(px, x, y, if y == 4 or y == 11 then { 200, 200, 196 } else { 238, 238, 232 })
+		end
+	end
+	text(px, "TNT", 2, 5, { 30, 30, 30 })
+	return px
+end
+function G.tnt_top(rng)
+	local px = base({ 204, 56, 44 }, rng, 0.05)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			local dx, dy = (x % 4) - 1.5, (y % 4) - 1.5
+			if dx * dx + dy * dy > 2.6 then
+				shadeAt(px, x, y, 0.7)
+			end
+		end
+	end
+	for _, p in { { 7, 7 }, { 8, 7 }, { 7, 8 }, { 8, 8 } } do
+		put(px, p[1], p[2], { 70, 70, 70 })
+	end
+	return px
+end
+function G.tnt_bottom(rng)
+	local px = G.tnt_top(rng)
+	for _, p in { { 7, 7 }, { 8, 7 }, { 7, 8 }, { 8, 8 } } do
+		put(px, p[1], p[2], { 150, 40, 32 })
+	end
+	return px
+end
+local function chestBase(rng)
+	local px = planks(rng, { 160, 112, 54 })
+	bevel(px, { 70, 46, 20 }, { 70, 46, 20 })
+	return px
+end
+function G.chest_side(rng)
+	local px = chestBase(rng)
+	for x = 0, N - 1 do
+		put(px, x, 5, { 70, 46, 20 })
+	end
+	return px
+end
+function G.chest_front(rng)
+	local px = G.chest_side(rng)
+	for y = 4, 7 do
+		for x = 7, 8 do
+			put(px, x, y, if y == 4 or y == 7 then { 60, 60, 64 } else { 170, 170, 176 })
+		end
+	end
+	return px
+end
+function G.chest_top(rng)
+	return chestBase(rng)
+end
+function G.bed_side(rng)
+	local px = planks(rng, { 160, 112, 54 })
+	for y = 0, 5 do
+		for x = 0, N - 1 do
+			put(px, x, y, mul({ 232, 232, 228 }, 0.95 + rng:next() * 0.08))
+		end
+	end
+	return px
+end
+
+-- 색 블록들 (양털: 뜨개 무늬, 테라코타: 부드러운 흙, 콘크리트: 매끈)
+local function knit(rng, c: Color)
+	local px = base(c, rng, 0.03)
+	for y = 0, N - 1 do
+		for x = 0, N - 1 do
+			if (x + 2 * y) % 4 == 0 then
+				shadeAt(px, x, y, 0.9)
+			elseif (x - y) % 4 == 0 then
+				shadeAt(px, x, y, 1.07)
+			end
+		end
+	end
+	return px
+end
+
+local function generator(name: string): ((any) -> Pixels)?
+	local direct = G[name]
+	if direct then
+		return direct
+	end
+	local wool = string.match(name, "^wool_(.+)$")
+	if wool then
+		local def = Blocks.get("wool_" .. wool)
+		if def then
+			local c = c3(def.color)
+			return function(rng)
+				return knit(rng, c)
+			end
+		end
+	end
+	local terracotta = string.match(name, "^terracotta_(.+)$")
+	if terracotta then
+		local def = Blocks.get("terracotta_" .. terracotta)
+		if def then
+			local c = c3(def.color)
+			return function(rng)
+				local px = base(c, rng, 0.035)
+				specks(px, rng, 0.05, mul(c, 0.9))
+				return px
+			end
+		end
+	end
+	local concrete = string.match(name, "^concrete_(.+)$")
+	if concrete then
+		local color = Blocks.ColorValues[concrete]
+		if color then
+			local c = c3(color)
+			return function(rng)
+				return base(c, rng, 0.018)
+			end
+		end
+	end
+	return nil
+end
+
+local function seedOf(name: string): number
+	local h = 7
+	for i = 1, #name do
+		h = (h * 31 + string.byte(name, i)) % 2147483647
+	end
+	return h + 1
+end
+
+local cache: { [string]: Pixels } = {}
+
+function Textures.has(name: string): boolean
+	return generator(name) ~= nil
+end
+
+function Textures.get(name: string): Pixels?
+	local cached = cache[name]
+	if cached then
+		return cached
+	end
+	local gen = generator(name)
+	if not gen then
+		return nil
+	end
+	local px = gen(Util.rng(seedOf(name)))
+	cache[name] = px
+	return px
+end
+
+-- 블록 정의가 쓰는 모든 텍스처 이름
+function Textures.names(): { string }
+	local seen = {}
+	local out = {}
+	for _, def in Blocks.defs do
+		for _, face in { "top", "side", "bottom", "front" } do
+			local name = Blocks.faceTexture(def, face)
+			if name and not seen[name] then
+				seen[name] = true
+				table.insert(out, name)
+			end
+		end
+	end
+	table.sort(out)
+	return out
+end
+
+return Textures
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="13">
+        <Properties>
           <string name="Name">Util</string>
           <string name="Source"><![CDATA[-- 작은 도우미 함수들 (시간 표시, 고정 시드 난수)
 local Util = {}
@@ -1293,15 +2430,15 @@ return Util
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="12">
+  <Item class="ServerScriptService" referent="14">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Folder" referent="13">
+    <Item class="Folder" referent="15">
       <Properties>
         <string name="Name">Server</string>
       </Properties>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">Actions</string>
           <string name="Source"><![CDATA[-- 클라이언트 요청 처리: 블록 설치/부수기, 공격, 아이템 사용, 가방 정리, 상점, 투표
@@ -1381,6 +2518,9 @@ end
 local function primeTnt(match, record, source: Player)
 	task.spawn(function()
 		local part = record.part
+		if not part then
+			return
+		end
 		for i = 1, 12 do
 			task.wait(0.25)
 			if match.world:get(record.x, record.y, record.z) ~= record or match.state ~= "playing" then
@@ -1785,7 +2925,7 @@ return Actions
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">Combat</string>
           <string name="Source"><![CDATA[-- 전투: 피해(갑옷/보호막 적용), 넉백, 근접 공격 판정, 자연 회복
@@ -2014,7 +3154,7 @@ return Combat
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">Containers</string>
           <string name="Source"><![CDATA[-- 상자 같은 보관함. 여러 명이 동시에 열어도 내용이 같이 바뀝니다.
@@ -2099,7 +3239,7 @@ return Containers
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">Drops</string>
           <string name="Source"><![CDATA[-- 바닥에 떨어진 아이템 꾸러미. 닿으면 주워집니다(스카이워즈에서 죽은 사람 아이템).
@@ -2235,7 +3375,7 @@ return Drops
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">Explosion</string>
           <string name="Source"><![CDATA[-- 폭발 (TNT, 화염구): 주변 블록 파괴 + 피해 + 넉백
@@ -2316,10 +3456,10 @@ return Explosion
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">LobbyService</string>
-          <string name="Source"><![CDATA[-- 로비 만들기: 광장 블록, 스폰 위치, 미니게임 NPC, 제목 홀로그램, 파쿠르 완주 지점
+          <string name="Source"><![CDATA[-- 로비 만들기: 블록 마을, 스폰, 게임 포털(들어가면 참가), NPC, 안내 홀로그램, 승리 순위, 파쿠르
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
@@ -2336,52 +3476,67 @@ local B = Config.BlockSize
 local LobbyService = {}
 
 LobbyService.spawn = CFrame.new(Config.LobbyOrigin + Vector3.new(0, 6, 0))
-LobbyService.voidY = Config.LobbyOrigin.Y - 40
+LobbyService.voidY = Config.LobbyOrigin.Y - 60
 
 local stations: { [string]: Model } = {}
+local portalInfo: { [string]: TextLabel } = {}
+local leaderboardLines: { TextLabel } = {}
 
-local function hologram(parent: Instance, position: Vector3)
-	local anchor = Instance.new("Part")
-	anchor.Name = "Title"
-	anchor.Anchored = true
-	anchor.CanCollide = false
-	anchor.CanQuery = false
-	anchor.CanTouch = false
-	anchor.Transparency = 1
-	anchor.Size = Vector3.new(1, 1, 1)
-	anchor.CFrame = CFrame.new(position)
-	anchor.Parent = parent
+local function anchor(parent: Instance, position: Vector3, name: string): Part
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Transparency = 1
+	part.Size = Vector3.new(1, 1, 1)
+	part.CFrame = CFrame.new(position)
+	part.Parent = parent
+	return part
+end
+
+local function hologram(parent: Instance, position: Vector3, size: Vector2, lines: { { text: string, color: Color3, scale: number } }): { TextLabel }
+	local part = anchor(parent, position, "Hologram")
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.new(24, 0, 6, 0)
+	gui.Size = UDim2.new(size.X, 0, size.Y, 0)
 	gui.LightInfluence = 0
-	gui.MaxDistance = 200
-	gui.Parent = anchor
-	local title = Instance.new("TextLabel")
-	title.BackgroundTransparency = 1
-	title.Size = UDim2.new(1, 0, 0.62, 0)
-	title.Font = Enum.Font.Arcade
-	title.TextScaled = true
-	title.TextColor3 = Color3.fromRGB(255, 220, 60)
-	title.TextStrokeColor3 = Color3.fromRGB(120, 60, 0)
-	title.TextStrokeTransparency = 0
-	title.Text = Config.GameName
-	title.Parent = gui
-	local sub = Instance.new("TextLabel")
-	sub.BackgroundTransparency = 1
-	sub.Position = UDim2.new(0, 0, 0.62, 0)
-	sub.Size = UDim2.new(1, 0, 0.38, 0)
-	sub.Font = Enum.Font.Arcade
-	sub.TextScaled = true
-	sub.TextColor3 = Color3.fromRGB(255, 255, 255)
-	sub.TextStrokeTransparency = 0.4
-	sub.Text = "베드워즈 · 스카이워즈 · TNT 런"
-	sub.Parent = gui
+	gui.MaxDistance = 140
+	gui.Parent = part
+	local total = 0
+	for _, line in lines do
+		total += line.scale
+	end
+	local labels = {}
+	local y = 0
+	for _, line in lines do
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Position = UDim2.new(0, 0, y / total, 0)
+		label.Size = UDim2.new(1, 0, line.scale / total, 0)
+		label.Font = Enum.Font.Arcade
+		label.TextScaled = true
+		label.RichText = true
+		label.TextColor3 = line.color
+		label.TextStrokeTransparency = 0.25
+		label.Text = line.text
+		label.Parent = gui
+		table.insert(labels, label)
+		y += line.scale
+	end
+	return labels
+end
+
+local function playerFromHit(hit: BasePart): Player?
+	local model = hit:FindFirstAncestorOfClass("Model")
+	return if model then Players:GetPlayerFromCharacter(model) else nil
 end
 
 function LobbyService.build(onJoin: (Player, string) -> ())
 	local world = World.new(Config.LobbyOrigin, "Lobby")
 	local markers = {}
 	LobbyMap.build(world:builder(markers), Util.rng(42))
+	world:show(workspace)
 
 	local s = markers.spawn[1]
 	local look = world:cellCenter(s.lookAt[1], s.lookAt[2], s.lookAt[3])
@@ -2400,6 +3555,7 @@ function LobbyService.build(onJoin: (Player, string) -> ())
 	spawnPad.CFrame = CFrame.new(world:cellCenter(s.x, s.y, s.z) - Vector3.new(0, B / 2 - 0.5, 0))
 	spawnPad.Parent = world.extras
 
+	-- NPC
 	for _, npc in markers.npc or {} do
 		local mode = Config.Modes[npc.mode]
 		if mode then
@@ -2419,8 +3575,101 @@ function LobbyService.build(onJoin: (Player, string) -> ())
 		end
 	end
 
+	-- 포털: 문틀 안의 빛나는 면, 들어가면 바로 참가
+	local cooldown: { [Player]: number } = {}
+	for _, p in markers.portal or {} do
+		local mode = Config.Modes[p.mode]
+		if mode then
+			local center = world:cellCenter(p.x, p.y, p.z) + Vector3.new(0, (p.h - 1) / 2 * B, 0)
+			local surface = Instance.new("Part")
+			surface.Name = "Portal_" .. p.mode
+			surface.Anchored = true
+			surface.CanCollide = false
+			surface.CanQuery = false
+			surface.Material = Enum.Material.Neon
+			surface.Color = mode.color
+			surface.Transparency = 0.35
+			surface.Size = Vector3.new(p.w * B, p.h * B, 0.6)
+			surface.CFrame = CFrame.new(center)
+			surface.Parent = world.extras
+			local sparkle = Instance.new("ParticleEmitter")
+			sparkle.Rate = 8
+			sparkle.Lifetime = NumberRange.new(1, 2)
+			sparkle.Speed = NumberRange.new(1, 3)
+			sparkle.SpreadAngle = Vector2.new(180, 180)
+			sparkle.LightEmission = 1
+			sparkle.Color = ColorSequence.new(mode.color)
+			sparkle.Size = NumberSequence.new(0.3)
+			sparkle.Parent = surface
+			local light = Instance.new("PointLight")
+			light.Color = mode.color
+			light.Range = 14
+			light.Brightness = 1.5
+			light.Parent = surface
+			surface.Touched:Connect(function(hit)
+				local player = playerFromHit(hit)
+				if not player then
+					return
+				end
+				local now = os.clock()
+				if cooldown[player] and now - cooldown[player] < 4 then
+					return
+				end
+				cooldown[player] = now
+				onJoin(player, p.mode)
+			end)
+		end
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		cooldown[player] = nil
+	end)
+
+	-- 포털 위 안내판
+	for _, label in markers.portalLabel or {} do
+		local mode = Config.Modes[label.mode]
+		if mode then
+			local lines = hologram(world.extras, world:cellCenter(label.x, label.y, label.z), Vector2.new(16, 5.5), {
+				{ text = mode.name, color = mode.color, scale = 1.4 },
+				{ text = mode.description, color = Color3.fromRGB(235, 235, 235), scale = 0.7 },
+				{ text = "", color = Color3.fromRGB(255, 255, 85), scale = 0.8 },
+				{ text = "포털에 들어가면 참가!", color = Color3.fromRGB(85, 255, 85), scale = 0.7 },
+			})
+			portalInfo[label.mode] = lines[3]
+		end
+	end
+
+	-- 큰 제목, 환영 문구, 순위, 파쿠르 안내
 	local t = markers.title[1]
-	hologram(world.extras, world:cellCenter(t.x, t.y, t.z))
+	hologram(world.extras, world:cellCenter(t.x, t.y, t.z), Vector2.new(28, 7), {
+		{ text = Config.GameName, color = Color3.fromRGB(255, 220, 60), scale = 1.6 },
+		{ text = "베드워즈 · 스카이워즈 · TNT 런", color = Color3.fromRGB(255, 255, 255), scale = 0.8 },
+	})
+	local w = markers.welcome and markers.welcome[1]
+	if w then
+		hologram(world.extras, world:cellCenter(w.x, w.y, w.z), Vector2.new(16, 4), {
+			{ text = "어서 오세요!", color = Color3.fromRGB(85, 255, 255), scale = 1.2 },
+			{ text = "북쪽 포털에 들어가거나 NPC에게 F", color = Color3.fromRGB(255, 255, 255), scale = 0.7 },
+			{ text = "나침반을 우클릭해도 게임을 고를 수 있어요", color = Color3.fromRGB(200, 200, 200), scale = 0.7 },
+		})
+	end
+	local board = markers.leaderboard and markers.leaderboard[1]
+	if board then
+		local rows = { { text = "승리 순위", color = Color3.fromRGB(255, 220, 60), scale = 1.3 } }
+		for _ = 1, 10 do
+			table.insert(rows, { text = "", color = Color3.fromRGB(240, 240, 240), scale = 0.6 })
+		end
+		local labels = hologram(world.extras, world:cellCenter(board.x, board.y, board.z), Vector2.new(11, 9), rows)
+		for i = 2, #labels do
+			table.insert(leaderboardLines, labels[i])
+		end
+	end
+	local ps = markers.parkourStart and markers.parkourStart[1]
+	if ps then
+		hologram(world.extras, world:cellCenter(ps.x, ps.y, ps.z), Vector2.new(10, 3), {
+			{ text = "파쿠르", color = Color3.fromRGB(85, 255, 85), scale = 1.2 },
+			{ text = "탑 꼭대기까지 올라가 보세요", color = Color3.fromRGB(255, 255, 255), scale = 0.7 },
+		})
+	end
 
 	local finish = markers.parkourEnd and markers.parkourEnd[1]
 	if finish then
@@ -2435,8 +3684,7 @@ function LobbyService.build(onJoin: (Player, string) -> ())
 		trigger.Parent = world.extras
 		local done: { [Player]: boolean } = {}
 		trigger.Touched:Connect(function(hit)
-			local model = hit:FindFirstAncestorOfClass("Model")
-			local player = model and Players:GetPlayerFromCharacter(model)
+			local player = playerFromHit(hit)
 			if player and not done[player] then
 				done[player] = true
 				Session.chat({ player }, '<font color="#55FF55">로비 파쿠르를 완주했습니다! 축하해요!</font>')
@@ -2448,29 +3696,68 @@ function LobbyService.build(onJoin: (Player, string) -> ())
 		end)
 	end
 
-	world:show(workspace)
 	LobbyService.world = world
+	LobbyService.updateLeaderboard()
 	return world
 end
 
 function LobbyService.updateStations(info: { [string]: { waiting: number, playing: number } })
-	for modeId, model in stations do
-		local entry = info[modeId]
-		if entry then
-			Npc.setSubtitle(model, string.format("대기 %d명 · 게임 중 %d명", entry.waiting, entry.playing))
+	for modeId, entry in info do
+		local text = string.format("대기 %d명 · 게임 중 %d명", entry.waiting, entry.playing)
+		local model = stations[modeId]
+		if model then
+			Npc.setSubtitle(model, text)
+		end
+		local label = portalInfo[modeId]
+		if label then
+			label.Text = text
 		end
 	end
 end
+
+-- 지금 접속한 사람들의 승리 순위
+function LobbyService.updateLeaderboard()
+	if #leaderboardLines == 0 then
+		return
+	end
+	local rows = {}
+	for player, state in Session.all() do
+		table.insert(rows, { name = player.DisplayName, wins = state.stats.wins })
+	end
+	table.sort(rows, function(a, b)
+		if a.wins ~= b.wins then
+			return a.wins > b.wins
+		end
+		return a.name < b.name
+	end)
+	local medals = { "#FFD700", "#D0D0D0", "#CD7F32" }
+	for i, label in leaderboardLines do
+		local row = rows[i]
+		if row then
+			local color = medals[i] or "#FFFFFF"
+			label.Text = string.format('<font color="%s">%d.</font> %s - <font color="#55FF55">%d승</font>', color, i, row.name, row.wins)
+		else
+			label.Text = '<font color="#777777">-</font>'
+		end
+	end
+end
+
+task.spawn(function()
+	while true do
+		task.wait(5)
+		LobbyService.updateLeaderboard()
+	end
+end)
 
 return LobbyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="20">
+      <Item class="Folder" referent="22">
         <Properties>
           <string name="Name">Logic</string>
         </Properties>
-        <Item class="ModuleScript" referent="21">
+        <Item class="ModuleScript" referent="23">
           <Properties>
             <string name="Name">Inventory</string>
             <string name="Source"><![CDATA[-- 플레이어 가방 (마인크래프트처럼 핫바 9칸 + 가방 27칸, 갑옷 4칸, 마우스로 집은 아이템)
@@ -2840,7 +4127,7 @@ return Inventory
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="22">
+        <Item class="ModuleScript" referent="24">
           <Properties>
             <string name="Name">Loot</string>
             <string name="Source"><![CDATA[-- 스카이워즈 상자 아이템 표. weight 가 클수록 자주 나옵니다.
@@ -2985,7 +4272,7 @@ return Loot
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="23">
+        <Item class="ModuleScript" referent="25">
           <Properties>
             <string name="Name">Teams</string>
             <string name="Source"><![CDATA[-- 팀 나누기: 사람 수가 가장 적은 팀부터 채워서 인원을 고르게 맞춥니다.
@@ -3020,7 +4307,7 @@ return Teams
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="24">
+        <Item class="ModuleScript" referent="26">
           <Properties>
             <string name="Name">Vote</string>
             <string name="Source"><![CDATA[-- 맵 투표 집계. 가장 많은 표를 받은 맵, 동점이면 그중에서 무작위로 고릅니다.
@@ -3061,7 +4348,7 @@ return Vote
           </Properties>
         </Item>
       </Item>
-      <Item class="Script" referent="25">
+      <Item class="Script" referent="27">
         <Properties>
           <string name="Name">Main</string>
           <token name="RunContext">0</token>
@@ -3171,15 +4458,16 @@ end)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="26">
+      <Item class="Folder" referent="28">
         <Properties>
           <string name="Name">Maps</string>
         </Properties>
-        <Item class="ModuleScript" referent="27">
+        <Item class="ModuleScript" referent="29">
           <Properties>
             <string name="Name">BedWarsMaps</string>
-            <string name="Source"><![CDATA[-- 베드워즈 맵 3종. 4팀 섬 + 다이아몬드 섬 4개 + 에메랄드가 있는 가운데 섬 구조는 같고,
--- 테마(블록, 장식, 가운데 건물)가 다릅니다.
+            <string name="Source"><![CDATA[-- 베드워즈 맵 3종.
+-- 구조: 팀 섬 4개(뒤쪽 집, 자원 생성기, 상점 가판대, 앞쪽 침대), 다이아몬드 섬 4개, 에메랄드가 있는 가운데 섬, 먼 풍경.
+-- 팀 섬 좌표계: s = 옆, f = 바깥쪽(가운데에서 멀어지는 방향).
 local Shapes = require(script.Parent.Shapes)
 
 local TEAM_DIRS = {
@@ -3189,102 +4477,168 @@ local TEAM_DIRS = {
 	{ id = "yellow", ox = -1, oz = 0 },
 }
 
-local TEAM_DISTANCE = 30
-local TEAM_RADIUS = 7
-local DIAMOND_DISTANCE = 18
-local CENTER_RADIUS = 8
+local TEAM_DISTANCE = 36
+local DIAMOND_DISTANCE = 22
+local CENTER_RADIUS = 13
 
 type Theme = {
 	top: string,
 	fill: string,
-	bottom: string,
-	accent: string,
-	path: string,
-	decorate: (api: any, x: number, y: number, z: number, rng: any) -> (),
+	deep: string,
+	floor: string,
+	border: string,
+	bedFloor: string,
+	genPad: string,
+	flora: { string },
+	floraChance: number,
+	house: (api: any, at: (number, number) -> (number, number), dir: any, team: string, rng: any) -> (),
+	tree: (api: any, x: number, y: number, z: number, rng: any) -> (),
+	lamp: (api: any, x: number, y: number, z: number) -> (),
+	diamond: (api: any, x: number, z: number, rng: any) -> (),
 	center: (api: any, rng: any) -> (),
+	scenery: (api: any, rng: any) -> (),
 }
 
-local function teamIsland(api, theme: Theme, dir, rng)
-	local ox, oz = dir.ox, dir.oz
-	local lx, lz = oz, -ox -- 옆 방향
-	local cx, cz = ox * TEAM_DISTANCE, oz * TEAM_DISTANCE
-	local function at(s: number, f: number): (number, number)
-		return cx + lx * s + ox * f, cz + lz * s + oz * f
+local GRASSY = { grass = true, snow_grass = true, sand = true, mycelium = true }
+
+-- 방향이 있는 집 짓기: 로컬 직사각형(s1..s2, f1..f2)을 월드 좌표로 바꿔 Shapes.house 호출
+local function orientedHouse(api, at, dir, s1: number, f1: number, s2: number, f2: number, y: number, opts)
+	local ax, az = at(s1, f1)
+	local bx, bz = at(s2, f2)
+	-- 문은 가운데(앞쪽 = f1 쪽)를 향함
+	local door
+	if dir.oz == 1 then
+		door = "z-"
+	elseif dir.oz == -1 then
+		door = "z+"
+	elseif dir.ox == 1 then
+		door = "x-"
+	else
+		door = "x+"
 	end
+	local o = table.clone(opts)
+	o.door = door
+	Shapes.house(api, ax, y, az, bx, bz, o)
+end
 
-	Shapes.island(api, cx, 0, cz, TEAM_RADIUS, { top = theme.top, fill = theme.fill, bottom = theme.bottom, depth = 5, rng = rng })
+local function teamIsland(api, theme: Theme, dir, rng)
+	local cx, cz = dir.ox * TEAM_DISTANCE, dir.oz * TEAM_DISTANCE
+	local at = Shapes.frame(cx, cz, dir.ox, dir.oz)
+	local ix, iz = at(0, 2)
+	local alongX = dir.ox ~= 0
+	Shapes.island(api, ix, 0, iz, {
+		rx = if alongX then 12 else 10,
+		rz = if alongX then 10 else 12,
+		top = theme.top,
+		fill = theme.fill,
+		deep = theme.deep,
+		depth = 8,
+		edge = 0.14,
+		ores = true,
+		drips = 0.05,
+		rng = rng,
+	})
 
-	-- 자원 생성기 받침
-	for s = -1, 1 do
-		for f = 4, 6 do
+	-- 기지 바닥
+	for s = -5, 5 do
+		for f = -4, 8 do
 			local x, z = at(s, f)
-			api.set(x, 0, z, theme.accent)
+			local border = math.abs(s) == 5 or f == -4 or f == 8
+			api.set(x, 0, z, if border then theme.border else theme.floor)
 		end
 	end
-	-- 침대 앞 길
-	for f = -6, 3 do
-		local x, z = at(0, f)
-		api.set(x, 0, z, theme.path)
+	for s = -1, 1 do
+		for f = -4, -1 do
+			local x, z = at(s, f)
+			api.set(x, 0, z, theme.bedFloor)
+		end
+		for f = 5, 7 do
+			local x, z = at(s, f)
+			api.set(x, 0, z, theme.genPad)
+		end
+	end
+	-- 생성기 주변 랜턴
+	for _, s in { -2, 2 } do
+		local x, z = at(s, 7)
+		theme.lamp(api, x, 0, z)
 	end
 
-	-- 장식
+	-- 상점/강화 가판대 (팀 색 천막)
+	local wool = "wool_" .. dir.id
 	for _, side in { -1, 1 } do
-		local x, z = at(side * 4, -5)
-		theme.decorate(api, x, 0, z, rng)
-		local lx2, lz2 = at(side * 2, 3)
-		Shapes.lamp(api, lx2, 0, lz2)
+		local x1, z1 = at(side * 4, 0)
+		local x2, z2 = at(side * 6, 2)
+		Shapes.stall(api, x1, 0, z1, x2, z2, wool, "wool_white")
 	end
 
-	local spawnX, spawnZ = at(0, 1)
-	local genX, genZ = at(0, 5)
-	local footX, footZ = at(0, -2)
-	local headX, headZ = at(0, -3)
-	local shopX, shopZ = at(-4, 1)
-	local upX, upZ = at(4, 1)
-	local faceShopX, faceShopZ = at(0, 1)
+	-- 뒤쪽 집
+	theme.house(api, at, dir, dir.id, rng)
 
+	-- 앞쪽 나무와 가로등
+	for _, side in { -1, 1 } do
+		local tx, tz = at(side * 7, -6)
+		theme.tree(api, tx, 0, tz, rng)
+		local lx, lz = at(side * 2, -5)
+		theme.lamp(api, lx, 0, lz)
+		local bx, bz = at(side * 8, 5)
+		theme.tree(api, bx, 0, bz, rng)
+	end
+
+	local function cell(s: number, y: number, f: number): { number }
+		local x, z = at(s, f)
+		return { x, y, z }
+	end
 	api.marker("team", {
 		team = dir.id,
-		spawn = { spawnX, 1, spawnZ },
+		spawn = cell(0, 1, 1),
 		lookAt = { 0, 1, 0 },
-		gen = { genX, 1, genZ },
-		bedFoot = { footX, 1, footZ },
-		bedHead = { headX, 1, headZ },
-		shop = { shopX, 1, shopZ },
-		upgrades = { upX, 1, upZ },
-		npcLook = { faceShopX, 1, faceShopZ },
-		center = { cx, 0, cz },
+		gen = cell(0, 1, 6),
+		bedFoot = cell(0, 1, -2),
+		bedHead = cell(0, 1, -3),
+		shop = cell(-5, 1, 1),
+		upgrades = cell(5, 1, 1),
+		npcLook = cell(0, 1, 1),
+		center = cell(0, 0, 2),
 	})
+
+	-- 풀/꽃 (기지 바닥 밖)
+	local x1, z1 = at(-12, -12)
+	local x2, z2 = at(12, 16)
+	Shapes.flora(api, rng, x1, z1, x2, z2, 6, -2, GRASSY, theme.flora, theme.floraChance)
 end
 
 local function diamondIsland(api, theme: Theme, x: number, z: number, rng)
-	Shapes.island(api, x, 0, z, 3, { top = theme.top, fill = theme.fill, bottom = theme.bottom, depth = 3, rng = rng })
+	Shapes.island(api, x, 0, z, { rx = 5, rz = 5, top = theme.top, fill = theme.fill, deep = theme.deep, depth = 5, edge = 0.18, ores = true, drips = 0.06, rng = rng })
+	for dx = -1, 1 do
+		for dz = -1, 1 do
+			api.set(x + dx, 0, z + dz, theme.border)
+		end
+	end
 	api.set(x, 0, z, "diamond_block")
+	theme.diamond(api, x, z, rng)
 	api.marker("diamond", { x, 1, z })
-	local sx = if x > 0 then -1 else 1
-	Shapes.lamp(api, x + sx * 2, 0, z)
 end
 
 local function centerIsland(api, theme: Theme, rng)
-	Shapes.island(api, 0, 0, 0, CENTER_RADIUS, { top = theme.top, fill = theme.fill, bottom = theme.bottom, depth = 6, rng = rng })
-	Shapes.disc(api, 0, 0, 0, 3, theme.path)
-	api.set(0, 0, -2, "emerald_block")
-	api.set(0, 0, 2, "emerald_block")
-	api.marker("emerald", { 0, 1, -2 })
-	api.marker("emerald", { 0, 1, 2 })
-	theme.center(api, rng)
-end
-
--- 멀리 떠 있는 작은 바위섬 (풍경용)
-local function scenery(api, theme: Theme, rng)
-	for i = 1, 6 do
-		local angle = i * (math.pi / 3) + rng:next() * 0.4
-		local dist = rng:int(48, 58)
-		local x = math.round(math.sin(angle) * dist)
-		local z = math.round(math.cos(angle) * dist)
-		local y = rng:int(-8, 6)
-		Shapes.island(api, x, y, z, rng:int(2, 3), { top = theme.top, fill = theme.fill, bottom = theme.bottom, depth = 3, rng = rng })
+	Shapes.island(api, 0, 0, 0, { rx = CENTER_RADIUS, rz = CENTER_RADIUS, top = theme.top, fill = theme.fill, deep = theme.deep, depth = 10, edge = 0.12, ores = true, drips = 0.05, rng = rng })
+	-- 가운데 두 층 단상과 반 블록 계단
+	for dx = -4, 4 do
+		for dz = -4, 4 do
+			local ring = math.max(math.abs(dx), math.abs(dz))
+			if ring <= 3 then
+				api.set(dx, 1, dz, theme.floor)
+				api.set(dx, 2, dz, if ring == 3 then theme.border else theme.floor)
+			elseif ring == 4 then
+				api.set(dx, 1, dz, theme.border .. "_slab")
+			end
+		end
 	end
+	api.set(0, 2, -2, "emerald_block")
+	api.set(0, 2, 2, "emerald_block")
+	api.marker("emerald", { 0, 3, -2 })
+	api.marker("emerald", { 0, 3, 2 })
+	theme.center(api, rng)
+	Shapes.flora(api, rng, -15, -15, 15, 15, 8, -2, GRASSY, theme.flora, theme.floraChance)
 end
 
 local function build(theme: Theme)
@@ -3298,92 +4652,305 @@ local function build(theme: Theme)
 			end
 		end
 		centerIsland(api, theme, rng)
-		scenery(api, theme, rng)
+		theme.scenery(api, rng)
 	end
 end
 
+local function farIslands(api, rng, theme: Theme, count: number, decorate: (number, number, number) -> ())
+	for i = 1, count do
+		local angle = (i - 0.5) * (2 * math.pi / count) + (rng:next() - 0.5) * 0.3
+		local dist = rng:int(62, 72)
+		local x = math.round(math.sin(angle) * dist)
+		local z = math.round(math.cos(angle) * dist)
+		local y = rng:int(-10, 6)
+		local r = rng:int(3, 5)
+		Shapes.island(api, x, y, z, { rx = r, rz = r, top = theme.top, fill = theme.fill, deep = theme.deep, depth = 5, edge = 0.25, drips = 0.1, rng = rng })
+		decorate(x, y, z)
+	end
+end
+
+----------------------------------------------------------------------------
+-- 1. 벚꽃 정원: 일본식 정원, 벚나무, 석등, 도리이, 가운데 정자
+----------------------------------------------------------------------------
 local sakura: Theme = {
 	top = "grass",
 	fill = "dirt",
-	bottom = "stone",
-	accent = "planks",
-	path = "gravel",
-	decorate = function(api, x, y, z, _rng)
-		Shapes.tree(api, x, y, z, { leaves = "sakura_leaves", height = 4, wide = true })
+	deep = "stone",
+	floor = "polished_stone",
+	border = "stone_bricks",
+	bedFloor = "cherry_planks",
+	genPad = "gold_block",
+	flora = { "tall_grass", "tall_grass", "flower_pink", "flower_white", "fern", "petals" },
+	floraChance = 0.22,
+	house = function(api, at, dir, team, rng)
+		orientedHouse(api, at, dir, -5, 10, 5, 14, 0, {
+			wall = "cherry_planks",
+			corner = "cherry_log",
+			floor = "dark_planks",
+			roof = "dark_planks",
+			roofSlab = "dark_planks_slab",
+			beam = "dark_log",
+			window = "stained_white",
+			height = 4,
+			accent = "wool_" .. team,
+		})
+		-- 집 앞 팀 깃발
+		for _, s in { -3, 3 } do
+			local x, z = at(s, 9)
+			Shapes.banner(api, x, 4, z, "wool_" .. team, 2)
+		end
+		local _ = rng
 	end,
-	center = function(api, _rng)
-		-- 정자: 기둥 4개와 지붕
-		for _, sx in { -4, 4 } do
-			for _, sz in { -4, 4 } do
-				Shapes.pillar(api, sx, 1, 4, sz, "dark_planks")
+	tree = function(api, x, y, z, rng)
+		Shapes.sakura(api, x, y, z, rng, true)
+	end,
+	lamp = function(api, x, y, z)
+		Shapes.stoneLantern(api, x, y, z)
+	end,
+	diamond = function(api, x, z, rng)
+		local ax = if x > 0 then -1 else 1
+		local az = if z > 0 then -1 else 1
+		Shapes.torii(api, x + ax * 3, 0, z, "z", 2, 4)
+		Shapes.stoneLantern(api, x - ax * 3, 0, z + az * 2)
+		local _ = rng
+	end,
+	center = function(api, rng)
+		-- 정자: 네 기둥과 3단 지붕
+		for _, c in { { -5, -5 }, { 5, -5 }, { -5, 5 }, { 5, 5 } } do
+			for i = 1, 7 do
+				api.set(c[1], i, c[2], "cherry_log")
 			end
 		end
-		for x = -5, 5 do
-			for z = -5, 5 do
-				local ring = math.max(math.abs(x), math.abs(z))
-				if ring >= 3 then
-					api.set(x, 5, z, if ring == 5 then "dark_planks" else "planks")
+		for level = 0, 2 do
+			local r = 6 - level * 2
+			for dx = -r, r do
+				for dz = -r, r do
+					local ring = math.max(math.abs(dx), math.abs(dz))
+					if ring >= r - 1 then
+						local corner = math.abs(dx) == r and math.abs(dz) == r
+						api.set(dx, 8 + level * 2 + (if corner then 1 else 0), dz, if ring == r then "dark_planks_slab" else "dark_planks")
+					end
 				end
 			end
 		end
-		for x = -2, 2 do
-			for z = -2, 2 do
-				if math.max(math.abs(x), math.abs(z)) == 2 then
-					api.set(x, 6, z, "dark_planks")
-				end
+		api.set(0, 14, 0, "gold_block")
+		api.set(0, 7, 0, "lantern")
+		-- 네 방향 도리이와 석등
+		for _, d in { { 0, 1 }, { 0, -1 }, { 1, 0 }, { -1, 0 } } do
+			local x, z = d[1] * 10, d[2] * 10
+			Shapes.torii(api, x, 0, z, if d[1] == 0 then "x" else "z", 2, 5)
+			Shapes.stoneLantern(api, x + d[2] * 4, 0, z + d[1] * 4)
+			Shapes.stoneLantern(api, x - d[2] * 4, 0, z - d[1] * 4)
+		end
+		-- 연못
+		for dx = -2, 2 do
+			for dz = -1, 1 do
+				api.set(8 + dx, 0, -5 + dz, "water")
+				api.set(8 + dx, -1, -5 + dz, "clay_block")
 			end
 		end
-		Shapes.tree(api, 6, 0, -3, { leaves = "sakura_leaves", height = 3 })
-		Shapes.tree(api, -6, 0, 3, { leaves = "sakura_leaves", height = 3 })
+		api.set(7, 1, -5, "carpet_lime")
+		for _, p in { { -8, -8 }, { 8, 8 }, { -8, 8 } } do
+			Shapes.sakura(api, p[1], 0, p[2], rng, true)
+		end
+	end,
+	scenery = function(api, rng)
+		farIslands(api, rng, { top = "grass", fill = "dirt", deep = "stone" } :: any, 7, function(x, y, z)
+			Shapes.sakura(api, x, y, z, rng, true)
+		end)
+		for i = 1, 6 do
+			local angle = i * math.pi / 3 + 0.4
+			Shapes.cloud(api, math.round(math.sin(angle) * 80), rng:int(22, 28), math.round(math.cos(angle) * 80), rng)
+		end
 	end,
 }
 
+----------------------------------------------------------------------------
+-- 2. 사막 신전: 사암 집, 야자수와 선인장, 오아시스, 기둥 신전과 오벨리스크
+----------------------------------------------------------------------------
 local desert: Theme = {
 	top = "sand",
 	fill = "sandstone",
-	bottom = "red_sandstone",
-	accent = "sandstone",
-	path = "red_sandstone",
-	decorate = function(api, x, y, z, rng)
-		Shapes.cactus(api, x, y, z, rng:int(2, 3))
-	end,
-	center = function(api, _rng)
-		-- 사암 기둥이 둘러싼 신전
-		for _, p in Shapes.ring(8, 6, math.pi / 8) do
-			Shapes.pillar(api, p.x, 1, 4, p.z, "sandstone")
-			api.set(p.x, 5, p.z, "gold_block")
+	deep = "red_sandstone",
+	floor = "smooth_sandstone",
+	border = "sandstone",
+	bedFloor = "red_sandstone",
+	genPad = "gold_block",
+	flora = { "dead_bush", "dead_bush", "tall_grass" },
+	floraChance = 0.07,
+	house = function(api, at, dir, team, rng)
+		orientedHouse(api, at, dir, -5, 10, 5, 14, 0, {
+			wall = "sandstone",
+			corner = "carved_sandstone",
+			floor = "smooth_sandstone",
+			roof = "smooth_sandstone",
+			window = "glass",
+			height = 4,
+			flat = true,
+			trim = "sandstone_wall",
+			accent = "terracotta_" .. team,
+		})
+		for _, s in { -3, 3 } do
+			local x, z = at(s, 9)
+			Shapes.banner(api, x, 4, z, "wool_" .. team, 3)
 		end
-		for _, p in Shapes.ring(4, 4, math.pi / 4) do
-			api.set(p.x, 1, p.z, "red_sandstone")
+		local px, pz = at(-8, 11)
+		Shapes.palm(api, px, 0, pz, rng, { dir.ox, dir.oz })
+	end,
+	tree = function(api, x, y, z, rng)
+		if rng:next() < 0.6 then
+			Shapes.palm(api, x, y, z, rng, { 1, 0 })
+		else
+			Shapes.cactus(api, x, y, z, rng:int(2, 4))
+		end
+	end,
+	lamp = function(api, x, y, z)
+		api.set(x, y + 1, z, "sandstone_wall")
+		api.set(x, y + 2, z, "sandstone_wall")
+		api.set(x, y + 3, z, "torch")
+	end,
+	diamond = function(api, x, z, rng)
+		local ax = if x > 0 then 1 else -1
+		local az = if z > 0 then 1 else -1
+		-- 오벨리스크
+		for i = 1, 6 do
+			api.set(x + ax * 3, i, z + az * 2, if i == 3 then "carved_sandstone" else "smooth_sandstone")
+		end
+		api.set(x + ax * 3, 7, z + az * 2, "gold_block")
+		Shapes.cactus(api, x - ax * 3, 0, z + az * 2, rng:int(2, 3))
+	end,
+	center = function(api, rng)
+		-- 기둥 신전 (둥글게 선 기둥 + 위를 잇는 들보)
+		for _, p in Shapes.ring(12, 7, math.pi / 12) do
+			for i = 1, 5 do
+				api.set(p.x, i, p.z, if i == 1 or i == 5 then "carved_sandstone" else "quartz_pillar")
+			end
+		end
+		for _, p in Shapes.ring(48, 7, 0) do
+			api.set(p.x, 6, p.z, "smooth_sandstone_slab")
+		end
+		-- 네 귀퉁이 오벨리스크
+		for _, c in { { -8, -8 }, { 8, -8 }, { -8, 8 }, { 8, 8 } } do
+			local x, z = c[1], c[2]
+			for i = 1, 7 do
+				api.set(x, i, z, if i == 4 then "carved_sandstone" else "smooth_sandstone")
+			end
+			api.set(x, 8, z, "gold_block")
+		end
+		-- 오아시스
+		for dx = -2, 2 do
+			for dz = -2, 2 do
+				if math.abs(dx) + math.abs(dz) <= 3 then
+					api.set(-9 + dx, 0, 3 + dz, "water")
+					api.set(-9 + dx, -1, 3 + dz, "sand")
+				end
+			end
+		end
+		Shapes.palm(api, -11, 0, 0, rng, { -1, 0 })
+		Shapes.palm(api, -7, 0, 6, rng, { 0, 1 })
+	end,
+	scenery = function(api, rng)
+		-- 멀리 보이는 붉은 메사(층층이 쌓인 바위산)
+		for i = 1, 6 do
+			local angle = (i - 0.5) * math.pi / 3
+			local x, z = math.round(math.sin(angle) * 68), math.round(math.cos(angle) * 68)
+			local base = rng:int(-14, -8)
+			-- 큰 파트 몇 개로 쌓은 층층 바위산 (멀리 있는 배경이라 파트 수를 아낌)
+			for layer = 0, rng:int(4, 6) do
+				local r = 7 - layer
+				api.big(x - r, base + layer * 2, z - r, x + r, base + layer * 2, z + r, if layer % 2 == 0 then "red_sandstone" else "terracotta_orange")
+				api.big(x - r, base + layer * 2 + 1, z - r, x + r, base + layer * 2 + 1, z + r, "terracotta_yellow")
+			end
 		end
 	end,
 }
 
+----------------------------------------------------------------------------
+-- 3. 얼음 성채: 석재 벽돌 오두막과 눈 쌓인 지붕, 가문비나무, 얼음 가시, 가운데 성
+----------------------------------------------------------------------------
 local frost: Theme = {
-	top = "snow",
-	fill = "packed_ice",
-	bottom = "stone",
-	accent = "quartz",
-	path = "stone_bricks",
-	decorate = function(api, x, y, z, rng)
-		if rng:chance(0.5) then
-			Shapes.spike(api, x, y, z, rng:int(4, 6), "packed_ice")
-		else
-			Shapes.tree(api, x, y, z, { log = "dark_planks", leaves = "leaves", height = 5 })
+	top = "snow_grass",
+	fill = "dirt",
+	deep = "stone",
+	floor = "stone_bricks",
+	border = "cobble",
+	bedFloor = "packed_ice",
+	genPad = "iron_block",
+	flora = { "fern", "tall_grass", "flower_blue" },
+	floraChance = 0.08,
+	house = function(api, at, dir, team, rng)
+		orientedHouse(api, at, dir, -5, 10, 5, 14, 0, {
+			wall = "stone_bricks",
+			corner = "dark_log",
+			floor = "dark_planks",
+			roof = "dark_planks",
+			roofSlab = "dark_planks_slab",
+			beam = "dark_log",
+			window = "glass",
+			height = 4,
+			accent = "wool_" .. team,
+		})
+		-- 지붕 위 눈
+		local x1, z1 = at(-7, 8)
+		local x2, z2 = at(7, 16)
+		for x = math.min(x1, x2), math.max(x1, x2) do
+			for z = math.min(z1, z2), math.max(z1, z2) do
+				local y = Shapes.topAt(api, x, z, 14, 5)
+				if y and api.get(x, y + 1, z) == nil and rng:next() < 0.85 then
+					api.set(x, y + 1, z, "carpet_white")
+				end
+			end
+		end
+		for _, s in { -3, 3 } do
+			local x, z = at(s, 9)
+			Shapes.banner(api, x, 4, z, "wool_" .. team, 2)
 		end
 	end,
+	tree = function(api, x, y, z, rng)
+		if rng:next() < 0.75 then
+			Shapes.spruce(api, x, y, z, rng, true)
+		else
+			Shapes.spike(api, x, y, z, rng:int(4, 6), "packed_ice")
+		end
+	end,
+	lamp = function(api, x, y, z)
+		api.set(x, y + 1, z, "cobble_wall")
+		api.set(x, y + 2, z, "cobble_wall")
+		api.set(x, y + 3, z, "soul_lantern")
+	end,
+	diamond = function(api, x, z, rng)
+		local ax = if x > 0 then 1 else -1
+		local az = if z > 0 then 1 else -1
+		Shapes.spike(api, x + ax * 3, 0, z + az * 3, rng:int(5, 7), "ice")
+		Shapes.spruce(api, x - ax * 3, 0, z + az * 2, rng, true)
+	end,
 	center = function(api, rng)
-		for _, p in Shapes.ring(4, 6, math.pi / 4) do
-			Shapes.spike(api, p.x, 0, p.z, rng:int(5, 7), "ice")
+		-- 네 귀퉁이 탑 + 짧은 성벽 (네 방향은 비워 둬서 다리를 놓을 수 있게)
+		for _, c in { { -8, -8 }, { 8, -8 }, { -8, 8 }, { 8, 8 } } do
+			Shapes.tower(api, c[1], 0, c[2], 2, 7, "stone_bricks", { roof = "dark_planks", floor = "dark_planks", window = "glass" })
+			Shapes.wall(api, c[1], c[2] - math.sign(c[2]) * 3, c[1], c[2] - math.sign(c[2]) * 5, 0, 3, "cobble", "stone_bricks")
+			Shapes.wall(api, c[1] - math.sign(c[1]) * 3, c[2], c[1] - math.sign(c[1]) * 5, c[2], 0, 3, "cobble", "stone_bricks")
 		end
-		-- 석영 아치 두 개
-		for _, sx in { -1, 1 } do
-			Shapes.pillar(api, sx * 3, 1, 4, 0, "quartz")
+		-- 얼어붙은 분수 대신 얼음 기둥 장식
+		for _, p in Shapes.ring(4, 7, math.pi / 4) do
+			Shapes.spike(api, p.x, 0, p.z, rng:int(3, 5), "packed_ice")
 		end
-		for x = -3, 3 do
-			api.set(x, 5, 0, "quartz")
+		-- 탑과 다리 길(네 방향) 사이에 가문비나무
+		for _, p in Shapes.ring(8, 11, math.pi / 8) do
+			Shapes.spruce(api, p.x, 0, p.z, rng, true)
 		end
-		api.set(0, 6, 0, "lamp")
+	end,
+	scenery = function(api, rng)
+		-- 멀리 솟은 얼음 산
+		for i = 1, 7 do
+			local angle = (i - 0.5) * (2 * math.pi / 7)
+			local x, z = math.round(math.sin(angle) * 70), math.round(math.cos(angle) * 70)
+			local base = rng:int(-16, -10)
+			for layer = 0, 8 do
+				local r = 8 - layer
+				api.big(x - r, base + layer * 2, z - r, x + r, base + layer * 2 + 1, z + r, if layer > 5 then "snow" else "packed_ice")
+			end
+		end
 	end,
 }
 
@@ -3391,21 +4958,21 @@ return {
 	{
 		id = "sakura",
 		name = "벚꽃 정원",
-		description = "분홍 꽃잎이 흩날리는 정원 섬",
+		description = "벚나무와 도리이, 석등이 있는 일본식 정원",
 		seed = 1101,
 		build = build(sakura),
 	},
 	{
 		id = "desert",
 		name = "사막 신전",
-		description = "모래바람 속 황금 기둥 신전",
+		description = "야자수 오아시스와 기둥 신전이 있는 모래섬",
 		seed = 2203,
 		build = build(desert),
 	},
 	{
 		id = "frost",
 		name = "얼음 성채",
-		description = "얼음 가시가 솟은 눈 덮인 섬",
+		description = "눈 덮인 오두막과 가문비나무, 얼음 성",
 		seed = 3307,
 		build = build(frost),
 	},
@@ -3413,147 +4980,316 @@ return {
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="28">
+        <Item class="ModuleScript" referent="30">
           <Properties>
             <string name="Name">Lobby</string>
-            <string name="Source"><![CDATA[-- 로비: 떠 있는 광장, 분수, 미니게임 NPC 세 개, 가장자리 파쿠르.
+            <string name="Source"><![CDATA[-- 로비: 큰 떠 있는 섬 위의 마을.
+--  남쪽: 스폰 광장과 큰길, 상점가(가판대, 집)
+--  가운데: 분수 광장
+--  북쪽: 게임 포털 3개(베드워즈, 스카이워즈, TNT 런)와 NPC, 뒤쪽 성벽과 탑
+--  동쪽: 파쿠르 탑 (빙글빙글 올라가는 발판)
+--  서쪽: 연못과 다리, 정자, 벚나무 정원
 local Shapes = require(script.Parent.Shapes)
 
 local Lobby = {}
 
-Lobby.Radius = 18
+Lobby.RadiusX = 30
+Lobby.RadiusZ = 34
+
+local GRASSY = { grass = true }
+
+-- 포털 문 (문틀은 x 방향으로 넓고 남쪽을 봄)
+local PORTALS = {
+	{ mode = "bedwars", x = -12, z = 19, frame = { "clay_red", "wool_white" }, floor = { "wool_red", "quartz" } },
+	{ mode = "skywars", x = 0, z = 21, frame = { "quartz_pillar", "quartz_pillar" }, floor = { "polished_diorite", "diamond_block" } },
+	{ mode = "tntrun", x = 12, z = 19, frame = { "tnt", "tnt" }, floor = { "sand", "gravel" } },
+}
+
+local function portal(api, p, rng)
+	local x, z = p.x, p.z
+	-- 단: 한 칸 높이, 앞쪽 반 블록 계단
+	for dx = -4, 4 do
+		for dz = -2, 2 do
+			api.set(x + dx, 1, z + dz, if (dx + dz) % 2 == 0 then p.floor[1] else p.floor[2])
+		end
+		api.set(x + dx, 1, z - 3, "polished_stone_slab")
+	end
+	-- 문틀
+	for y = 2, 7 do
+		local id = if y % 2 == 0 then p.frame[1] else p.frame[2]
+		api.set(x - 2, y, z, id)
+		api.set(x + 2, y, z, id)
+	end
+	for dx = -2, 2 do
+		api.set(x + dx, 8, z, p.frame[1])
+	end
+	api.set(x - 3, 8, z, "polished_stone_slab")
+	api.set(x + 3, 8, z, "polished_stone_slab")
+	if p.mode == "bedwars" then
+		api.set(x, 9, z, "wool_red")
+		api.set(x - 4, 2, z + 1, "lantern")
+		api.set(x + 4, 2, z + 1, "lantern")
+	elseif p.mode == "skywars" then
+		api.set(x - 2, 8, z, "diamond_block")
+		api.set(x + 2, 8, z, "diamond_block")
+		Shapes.cloud(api, x, 13, z, rng)
+	else
+		api.set(x - 2, 9, z, "tnt")
+		api.set(x + 2, 9, z, "tnt")
+		api.set(x + 4, 2, z + 1, "tnt")
+		api.set(x - 4, 2, z + 1, "tnt")
+	end
+	api.marker("portal", { mode = p.mode, x = x, y = 2, z = z, w = 3, h = 6 })
+	api.marker("npc", { mode = p.mode, x = x + 3, y = 2, z = z - 1 })
+	api.marker("portalLabel", { mode = p.mode, x = x, y = 11, z = z })
+end
 
 function Lobby.build(api, rng)
-	local R = Lobby.Radius
-	Shapes.island(api, 0, 0, 0, R, { top = "grass", fill = "dirt", bottom = "stone", depth = 4, rng = rng })
+	Shapes.island(api, 0, 0, 0, {
+		rx = Lobby.RadiusX,
+		rz = Lobby.RadiusZ,
+		top = "grass",
+		fill = "dirt",
+		deep = "stone",
+		depth = 12,
+		edge = 0.1,
+		ores = true,
+		drips = 0.04,
+		rng = rng,
+	})
 
-	-- 광장 바닥 무늬
-	Shapes.disc(api, 0, 0, 0, 13, function(dx, dz)
+	-- 스폰 광장
+	Shapes.disc(api, 0, 0, -24, 4.5, function(dx, dz)
 		local d = math.sqrt(dx * dx + dz * dz)
-		if d <= 4.5 then
-			return "quartz"
-		elseif d <= 5.5 then
+		if d > 3.6 then
 			return "gold_block"
-		elseif d >= 12 then
+		end
+		return if (dx + dz) % 2 == 0 then "quartz" else "polished_diorite"
+	end)
+	-- 큰길 (남쪽 -> 광장, 광장 -> 북쪽)
+	Shapes.paint(api, -2, -20, 2, -11, 0, "polished_stone")
+	Shapes.paint(api, -3, -20, -3, -11, 0, "stone_bricks")
+	Shapes.paint(api, 3, -20, 3, -11, 0, "stone_bricks")
+	Shapes.paint(api, -2, 11, 2, 14, 0, "polished_stone")
+	Shapes.paint(api, -11, -2, -14, 2, 0, "polished_stone")
+	Shapes.paint(api, 11, -2, 14, 2, 0, "polished_stone")
+	for _, z in { -19, -15 } do
+		Shapes.lampPost(api, -4, 0, z)
+		Shapes.lampPost(api, 4, 0, z)
+	end
+
+	-- 가운데 분수 광장
+	Shapes.disc(api, 0, 0, 0, 11, function(dx, dz)
+		local d = math.sqrt(dx * dx + dz * dz)
+		if d <= 3.6 then
+			return "polished_diorite"
+		elseif d <= 4.6 then
+			return "gold_block"
+		elseif d > 10.2 then
 			return "stone_bricks"
 		end
-		return if (dx + dz) % 2 == 0 then "stone_bricks" else "cobble"
+		return if math.floor(d) % 2 == 0 then "polished_stone" else "stone_bricks"
 	end)
-
-	-- 분수
-	for dx = -3, 3 do
-		for dz = -3, 3 do
-			local d = math.max(math.abs(dx), math.abs(dz))
-			if d == 3 then
-				api.set(dx, 1, dz, "stone_bricks")
-			elseif d < 3 then
-				api.set(dx, 1, dz, "water")
-			end
-		end
+	Shapes.fountain(api, 0, 0, 0, 3, "quartz", "quartz_pillar", "lamp")
+	api.set(0, 5, 0, "gold_block")
+	for _, p in Shapes.ring(8, 10, math.pi / 8) do
+		Shapes.lampPost(api, p.x, 0, p.z)
 	end
-	Shapes.pillar(api, 0, 1, 3, 0, "quartz")
-	api.set(0, 4, 0, "lamp")
-
-	-- 미니게임 NPC 받침대 (북쪽 반원)
-	local stations = {
-		{ mode = "bedwars", angle = math.rad(-38), block = "wool_red" },
-		{ mode = "skywars", angle = 0, block = "diamond_block" },
-		{ mode = "tntrun", angle = math.rad(38), block = "tnt" },
-	}
-	for _, station in stations do
-		local x = math.round(math.sin(station.angle) * 10)
-		local z = math.round(math.cos(station.angle) * 10)
-		for dx = -1, 1 do
-			for dz = -1, 1 do
-				api.set(x + dx, 1, z + dz, if dx == 0 and dz == 0 then station.block else "quartz")
-			end
-		end
-		Shapes.lamp(api, x - 2, 0, z + 1, "quartz")
-		Shapes.lamp(api, x + 2, 0, z + 1, "quartz")
-		api.marker("npc", { mode = station.mode, x = x, y = 2, z = z })
+	-- 벤치 (반 블록) 네 개
+	for _, b in { { 6, 6 }, { -6, 6 }, { 6, -6 }, { -6, -6 } } do
+		local dx = if b[1] > 0 then 1 else -1
+		api.set(b[1], 1, b[2], "dark_planks_slab")
+		api.set(b[1] - dx, 1, b[2], "dark_planks_slab")
+		api.set(b[1], 1, b[2] + (if b[2] > 0 then -1 else 1), "dark_planks_slab")
 	end
-
-	-- 바깥쪽 나무와 가로등
-	for _, p in Shapes.ring(10, 16, 0.2) do
-		if p.z < 8 then
-			Shapes.tree(api, p.x, 0, p.z, { leaves = if (p.x + p.z) % 2 == 0 then "leaves" else "sakura_leaves", height = 4 })
-		end
-	end
-	for _, p in Shapes.ring(8, 8, math.pi / 8) do
-		if p.z < 5 then
-			Shapes.lamp(api, p.x, 0, p.z)
+	-- 광장 둘레 산울타리와 꽃
+	for _, p in Shapes.ring(28, 12.5, 0) do
+		local onPath = math.abs(p.x) <= 3 or math.abs(p.z) <= 3
+		if not onPath then
+			api.set(p.x, 1, p.z, "leaves")
 		end
 	end
 
-	-- 파쿠르: 동쪽 가장자리에서 시작해 위로 올라가는 발판
-	-- 한 칸씩 띄우고 많아야 한 칸씩 올라가서 누구나 넘을 수 있는 코스
-	local jumps = {
-		{ 19, 1, -3 },
-		{ 21, 1, -3 },
-		{ 23, 2, -3 },
-		{ 23, 2, -1 },
-		{ 23, 3, 1 },
-		{ 21, 3, 1 },
-		{ 19, 4, 1 },
-		{ 19, 4, 3 },
-		{ 19, 5, 5 },
-		{ 21, 5, 5 },
-		{ 23, 6, 5 },
-	}
+	-- 북쪽 게임 홀 바닥
+	Shapes.paint(api, -20, 13, 20, 25, 0, function(x, z)
+		if (x + z) % 4 == 0 then
+			return "stone_bricks"
+		end
+		return if math.abs(x) % 6 == 3 then "polished_granite" else "polished_stone"
+	end)
+	for _, p in PORTALS do
+		portal(api, p, rng)
+	end
+	for _, x in { -18, -6, 6, 18 } do
+		Shapes.lampPost(api, x, 0, 14)
+	end
+
+	-- 뒤쪽 성벽과 탑, 깃발
+	Shapes.wall(api, -21, 28, 21, 28, 0, 7, "stone_bricks", "stone_bricks")
+	Shapes.wall(api, -21, 29, 21, 29, 0, 6, "cobble", "cobble")
+	for _, t in { { -24, 28 }, { 24, 28 }, { 0, 31 } } do
+		Shapes.tower(api, t[1], 0, t[2], 3, if t[1] == 0 then 14 else 11, "stone_bricks", { roof = "dark_planks", floor = "dark_planks", window = "glass" })
+	end
+	local bannerColors = { "wool_red", "wool_cyan", "wool_orange", "wool_yellow", "wool_purple", "wool_lime" }
+	for i, x in { -18, -12, -6, 6, 12, 18 } do
+		Shapes.banner(api, x, 7, 27, bannerColors[i], 3)
+	end
+
+	-- 동쪽 파쿠르 탑
+	local tx, tz = 22, -4
+	Shapes.tower(api, tx, 0, tz, 3, 16, "stone_bricks", { floor = "dark_planks", window = "glass" })
+	local jumps = {}
+	local steps = 31
+	for i = 0, steps - 1 do
+		local a = math.rad(200) + i * 0.3
+		local x = math.round(tx + math.sin(a) * 6)
+		local z = math.round(tz + math.cos(a) * 6)
+		local y = 1 + i // 2
+		table.insert(jumps, { x, y, z })
+	end
+	local colors = { "color_lime", "color_cyan", "color_yellow", "color_pink" }
 	for i, j in jumps do
-		api.set(j[1], j[2], j[3], if i % 2 == 0 then "color_lime" else "color_cyan")
+		api.set(j[1], j[2], j[3], colors[(i - 1) % #colors + 1])
 	end
-	Shapes.box(api, 22, 6, 7, 24, 6, 9, "gold_block")
-	api.set(24, 7, 9, "lamp")
-	api.marker("parkourEnd", { x = 23, y = 7, z = 8 })
+	api.marker("parkour", jumps)
+	api.marker("parkourStart", { x = jumps[1][1], y = 4, z = jumps[1][3] })
+	api.marker("parkourEnd", { x = tx, y = 18, z = tz })
+	api.set(tx, 17, tz, "gold_block")
 
-	api.marker("spawn", { x = 0, y = 1, z = -9, lookAt = { 0, 1, 10 } })
-	api.marker("title", { x = 0, y = 9, z = 0 })
+	-- 서쪽 정원: 연못, 다리, 정자, 벚나무
+	for dx = -5, 5 do
+		for dz = -4, 4 do
+			if (dx / 5.5) ^ 2 + (dz / 4.5) ^ 2 <= 1 then
+				api.set(-19 + dx, 0, -2 + dz, "water")
+				api.set(-19 + dx, -1, -2 + dz, "clay_block")
+			end
+		end
+	end
+	for _, lily in { { -21, -3 }, { -17, 0 }, { -20, 1 }, { -16, -4 } } do
+		api.set(lily[1], 1, lily[2], "carpet_lime")
+	end
+	Shapes.bridge(api, -26, -2, -12, -2, 1, "dark_planks_slab", 3, "dark_fence")
+	Shapes.pagoda(api, -18, 0, 11, 2, 2, { wall = "cherry_planks", pillar = "cherry_log", roof = "dark_planks", floor = "cherry_planks" })
+	for _, t in { { -24, 7 }, { -12, 7 }, { -25, -11 }, { -12, -12 } } do
+		Shapes.sakura(api, t[1], 0, t[2], rng, true)
+	end
+	Shapes.stoneLantern(api, -12, 0, 4)
+	Shapes.stoneLantern(api, -12, 0, -5)
+
+	-- 남쪽 상점가: 가판대와 집
+	local stallColors = { "wool_red", "wool_blue", "wool_yellow", "wool_green" }
+	for i, sx in { -15, -10, 10, 15 } do
+		Shapes.stall(api, sx - 1, 0, -14, sx + 1, -12, stallColors[i], "wool_white")
+		api.set(sx, 1, -13, if i % 2 == 0 then "hay" else "bookshelf")
+	end
+	Shapes.house(api, -21, 0, -21, -15, -16, { wall = "bricks", corner = "dark_log", floor = "dark_planks", roof = "dark_planks", roofSlab = "dark_planks_slab", beam = "dark_log", window = "glass", door = "x+", height = 4 })
+	Shapes.house(api, 15, 0, -21, 21, -16, { wall = "birch_planks", corner = "log", floor = "planks", roof = "bricks", roofSlab = "bricks_slab", beam = "log", window = "glass", door = "x-", height = 4 })
+	Shapes.well(api, 10, 0, -22)
+
+	-- 가장자리 나무
+	for _, p in Shapes.ring(16, 27, 0.15) do
+		local nearParkour = (p.x - tx) ^ 2 + (p.z - tz) ^ 2 < 100
+		if not nearParkour and api.get(p.x, 1, p.z) == nil and api.get(p.x, 0, p.z) == "grass" and math.abs(p.z) < 26 then
+			if rng:next() < 0.5 then
+				Shapes.oak(api, p.x, 0, p.z, rng)
+			else
+				Shapes.birch(api, p.x, 0, p.z, rng)
+			end
+		end
+	end
+	Shapes.flora(api, rng, -32, -36, 32, 36, 2, -1, GRASSY, { "tall_grass", "tall_grass", "flower_red", "flower_yellow", "flower_blue", "flower_white", "fern" }, 0.16)
+
+	-- 둘레에 떠 있는 작은 섬
+	for i = 1, 7 do
+		local a = (i - 0.5) * (2 * math.pi / 7)
+		local x, z = math.round(math.sin(a) * 52), math.round(math.cos(a) * 56)
+		local y = rng:int(-8, 8)
+		Shapes.island(api, x, y, z, { rx = 4, rz = 4, top = "grass", fill = "dirt", deep = "stone", depth = 5, edge = 0.25, drips = 0.1, rng = rng })
+		if i % 2 == 0 then
+			Shapes.sakura(api, x, y, z, rng, false)
+		else
+			Shapes.oak(api, x, y, z, rng)
+		end
+	end
+	for i = 1, 8 do
+		local a = i * (2 * math.pi / 8) + 0.3
+		Shapes.cloud(api, math.round(math.sin(a) * 64), rng:int(18, 26), math.round(math.cos(a) * 64), rng)
+	end
+
+	api.marker("spawn", { x = 0, y = 1, z = -24, lookAt = { 0, 1, 0 } })
+	api.marker("title", { x = 0, y = 12, z = 0 })
+	api.marker("welcome", { x = 0, y = 6, z = -19 })
+	api.marker("leaderboard", { x = -7, y = 5, z = -22 })
 end
 
 return Lobby
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="29">
+        <Item class="ModuleScript" referent="31">
           <Properties>
             <string name="Name">Rooms</string>
             <string name="Source"><![CDATA[-- 게임 시작 전 대기실과, 탈락한 사람이 구경하는 관전실
+local Shapes = require(script.Parent.Shapes)
+
 local Rooms = {}
 
-function Rooms.waiting(api, _rng)
-	for x = -5, 5 do
-		for z = -5, 5 do
-			local edge = math.abs(x) == 5 or math.abs(z) == 5
+-- 대기실: 석영 기둥과 유리벽으로 된 방, 팀 색 깃발, 랜턴, 둘레를 떠다니는 작은 섬
+function Rooms.waiting(api, rng)
+	local R = 6
+	for x = -R, R do
+		for z = -R, R do
+			local edge = math.abs(x) == R or math.abs(z) == R
+			local corner = math.abs(x) == R and math.abs(z) == R
+			local mid = edge and (x == 0 or z == 0)
+			-- 바닥 무늬
+			local d = math.max(math.abs(x), math.abs(z))
+			local floor = if d <= 1 then "gold_block" elseif d % 2 == 0 then "quartz" else "polished_diorite"
+			api.set(x, 0, z, if edge then "quartz_pillar" else floor)
+			api.set(x, -1, z, "stone_bricks")
 			if edge then
-				for y = 1, 4 do
-					api.set(x, y, z, "cage_glass")
+				for y = 1, 5 do
+					api.set(x, y, z, if corner or mid then "quartz_pillar" else "cage_glass")
 				end
-				api.set(x, 0, z, "quartz")
+				api.set(x, 6, z, "quartz")
 			else
-				api.set(x, 0, z, if (x + z) % 2 == 0 then "quartz" else "stone_bricks")
+				api.set(x, 6, z, if (x + z) % 2 == 0 then "cage_glass" else "quartz")
 			end
-			api.set(x, 5, z, "cage_glass")
 		end
 	end
-	for _, c in { { -4, -4 }, { 4, -4 }, { -4, 4 }, { 4, 4 } } do
-		api.set(c[1], 1, c[2], "lamp")
+	-- 랜턴과 팀 색 깃발
+	for _, c in { { -5, -5 }, { 5, -5 }, { -5, 5 }, { 5, 5 } } do
+		api.set(c[1], 1, c[2], "lantern")
+	end
+	local wools = { "wool_red", "wool_blue", "wool_green", "wool_yellow" }
+	for i, p in { { -3, 5, -5 }, { 3, 5, -5 }, { -3, 5, 5 }, { 3, 5, 5 } } do
+		Shapes.banner(api, p[1], p[2], p[3], wools[i], 2)
+	end
+	-- 밖에서 보이는 섬 장식
+	Shapes.island(api, 0, -2, 0, { rx = 8, rz = 8, top = "grass", fill = "dirt", deep = "stone", depth = 6, edge = 0.2, drips = 0.08, rng = rng })
+	for x = -R, R do
+		for z = -R, R do
+			api.set(x, -1, z, "stone_bricks")
+		end
 	end
 	api.marker("spawn", { x = 0, y = 1, z = 0 })
 end
 
+-- 관전실: 아래가 보이는 유리 바닥과 낮은 유리 담
 function Rooms.spectator(api, _rng)
 	for x = -4, 4 do
 		for z = -4, 4 do
 			local edge = math.abs(x) == 4 or math.abs(z) == 4
-			api.set(x, 0, z, "cage_glass")
+			api.set(x, 0, z, if edge then "quartz" else "cage_glass")
 			if edge then
 				for y = 1, 3 do
-					api.set(x, y, z, "cage_glass")
+					api.set(x, y, z, if (math.abs(x) == 4 and math.abs(z) == 4) then "quartz_pillar" else "cage_glass")
 				end
 			end
 		end
 	end
+	api.set(-3, 1, -3, "lantern")
+	api.set(3, 1, 3, "lantern")
 	api.marker("spawn", { x = 0, y = 1, z = 0 })
 end
 
@@ -3561,46 +5297,72 @@ return Rooms
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="30">
+        <Item class="ModuleScript" referent="32">
           <Properties>
             <string name="Name">Shapes</string>
-            <string name="Source"><![CDATA[-- 맵을 그릴 때 쓰는 모양 도구 (섬, 나무, 기둥 등). api.set(x, y, z, 블록) 만 사용합니다.
+            <string name="Source"><![CDATA[-- 맵 그리기 도구: 떠 있는 섬, 나무 여러 종류, 집, 탑, 지붕, 문, 분수, 가판대, 울타리 등.
+-- 모두 api.set(x, y, z, 블록) / api.get / api.part / api.big 만 사용합니다. (y 는 땅 블록 높이 기준)
 local Shapes = {}
 
--- 위가 넓고 아래로 갈수록 좁아지는 떠 있는 섬
-function Shapes.island(
-	api,
-	cx: number,
-	cy: number,
-	cz: number,
-	radius: number,
-	opts: { top: string, fill: string, bottom: string?, depth: number?, rng: any? }
-)
-	local depth = opts.depth or math.max(3, math.floor(radius * 0.8))
-	local rng = opts.rng
-	for layer = 0, depth do
-		local r = radius - layer * (radius / (depth + 1)) * 1.1
-		if layer == 0 then
-			r = radius
-		end
-		local id = if layer == 0 then opts.top elseif layer <= 2 then opts.fill else (opts.bottom or opts.fill)
-		local ri = math.ceil(r)
-		for dx = -ri, ri do
-			for dz = -ri, ri do
-				local d = math.sqrt(dx * dx + dz * dz)
-				local edge = r
-				if rng and layer > 0 then
-					edge += (rng:next() - 0.5) * 1.2
-				end
-				if d <= edge then
-					api.set(cx + dx, cy - layer, cz + dz, id)
+----------------------------------------------------------------------------
+-- 기본
+----------------------------------------------------------------------------
+
+-- 부드럽게 이어지는 값 노이즈 (0~1)
+function Shapes.noise(seed: number): (number, number) -> number
+	local s = math.floor(seed) % 2147483647
+	local function hash(ix: number, iz: number): number
+		local h = (ix * 374761 + iz * 668265 + s * 9176) % 2147483647
+		h = (h * 48271) % 2147483647
+		h = (h * 48271) % 2147483647
+		return h / 2147483647
+	end
+	return function(x: number, z: number): number
+		local ix, iz = math.floor(x), math.floor(z)
+		local fx, fz = x - ix, z - iz
+		fx = fx * fx * (3 - 2 * fx)
+		fz = fz * fz * (3 - 2 * fz)
+		local a = hash(ix, iz)
+		local b = hash(ix + 1, iz)
+		local c = hash(ix, iz + 1)
+		local d = hash(ix + 1, iz + 1)
+		return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fz
+	end
+end
+
+function Shapes.box(api, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: string, hollow: boolean?)
+	local lx, hx = math.min(x1, x2), math.max(x1, x2)
+	local ly, hy = math.min(y1, y2), math.max(y1, y2)
+	local lz, hz = math.min(z1, z2), math.max(z1, z2)
+	for x = lx, hx do
+		for y = ly, hy do
+			for z = lz, hz do
+				local edge = x == lx or x == hx or y == ly or y == hy or z == lz or z == hz
+				if not hollow or edge then
+					api.set(x, y, z, id)
 				end
 			end
 		end
 	end
 end
 
--- 평평한 원판
+function Shapes.clear(api, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number)
+	for x = math.min(x1, x2), math.max(x1, x2) do
+		for y = math.min(y1, y2), math.max(y1, y2) do
+			for z = math.min(z1, z2), math.max(z1, z2) do
+				api.clear(x, y, z)
+			end
+		end
+	end
+end
+
+function Shapes.pillar(api, x: number, y1: number, y2: number, z: number, id: string)
+	for y = y1, y2 do
+		api.set(x, y, z, id)
+	end
+end
+
+-- 평평한 원판. id 가 함수면 (dx, dz) 마다 블록을 고름 (nil 이면 비움)
 function Shapes.disc(api, cx: number, y: number, cz: number, radius: number, id: string | (number, number) -> string?)
 	local ri = math.ceil(radius)
 	for dx = -ri, ri do
@@ -3615,128 +5377,7 @@ function Shapes.disc(api, cx: number, y: number, cz: number, radius: number, id:
 	end
 end
 
-function Shapes.box(api, x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: string, hollow: boolean?)
-	for x = math.min(x1, x2), math.max(x1, x2) do
-		for y = math.min(y1, y2), math.max(y1, y2) do
-			for z = math.min(z1, z2), math.max(z1, z2) do
-				local edge = x == x1 or x == x2 or y == y1 or y == y2 or z == z1 or z == z2
-				if not hollow or edge then
-					api.set(x, y, z, id)
-				end
-			end
-		end
-	end
-end
-
-function Shapes.pillar(api, x: number, y1: number, y2: number, z: number, id: string)
-	for y = y1, y2 do
-		api.set(x, y, z, id)
-	end
-end
-
--- 나무: y 는 땅 블록 높이, 줄기는 그 위로 올라갑니다.
-function Shapes.tree(api, x: number, y: number, z: number, opts: { log: string?, leaves: string?, height: number?, wide: boolean? }?)
-	local o = opts or {}
-	local log = o.log or "log"
-	local leaves = o.leaves or "leaves"
-	local h = o.height or 4
-	for i = 1, h do
-		api.set(x, y + i, z, log)
-	end
-	local top = y + h
-	local r = if o.wide then 3 else 2
-	for dy = -1, 1 do
-		local rr = if dy == 1 then r - 1 else r
-		for dx = -rr, rr do
-			for dz = -rr, rr do
-				local corner = math.abs(dx) == rr and math.abs(dz) == rr
-				if not corner and not (dx == 0 and dz == 0 and dy < 1) then
-					api.set(x + dx, top + dy, z + dz, leaves)
-				end
-			end
-		end
-	end
-	api.set(x, top + 2, z, leaves)
-end
-
-function Shapes.cactus(api, x: number, y: number, z: number, height: number)
-	for i = 1, height do
-		api.set(x, y + i, z, "cactus")
-	end
-end
-
--- 위로 갈수록 가늘어지는 뾰족한 기둥 (얼음 가시, 바위)
-function Shapes.spike(api, x: number, y: number, z: number, height: number, id: string)
-	for i = 1, height do
-		local r = math.floor((1 - i / height) * 1.6 + 0.4)
-		for dx = -r, r do
-			for dz = -r, r do
-				if math.abs(dx) + math.abs(dz) <= r then
-					api.set(x + dx, y + i, z + dz, id)
-				end
-			end
-		end
-	end
-end
-
--- 큰 버섯
-function Shapes.mushroom(api, x: number, y: number, z: number, height: number, radius: number)
-	for i = 1, height do
-		api.set(x, y + i, z, "mushroom_stem")
-	end
-	local top = y + height + 1
-	Shapes.disc(api, x, top, z, radius, "mushroom_red")
-	Shapes.disc(api, x, top + 1, z, radius - 1, "mushroom_red")
-	for dx = -radius, radius do
-		for dz = -radius, radius do
-			local d = dx * dx + dz * dz
-			if d <= radius * radius and d > (radius - 1) * (radius - 1) then
-				api.set(x + dx, top - 1, z + dz, "mushroom_red")
-			end
-		end
-	end
-	-- 하얀 점
-	api.set(x + 1, top + 2, z, "wool_white")
-	api.set(x - 1, top + 1, z + radius - 2, "wool_white")
-end
-
--- 가로등: 기둥 + 조명 블록
-function Shapes.lamp(api, x: number, y: number, z: number, post: string?)
-	local id = post or "dark_planks"
-	api.set(x, y + 1, z, id)
-	api.set(x, y + 2, z, id)
-	api.set(x, y + 3, z, "lamp")
-end
-
--- 두 점 사이를 잇는 다리 (가로 방향)
-function Shapes.bridge(api, x1: number, z1: number, x2: number, z2: number, y: number, id: string, width: number?)
-	local steps = math.max(math.abs(x2 - x1), math.abs(z2 - z1))
-	local w = width or 1
-	for i = 0, steps do
-		local t = if steps == 0 then 0 else i / steps
-		local x = math.round(x1 + (x2 - x1) * t)
-		local z = math.round(z1 + (z2 - z1) * t)
-		for o = -(w // 2), w // 2 do
-			if math.abs(x2 - x1) >= math.abs(z2 - z1) then
-				api.set(x, y, z + o, id)
-			else
-				api.set(x + o, y, z, id)
-			end
-		end
-	end
-end
-
--- 구름: 흰 블록 덩어리
-function Shapes.cloud(api, x: number, y: number, z: number, rng)
-	local n = rng:int(5, 9)
-	for _ = 1, n do
-		local cx = x + rng:int(-3, 3)
-		local cz = z + rng:int(-2, 2)
-		Shapes.disc(api, cx, y, cz, rng:int(1, 2), "wool_white")
-	end
-end
-
--- 섬 둘레를 돌며 하나씩 떨어진 위치
+-- 둘레 위 같은 간격의 점들
 function Shapes.ring(count: number, radius: number, offsetAngle: number?): { { x: number, z: number, angle: number } }
 	local out = {}
 	for i = 0, count - 1 do
@@ -3750,48 +5391,822 @@ function Shapes.ring(count: number, radius: number, offsetAngle: number?): { { x
 	return out
 end
 
+-- 방향이 있는 구조물용 좌표계: s = 옆, f = 앞(바깥쪽). ox, oz 는 바깥 방향(축 방향)
+function Shapes.frame(cx: number, cz: number, ox: number, oz: number)
+	local lx, lz = oz, -ox
+	return function(s: number, f: number): (number, number)
+		return cx + lx * s + ox * f, cz + lz * s + oz * f
+	end
+end
+
+-- (x, z) 칸에서 위에서부터 내려가며 처음 만나는 단단한 블록 높이
+function Shapes.topAt(api, x: number, z: number, yMax: number, yMin: number): (number?, string?)
+	for y = yMax, yMin, -1 do
+		local id = api.get(x, y, z)
+		if id then
+			return y, id
+		end
+	end
+	return nil, nil
+end
+
+----------------------------------------------------------------------------
+-- 섬과 지형
+----------------------------------------------------------------------------
+
+export type IslandOptions = {
+	rx: number,
+	rz: number,
+	top: string,
+	fill: string,
+	deep: string,
+	depth: number?,
+	fillDepth: number?,
+	edge: number?,
+	ores: boolean?,
+	drips: number?,
+	height: ((dx: number, dz: number, t: number) -> number)?,
+	rng: any,
+}
+
+-- 위는 평평하고 아래로 갈수록 좁아지는 울퉁불퉁한 떠 있는 섬 (아래엔 돌과 광석, 고드름처럼 매달린 돌)
+function Shapes.island(api, cx: number, cy: number, cz: number, o: IslandOptions)
+	local rng = o.rng
+	local noise = Shapes.noise(rng:int(1, 1000000))
+	local edgeAmt = o.edge or 0.2
+	local depthMax = o.depth or math.max(3, math.floor(math.min(o.rx, o.rz) * 0.75))
+	local fillDepth = o.fillDepth or 2
+	local R = math.ceil(math.max(o.rx, o.rz) * (1 + edgeAmt)) + 1
+	for dx = -R, R do
+		for dz = -R, R do
+			local nx, nz = dx / o.rx, dz / o.rz
+			local d = math.sqrt(nx * nx + nz * nz)
+			local edge = 1 + (noise(dx * 0.17, dz * 0.17) - 0.5) * 2 * edgeAmt
+			if d <= edge then
+				local t = d / edge
+				local h = if o.height then o.height(dx, dz, t) else 0
+				local depth = math.floor((1 - t ^ 1.4) * depthMax + noise(dx * 0.4 + 40, dz * 0.4 - 20) * 2.2) + 1
+				local x, z = cx + dx, cz + dz
+				local top = cy + h
+				api.set(x, top, z, o.top)
+				for k = 1, depth + h do
+					local id = o.fill
+					if k > fillDepth then
+						id = o.deep
+						if o.ores and rng:next() < 0.05 then
+							id = if rng:next() < 0.65 then "coal_ore" else "iron_ore"
+						end
+					end
+					api.set(x, top - k, z, id)
+				end
+				if o.drips and t < 0.8 and rng:next() < o.drips then
+					for k = 1, rng:int(1, 3) do
+						api.set(x, top - depth - h - k, z, o.deep)
+					end
+				end
+			end
+		end
+	end
+end
+
+-- 섬 위 풀밭에 꽃과 풀을 흩뿌림
+function Shapes.flora(api, rng, x1: number, z1: number, x2: number, z2: number, yMax: number, yMin: number, ground: { [string]: boolean }, choices: { string }, chance: number)
+	for x = math.min(x1, x2), math.max(x1, x2) do
+		for z = math.min(z1, z2), math.max(z1, z2) do
+			local y, id = Shapes.topAt(api, x, z, yMax, yMin)
+			if y and id and ground[id] and api.get(x, y + 1, z) == nil and rng:next() < chance then
+				api.set(x, y + 1, z, choices[rng:int(1, #choices)])
+			end
+		end
+	end
+end
+
+-- 바닥 깔기 (위에서 보이는 블록만 바꿈)
+function Shapes.paint(api, x1: number, z1: number, x2: number, z2: number, y: number, id: string | (number, number) -> string?)
+	for x = math.min(x1, x2), math.max(x1, x2) do
+		for z = math.min(z1, z2), math.max(z1, z2) do
+			local block = if type(id) == "function" then id(x, z) else id
+			if block then
+				api.set(x, y, z, block)
+				if api.get(x, y - 1, z) == nil then
+					api.set(x, y - 1, z, "dirt")
+				end
+			end
+		end
+	end
+end
+
+----------------------------------------------------------------------------
+-- 나무
+----------------------------------------------------------------------------
+
+local function blob(api, rng, cx: number, cy: number, cz: number, rx: number, ry: number, rz: number, id: string, holes: number?)
+	for dx = -math.ceil(rx), math.ceil(rx) do
+		for dy = -math.ceil(ry), math.ceil(ry) do
+			for dz = -math.ceil(rz), math.ceil(rz) do
+				local d = (dx / rx) ^ 2 + (dy / ry) ^ 2 + (dz / rz) ^ 2
+				if d <= 1 and (d < 0.6 or rng:next() > (holes or 0.25)) then
+					if api.get(cx + dx, cy + dy, cz + dz) == nil then
+						api.set(cx + dx, cy + dy, cz + dz, id)
+					end
+				end
+			end
+		end
+	end
+end
+
+function Shapes.oak(api, x: number, y: number, z: number, rng, opts: { log: string?, leaves: string?, height: number? }?)
+	local o = opts or {}
+	local log = o.log or "log"
+	local leaves = o.leaves or "leaves"
+	local h = o.height or rng:int(4, 6)
+	local top = y + h
+	blob(api, rng, x, top - 1, z, 2.6, 1.6, 2.6, leaves, 0.3)
+	blob(api, rng, x, top + 1, z, 1.6, 1.2, 1.6, leaves, 0.2)
+	for i = 1, h do
+		api.set(x, y + i, z, log)
+	end
+end
+
+function Shapes.birch(api, x: number, y: number, z: number, rng)
+	local h = rng:int(5, 7)
+	blob(api, rng, x, y + h - 1, z, 2.1, 2.2, 2.1, "birch_leaves", 0.25)
+	for i = 1, h do
+		api.set(x, y + i, z, "birch_log")
+	end
+end
+
+-- 벚나무: 갈라진 가지와 넓게 퍼진 분홍 잎, 땅에 떨어진 꽃잎
+function Shapes.sakura(api, x: number, y: number, z: number, rng, petals: boolean?)
+	local h = rng:int(4, 5)
+	for i = 1, h do
+		api.set(x, y + i, z, "cherry_log")
+	end
+	local top = y + h
+	local dirs = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+	local a = dirs[rng:int(1, 4)]
+	local b = dirs[rng:int(1, 4)]
+	for _, d in { a, b } do
+		api.set(x + d[1], top, z + d[2], "cherry_log")
+		api.set(x + d[1] * 2, top + 1, z + d[2] * 2, "cherry_log")
+	end
+	blob(api, rng, x, top + 1, z, 3.6, 1.8, 3.6, "sakura_leaves", 0.3)
+	blob(api, rng, x + a[1] * 2, top + 2, z + a[2] * 2, 2.2, 1.3, 2.2, "sakura_leaves", 0.2)
+	-- 아래로 늘어진 꽃잎 덩어리
+	for _ = 1, 6 do
+		local dx, dz = rng:int(-3, 3), rng:int(-3, 3)
+		if api.get(x + dx, top, z + dz) == "sakura_leaves" and api.get(x + dx, top - 1, z + dz) == nil then
+			api.set(x + dx, top - 1, z + dz, "sakura_leaves")
+		end
+	end
+	if petals then
+		for dx = -4, 4 do
+			for dz = -4, 4 do
+				if rng:next() < 0.22 then
+					local gy, id = Shapes.topAt(api, x + dx, z + dz, y + 1, y - 2)
+					if gy and id and (id == "grass" or id == "path") and api.get(x + dx, gy + 1, z + dz) == nil then
+						api.set(x + dx, gy + 1, z + dz, "petals")
+					end
+				end
+			end
+		end
+	end
+end
+
+-- 가문비나무 (눈 덮인 버전 가능)
+function Shapes.spruce(api, x: number, y: number, z: number, rng, snowy: boolean?)
+	local h = rng:int(7, 9)
+	local radii = { 2, 2, 1, 2, 1, 1, 0 }
+	local start = y + 2
+	for i, r in radii do
+		local ly = start + i - 1
+		if ly > y + h then
+			break
+		end
+		for dx = -r, r do
+			for dz = -r, r do
+				if math.abs(dx) + math.abs(dz) <= r + (if r >= 2 then 1 else 0) and not (dx == 0 and dz == 0) then
+					api.set(x + dx, ly, z + dz, "dark_leaves")
+					if snowy and api.get(x + dx, ly + 1, z + dz) == nil and (math.abs(dx) == r or math.abs(dz) == r) then
+						api.set(x + dx, ly + 1, z + dz, "carpet_white")
+					end
+				end
+			end
+		end
+	end
+	for i = 1, h do
+		api.set(x, y + i, z, "dark_log")
+	end
+	api.set(x, y + h + 1, z, "dark_leaves")
+	if snowy then
+		api.set(x, y + h + 2, z, "carpet_white")
+	end
+end
+
+-- 야자수: 살짝 휜 줄기와 늘어진 잎
+function Shapes.palm(api, x: number, y: number, z: number, rng, lean: { number }?)
+	local h = rng:int(5, 7)
+	local d = lean or { 1, 0 }
+	local tx, tz = x, z
+	for i = 1, h do
+		if i == math.floor(h / 2) + 1 then
+			tx += d[1]
+			tz += d[2]
+		end
+		api.set(tx, y + i, tz, "log")
+	end
+	local top = y + h + 1
+	api.set(tx, top, tz, "palm_leaves")
+	for _, dir in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 }, { 1, 1 }, { -1, -1 }, { 1, -1 }, { -1, 1 } } do
+		local len = if dir[1] ~= 0 and dir[2] ~= 0 then 2 else 3
+		for k = 1, len do
+			local drop = if k == len then 1 else 0
+			api.set(tx + dir[1] * k, top - drop, tz + dir[2] * k, "palm_leaves")
+		end
+	end
+	if rng:next() < 0.7 then
+		api.set(tx + 1, top - 1, tz, "wool_brown")
+	end
+end
+
+function Shapes.bush(api, x: number, y: number, z: number, rng, leaves: string?)
+	local id = leaves or "leaves"
+	api.set(x, y + 1, z, id)
+	for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+		if rng:next() < 0.6 then
+			api.set(x + d[1], y + 1, z + d[2], id)
+		end
+	end
+	if rng:next() < 0.5 then
+		api.set(x, y + 2, z, id)
+	end
+end
+
+function Shapes.cactus(api, x: number, y: number, z: number, height: number)
+	for i = 1, height do
+		api.set(x, y + i, z, "cactus")
+	end
+end
+
+-- 위로 갈수록 가늘어지는 뾰족한 기둥 (얼음 가시, 바위)
+function Shapes.spike(api, x: number, y: number, z: number, height: number, id: string)
+	for i = 1, height do
+		local r = math.floor((1 - i / height) * 1.8 + 0.4)
+		for dx = -r, r do
+			for dz = -r, r do
+				if math.abs(dx) + math.abs(dz) <= r then
+					api.set(x + dx, y + i, z + dz, id)
+				end
+			end
+		end
+	end
+end
+
+-- 큰 버섯 (아래에 버섯 조명)
+function Shapes.mushroom(api, x: number, y: number, z: number, height: number, radius: number, cap: string?, rng)
+	local capId = cap or "mushroom_red"
+	local top = y + height + 1
+	for dx = -radius, radius do
+		for dz = -radius, radius do
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d <= radius + 0.3 then
+				api.set(x + dx, top, z + dz, capId)
+				if d <= radius - 1.2 then
+					api.set(x + dx, top + 1, z + dz, capId)
+				end
+				if d > radius - 1 then
+					api.set(x + dx, top - 1, z + dz, capId)
+				elseif rng and rng:next() < 0.12 then
+					api.set(x + dx, top - 1, z + dz, "shroomlight")
+				end
+			end
+		end
+	end
+	if capId == "mushroom_red" and rng then
+		for _ = 1, radius + 2 do
+			local dx, dz = rng:int(-radius + 1, radius - 1), rng:int(-radius + 1, radius - 1)
+			if api.get(x + dx, top + 1, z + dz) == capId then
+				api.set(x + dx, top + 1, z + dz, "wool_white")
+			end
+		end
+	end
+	for i = 1, height do
+		api.set(x, y + i, z, "mushroom_stem")
+	end
+end
+
+----------------------------------------------------------------------------
+-- 장식
+----------------------------------------------------------------------------
+
+-- 가로등: 울타리 기둥 3칸 + 랜턴
+function Shapes.lampPost(api, x: number, y: number, z: number, post: string?, light: string?)
+	for i = 1, 3 do
+		api.set(x, y + i, z, post or "dark_fence")
+	end
+	api.set(x, y + 4, z, light or "lantern")
+end
+
+-- 석등: 담장 기둥 + 반 블록 + 랜턴
+function Shapes.stoneLantern(api, x: number, y: number, z: number)
+	api.set(x, y + 1, z, "cobble_wall")
+	api.set(x, y + 2, z, "stone_bricks_slab")
+	api.set(x, y + 3, z, "lantern")
+end
+
+-- 울타리 줄 (기둥 + 가로대)
+function Shapes.fenceLine(api, x1: number, z1: number, x2: number, z2: number, y: number, id: string?)
+	local fence = id or "fence"
+	local dx = if x2 > x1 then 1 elseif x2 < x1 then -1 else 0
+	local dz = if z2 > z1 then 1 elseif z2 < z1 then -1 else 0
+	local steps = math.max(math.abs(x2 - x1), math.abs(z2 - z1))
+	local railId = if fence == "dark_fence" then "dark_planks" else "planks"
+	for i = 0, steps do
+		local x, z = x1 + dx * i, z1 + dz * i
+		api.set(x, y, z, fence)
+		if i < steps then
+			local mx, mz = x + dx * 0.5, z + dz * 0.5
+			local sx = if dx ~= 0 then 0.8 else 0.1
+			local sz = if dz ~= 0 then 0.8 else 0.1
+			api.part(mx, y + 0.25, mz, sx, 0.1, sz, railId)
+			api.part(mx, y - 0.15, mz, sx, 0.1, sz, railId)
+		end
+	end
+end
+
+-- 가판대: 네 기둥과 줄무늬 천막
+function Shapes.stall(api, x1: number, y: number, z1: number, x2: number, z2: number, canopy: string, stripe: string?)
+	for _, c in { { x1, z1 }, { x2, z1 }, { x1, z2 }, { x2, z2 } } do
+		for i = 1, 3 do
+			api.set(c[1], y + i, c[2], "dark_fence")
+		end
+	end
+	for x = math.min(x1, x2) - 1, math.max(x1, x2) + 1 do
+		for z = math.min(z1, z2) - 1, math.max(z1, z2) + 1 do
+			local stripeOn = stripe and (x + z) % 2 == 0
+			api.set(x, y + 4, z, if stripeOn then stripe :: string else canopy)
+		end
+	end
+end
+
+-- 분수: 테두리 + 물 + 가운데 기둥
+function Shapes.fountain(api, cx: number, y: number, cz: number, radius: number, rim: string, center: string, top: string?)
+	for dx = -radius, radius do
+		for dz = -radius, radius do
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d <= radius + 0.4 then
+				api.set(cx + dx, y, cz + dz, rim)
+				if d > radius - 0.6 then
+					api.set(cx + dx, y + 1, cz + dz, rim)
+				else
+					api.set(cx + dx, y + 1, cz + dz, "water")
+				end
+			end
+		end
+	end
+	for i = 1, 3 do
+		api.set(cx, y + i, cz, center)
+	end
+	api.set(cx, y + 4, cz, top or "lamp")
+	for _, d in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+		api.set(cx + d[1], y + 3, cz + d[2], "water")
+	end
+end
+
+-- 우물
+function Shapes.well(api, x: number, y: number, z: number)
+	for dx = -1, 1 do
+		for dz = -1, 1 do
+			if dx == 0 and dz == 0 then
+				api.set(x, y, z, "water")
+			else
+				api.set(x + dx, y + 1, z + dz, "cobble")
+			end
+		end
+	end
+	for _, c in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+		api.set(x + c[1], y + 2, z + c[2], "dark_fence")
+		api.set(x + c[1], y + 3, z + c[2], "dark_fence")
+	end
+	Shapes.box(api, x - 1, y + 4, z - 1, x + 1, y + 4, z + 1, "dark_planks_slab")
+end
+
+-- 걸린 깃발 (양털 두세 칸)
+function Shapes.banner(api, x: number, y: number, z: number, wool: string, length: number?)
+	for i = 0, (length or 2) - 1 do
+		api.set(x, y - i, z, wool)
+	end
+end
+
+-- 구름 덩어리
+function Shapes.cloud(api, x: number, y: number, z: number, rng)
+	for _ = 1, rng:int(5, 9) do
+		local cx = x + rng:int(-4, 4)
+		local cz = z + rng:int(-3, 3)
+		Shapes.disc(api, cx, y, cz, rng:int(1, 2), "wool_white")
+		if rng:next() < 0.4 then
+			Shapes.disc(api, cx, y + 1, cz, 1, "wool_white")
+		end
+	end
+end
+
+-- 두 점을 잇는 다리 (반 블록 바닥 + 난간)
+function Shapes.bridge(api, x1: number, z1: number, x2: number, z2: number, y: number, floor: string, width: number?, rails: string?)
+	local steps = math.max(math.abs(x2 - x1), math.abs(z2 - z1))
+	local w = width or 1
+	local alongX = math.abs(x2 - x1) >= math.abs(z2 - z1)
+	for i = 0, steps do
+		local t = if steps == 0 then 0 else i / steps
+		local x = math.round(x1 + (x2 - x1) * t)
+		local z = math.round(z1 + (z2 - z1) * t)
+		for o = -(w // 2), w // 2 do
+			if alongX then
+				api.set(x, y, z + o, floor)
+			else
+				api.set(x + o, y, z, floor)
+			end
+		end
+		if rails and i % 2 == 0 then
+			local o = w // 2 + 1
+			if alongX then
+				api.set(x, y + 1, z - o, rails)
+				api.set(x, y + 1, z + o, rails)
+			else
+				api.set(x - o, y + 1, z, rails)
+				api.set(x + o, y + 1, z, rails)
+			end
+		end
+	end
+end
+
+----------------------------------------------------------------------------
+-- 건물
+----------------------------------------------------------------------------
+
+export type HouseOptions = {
+	wall: string,
+	corner: string,
+	floor: string,
+	roof: string, -- 지붕 블록
+	roofSlab: string?, -- 지붕 꼭대기/처마에 쓰는 반 블록
+	beam: string?,
+	window: string?,
+	door: string, -- "x-", "x+", "z-", "z+" 문이 난 쪽
+	height: number?,
+	flat: boolean?, -- 평평한 지붕 (사막집)
+	trim: string?, -- 평지붕 둘레 장식
+	interior: boolean?,
+	accent: string?,
+}
+
+-- 직사각형 집: 바닥, 모서리 기둥, 창문, 문, 박공지붕(또는 평지붕), 안쪽 장식
+function Shapes.house(api, x0: number, y: number, z0: number, x1: number, z1: number, o: HouseOptions)
+	local lx, hx = math.min(x0, x1), math.max(x0, x1)
+	local lz, hz = math.min(z0, z1), math.max(z0, z1)
+	local h = o.height or 4
+	-- 바닥과 기초
+	for x = lx, hx do
+		for z = lz, hz do
+			api.set(x, y, z, o.floor)
+			if api.get(x, y - 1, z) == nil then
+				api.set(x, y - 1, z, o.corner)
+			end
+		end
+	end
+	-- 벽
+	local cxDoor = math.floor((lx + hx) / 2)
+	local czDoor = math.floor((lz + hz) / 2)
+	for x = lx, hx do
+		for z = lz, hz do
+			local edgeX = x == lx or x == hx
+			local edgeZ = z == lz or z == hz
+			if edgeX or edgeZ then
+				local corner = edgeX and edgeZ
+				for i = 1, h do
+					local id = if corner then o.corner else o.wall
+					if not corner and i == h and o.beam then
+						id = o.beam
+					end
+					-- 창문: 가운데 높이, 두 칸마다
+					if not corner and i == 2 and h >= 3 then
+						local along = if edgeX then z - lz else x - lx
+						if along % 2 == 1 then
+							id = o.window or "glass"
+						end
+					end
+					api.set(x, y + i, z, id)
+				end
+			end
+		end
+	end
+	-- 문 (2칸 높이)
+	local doorX, doorZ = cxDoor, czDoor
+	if o.door == "x-" then
+		doorX = lx
+	elseif o.door == "x+" then
+		doorX = hx
+	elseif o.door == "z-" then
+		doorZ = lz
+	else
+		doorZ = hz
+	end
+	api.clear(doorX, y + 1, doorZ)
+	api.clear(doorX, y + 2, doorZ)
+	if o.accent then
+		api.set(doorX, y + 3, doorZ, o.accent)
+	end
+	-- 지붕
+	if o.flat then
+		for x = lx, hx do
+			for z = lz, hz do
+				api.set(x, y + h + 1, z, o.roof)
+				local edge = x == lx or x == hx or z == lz or z == hz
+				if edge and ((x + z) % 2 == 0) then
+					api.set(x, y + h + 2, z, o.trim or o.roof)
+				end
+			end
+		end
+	else
+		local alongX = (hx - lx) >= (hz - lz)
+		local a0, a1 = if alongX then lx - 1 else lz - 1, if alongX then hx + 1 else hz + 1
+		local b0, b1 = if alongX then lz - 1 else lx - 1, if alongX then hz + 1 else hx + 1
+		local half = (b1 - b0) / 2
+		for i = 0, math.ceil(half) do
+			local ry = y + h + i
+			local slabTop = i == math.ceil(half) and (b1 - b0) % 2 == 0
+			for a = a0, a1 do
+				for _, b in { b0 + i, b1 - i } do
+					local x, z = if alongX then a else b, if alongX then b else a
+					if slabTop and o.roofSlab then
+						api.set(x, ry, z, o.roofSlab)
+					else
+						api.set(x, ry, z, o.roof)
+					end
+				end
+			end
+			-- 박공 벽 채우기
+			if i > 0 then
+				for b = b0 + i + 1, b1 - i - 1 do
+					for _, a in { a0 + 1, a1 - 1 } do
+						local x, z = if alongX then a else b, if alongX then b else a
+						api.set(x, ry, z, o.wall)
+					end
+				end
+			end
+		end
+		-- 처마 끝을 반 블록으로
+		if o.roofSlab then
+			for a = a0, a1 do
+				for _, b in { b0 - 1, b1 + 1 } do
+					local x, z = if alongX then a else b, if alongX then b else a
+					if api.get(x, y + h, z) == nil then
+						api.set(x, y + h, z, o.roofSlab)
+					end
+				end
+			end
+		end
+	end
+	-- 안쪽: 랜턴, 책장, 카펫
+	if o.interior ~= false and hx - lx >= 3 and hz - lz >= 3 then
+		api.set(lx + 1, y + 1, lz + 1, "bookshelf")
+		api.set(hx - 1, y + 1, hz - 1, "lantern")
+		if hx - lx >= 4 then
+			api.set(hx - 1, y + 1, lz + 1, "hay")
+		end
+	end
+end
+
+-- 둥근 탑: 벽, 창문, 꼭대기 톱니 모양 성가퀴, 원뿔 지붕(선택)
+function Shapes.tower(api, cx: number, y: number, cz: number, radius: number, height: number, wall: string, opts: { roof: string?, battlement: boolean?, floor: string?, window: string? }?)
+	local o = opts or {}
+	for dx = -radius, radius do
+		for dz = -radius, radius do
+			local d = math.sqrt(dx * dx + dz * dz)
+			if d <= radius + 0.4 then
+				local outer = d > radius - 0.7
+				api.set(cx + dx, y, cz + dz, o.floor or wall)
+				for i = 1, height do
+					if outer then
+						local window = i % 4 == 2 and (dx == 0 or dz == 0)
+						api.set(cx + dx, y + i, cz + dz, if window then o.window or "glass" else wall)
+					end
+				end
+				if not outer then
+					api.set(cx + dx, y + height, cz + dz, o.floor or wall)
+				end
+			end
+		end
+	end
+	if o.battlement ~= false then
+		for dx = -radius - 1, radius + 1 do
+			for dz = -radius - 1, radius + 1 do
+				local d = math.sqrt(dx * dx + dz * dz)
+				if d > radius + 0.4 and d <= radius + 1.4 then
+					api.set(cx + dx, y + height, cz + dz, wall)
+					if (dx + dz) % 2 == 0 then
+						api.set(cx + dx, y + height + 1, cz + dz, wall)
+					end
+				end
+			end
+		end
+	end
+	if o.roof then
+		for i = 0, radius + 1 do
+			local r = radius + 1 - i
+			Shapes.disc(api, cx, y + height + 2 + i, cz, r, function(dx, dz)
+				local d = math.sqrt(dx * dx + dz * dz)
+				return if d > r - 1.2 then o.roof else nil
+			end)
+		end
+		api.set(cx, y + height + radius + 4, cz, "gold_block")
+	end
+end
+
+-- 성벽 한 줄 (높이 h, 꼭대기 톱니)
+function Shapes.wall(api, x1: number, z1: number, x2: number, z2: number, y: number, h: number, id: string, battlement: string?)
+	local dx = if x2 > x1 then 1 elseif x2 < x1 then -1 else 0
+	local dz = if z2 > z1 then 1 elseif z2 < z1 then -1 else 0
+	local steps = math.max(math.abs(x2 - x1), math.abs(z2 - z1))
+	for i = 0, steps do
+		local x, z = x1 + dx * i, z1 + dz * i
+		for k = 1, h do
+			api.set(x, y + k, z, id)
+		end
+		if i % 2 == 0 then
+			api.set(x, y + h + 1, z, battlement or id)
+		end
+	end
+end
+
+-- 도리이 문 (axis "x": 문이 x 방향으로 넓음)
+function Shapes.torii(api, x: number, y: number, z: number, axis: string, half: number, height: number)
+	local pillar = "wool_red"
+	local function at(o: number): (number, number)
+		if axis == "x" then
+			return x + o, z
+		end
+		return x, z + o
+	end
+	for _, o in { -half, half } do
+		local px, pz = at(o)
+		for i = 1, height do
+			api.set(px, y + i, pz, pillar)
+		end
+		api.set(px, y, pz, "dark_stone")
+	end
+	for o = -half + 1, half - 1 do
+		local px, pz = at(o)
+		api.set(px, y + height - 1, pz, pillar)
+	end
+	for o = -half - 1, half + 1 do
+		local px, pz = at(o)
+		api.set(px, y + height + 1, pz, "dark_planks")
+		if math.abs(o) == half + 1 then
+			api.set(px, y + height + 2, pz, "dark_planks_slab")
+		end
+	end
+	local mx, mz = at(0)
+	api.set(mx, y + height, mz, "dark_planks")
+end
+
+-- 층마다 처마가 있는 탑 (탑 모양 정자)
+function Shapes.pagoda(api, cx: number, y: number, cz: number, levels: number, size: number, opts: { wall: string, pillar: string, roof: string, floor: string })
+	local yy = y
+	for level = 1, levels do
+		local s = size - (level - 1)
+		if s < 1 then
+			break
+		end
+		-- 기둥
+		for _, c in { { -s, -s }, { s, -s }, { -s, s }, { s, s } } do
+			for i = 1, 3 do
+				api.set(cx + c[1], yy + i, cz + c[2], opts.pillar)
+			end
+		end
+		-- 처마 (모서리가 살짝 올라감)
+		for dx = -s - 1, s + 1 do
+			for dz = -s - 1, s + 1 do
+				local ring = math.max(math.abs(dx), math.abs(dz))
+				if ring >= s then
+					local cornerUp = math.abs(dx) == s + 1 and math.abs(dz) == s + 1
+					api.set(cx + dx, yy + 4 + (if cornerUp then 1 else 0), cz + dz, opts.roof)
+				elseif level < levels then
+					api.set(cx + dx, yy + 4, cz + dz, opts.floor)
+				end
+			end
+		end
+		yy += 4
+	end
+	api.set(cx, yy + 1, cz, opts.roof)
+	api.set(cx, yy + 2, cz, "gold_block")
+end
+
+-- 계단식 피라미드
+function Shapes.pyramid(api, cx: number, y: number, cz: number, half: number, id: string, edge: string?)
+	for i = 0, half do
+		local r = half - i
+		for dx = -r, r do
+			for dz = -r, r do
+				local border = math.abs(dx) == r or math.abs(dz) == r
+				api.set(cx + dx, y + i, cz + dz, if border and edge then edge else id)
+			end
+		end
+	end
+end
+
+-- 부서진 기둥 (폐허)
+function Shapes.ruinPillar(api, x: number, y: number, z: number, height: number, id: string, rng)
+	local h = math.max(1, height - rng:int(0, height // 2))
+	for i = 1, h do
+		api.set(x, y + i, z, if rng:next() < 0.2 then "mossy_cobble" else id)
+	end
+	if rng:next() < 0.5 then
+		api.set(x + rng:int(-1, 1), y + 1, z + rng:int(-1, 1), id)
+	end
+end
+
 return Shapes
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="31">
+        <Item class="ModuleScript" referent="33">
           <Properties>
             <string name="Name">SkyWarsMaps</string>
-            <string name="Source"><![CDATA[-- 스카이워즈 맵 3종: 시작 섬 8개, 중간 섬 4개, 좋은 상자가 있는 가운데 섬.
+            <string name="Source"><![CDATA[-- 스카이워즈 맵 3종: 시작 섬 8개(작은 집 + 상자 2개), 중간 섬 4개(폐허 + 상자), 큰 가운데 섬(좋은 상자 4개).
 local Shapes = require(script.Parent.Shapes)
 
 local ISLANDS = 8
-local ISLAND_DISTANCE = 26
-local ISLAND_RADIUS = 4
-local MID_DISTANCE = 14
+local ISLAND_DISTANCE = 30
+local MID_DISTANCE = 16
 
 type Theme = {
 	top: string,
 	fill: string,
-	bottom: string,
-	accent: string,
-	decorate: (api: any, x: number, y: number, z: number, rng: any) -> (),
+	deep: string,
+	flora: { string },
+	floraChance: number,
+	hut: (api: any, at: (number, number) -> (number, number), ox: number, oz: number, rng: any) -> (),
+	tree: (api: any, x: number, y: number, z: number, rng: any) -> (),
+	ruin: (api: any, x: number, y: number, z: number, rng: any) -> (),
 	center: (api: any, rng: any) -> (),
-	sky: ((api: any, rng: any) -> ())?,
-	centerChestRadius: number?,
+	sky: (api: any, rng: any) -> (),
+	centerChestRadius: number,
 }
+
+local GROUND = { grass = true, mycelium = true, basalt = true, snow_grass = true }
 
 local function chest(api, x: number, y: number, z: number, tier: string)
 	api.set(x, y, z, "chest")
 	api.marker("chest", { x = x, y = y, z = z, tier = tier })
 end
 
+-- 바깥쪽 방향을 가장 가까운 축으로 맞춤 (건물이 반듯하게 서도록)
+local function axisDir(angle: number): (number, number)
+	local sx, cz = math.sin(angle), math.cos(angle)
+	if math.abs(sx) > math.abs(cz) + 0.01 then
+		return if sx > 0 then 1 else -1, 0
+	end
+	return 0, if cz > 0 then 1 else -1
+end
+
+local function doorFacing(ox: number, oz: number): string
+	if oz == 1 then
+		return "z-"
+	elseif oz == -1 then
+		return "z+"
+	elseif ox == 1 then
+		return "x-"
+	end
+	return "x+"
+end
+
 local function startIsland(api, theme: Theme, index: number, rng)
 	local angle = (index - 1) * (2 * math.pi / ISLANDS)
-	local ox, oz = math.sin(angle), math.cos(angle)
-	local cx, cz = math.round(ox * ISLAND_DISTANCE) + 0, math.round(oz * ISLAND_DISTANCE) + 0
-	Shapes.island(api, cx, 0, cz, ISLAND_RADIUS, { top = theme.top, fill = theme.fill, bottom = theme.bottom, depth = 4, rng = rng })
-	-- 옆 방향(정수 격자에 맞춤)
-	local lx, lz = math.round(oz * 2.4) + 0, math.round(-ox * 2.4) + 0
-	local bx, bz = math.round(ox * 2.6) + 0, math.round(oz * 2.6) + 0
-	chest(api, cx + lx, 1, cz + lz, "island")
-	chest(api, cx - lx + bx, 1, cz - lz + bz, "island")
-	theme.decorate(api, cx + bx + lx, 0, cz + bz + lz, rng)
+	local cx = math.round(math.sin(angle) * ISLAND_DISTANCE) + 0
+	local cz = math.round(math.cos(angle) * ISLAND_DISTANCE) + 0
+	local ox, oz = axisDir(angle)
+	local at = Shapes.frame(cx, cz, ox, oz)
+	Shapes.island(api, cx, 0, cz, { rx = 6, rz = 6, top = theme.top, fill = theme.fill, deep = theme.deep, depth = 6, edge = 0.16, ores = true, drips = 0.08, rng = rng })
+	-- 집(뒤쪽) 안에 상자 하나, 옆에 상자 하나
+	theme.hut(api, at, ox, oz, rng)
+	local hx, hz = at(1, 4)
+	chest(api, hx, 1, hz, "island")
+	local sx, sz = at(3, 0)
+	chest(api, sx, 1, sz, "island")
+	local tx, tz = at(-4, -2)
+	theme.tree(api, tx, 0, tz, rng)
+	Shapes.flora(api, rng, cx - 7, cz - 7, cx + 7, cz + 7, 3, -2, GROUND, theme.flora, theme.floraChance)
+	-- 유리관 자리(스폰 주변 3x3, 높이 3)는 비워 둠
+	for dx = -1, 1 do
+		for dz = -1, 1 do
+			for y = 1, 3 do
+				local id = api.get(cx + dx, y, cz + dz)
+				if id and id ~= "chest" then
+					api.clear(cx + dx, y, cz + dz)
+				end
+			end
+		end
+	end
 	api.marker("spawn", { x = cx, y = 1, z = cz })
 end
 
@@ -3799,9 +6214,9 @@ local function midIsland(api, theme: Theme, index: number, rng)
 	local angle = math.pi / 4 + (index - 1) * (math.pi / 2)
 	local cx = math.round(math.sin(angle) * MID_DISTANCE) + 0
 	local cz = math.round(math.cos(angle) * MID_DISTANCE) + 0
-	Shapes.island(api, cx, 1, cz, 3, { top = theme.top, fill = theme.fill, bottom = theme.bottom, depth = 3, rng = rng })
+	Shapes.island(api, cx, 1, cz, { rx = 4, rz = 4, top = theme.top, fill = theme.fill, deep = theme.deep, depth = 5, edge = 0.2, ores = true, drips = 0.1, rng = rng })
+	theme.ruin(api, cx, 1, cz, rng)
 	chest(api, cx, 2, cz, "island")
-	api.set(cx + 1, 1, cz, theme.accent)
 end
 
 local function build(theme: Theme)
@@ -3812,96 +6227,243 @@ local function build(theme: Theme)
 		for i = 1, 4 do
 			midIsland(api, theme, i, rng)
 		end
-		Shapes.island(api, 0, 2, 0, 9, { top = theme.top, fill = theme.fill, bottom = theme.bottom, depth = 7, rng = rng })
-		for _, p in Shapes.ring(4, theme.centerChestRadius or 3, math.pi / 4) do
+		Shapes.island(api, 0, 2, 0, { rx = 11, rz = 11, top = theme.top, fill = theme.fill, deep = theme.deep, depth = 10, edge = 0.12, ores = true, drips = 0.06, rng = rng })
+		theme.center(api, rng)
+		for _, p in Shapes.ring(4, theme.centerChestRadius, math.pi / 4) do
 			chest(api, p.x, 3, p.z, "center")
 		end
-		theme.center(api, rng)
-		if theme.sky then
-			theme.sky(api, rng)
-		end
+		Shapes.flora(api, rng, -13, -13, 13, 13, 6, 0, GROUND, theme.flora, theme.floraChance)
+		theme.sky(api, rng)
 	end
 end
 
+----------------------------------------------------------------------------
+-- 1. 구름 정원: 오두막, 참나무/자작나무, 가운데 큰 나무와 나선 계단, 구름
+----------------------------------------------------------------------------
 local cloud: Theme = {
 	top = "grass",
 	fill = "dirt",
-	bottom = "stone",
-	accent = "planks",
-	decorate = function(api, x, y, z, rng)
-		Shapes.tree(api, x, y, z, { height = rng:int(3, 4) })
+	deep = "stone",
+	flora = { "tall_grass", "tall_grass", "flower_red", "flower_yellow", "flower_white", "fern" },
+	floraChance = 0.25,
+	centerChestRadius = 4,
+	hut = function(api, at, ox, oz, _rng)
+		local ax, az = at(-2, 2)
+		local bx, bz = at(2, 5)
+		Shapes.house(api, ax, 0, az, bx, bz, {
+			wall = "planks",
+			corner = "log",
+			floor = "planks",
+			roof = "bricks",
+			roofSlab = "bricks_slab",
+			window = "glass",
+			door = doorFacing(ox, oz),
+			height = 3,
+			interior = false,
+		})
+		local lx, lz = at(-1, 4)
+		api.set(lx, 1, lz, "lantern")
 	end,
-	center = function(api, _rng)
-		-- 가운데 나무 집
-		for _, p in Shapes.ring(4, 6, 0) do
-			Shapes.pillar(api, p.x, 3, 5, p.z, "log")
+	tree = function(api, x, y, z, rng)
+		if rng:next() < 0.5 then
+			Shapes.oak(api, x, y, z, rng)
+		else
+			Shapes.birch(api, x, y, z, rng)
 		end
-		for x = -6, 6 do
-			for z = -6, 6 do
-				local d = math.abs(x) + math.abs(z)
-				if d == 6 then
-					api.set(x, 6, z, "planks")
+	end,
+	ruin = function(api, x, y, z, rng)
+		for _, c in { { -2, -2 }, { 2, -2 }, { -2, 2 }, { 2, 2 } } do
+			Shapes.ruinPillar(api, x + c[1], y, z + c[2], 4, "stone_bricks", rng)
+		end
+		Shapes.lampPost(api, x + 1, y, z - 1, "fence", "lantern")
+	end,
+	center = function(api, rng)
+		-- 큰 나무: 3x3 줄기, 뿌리, 넓은 잎
+		for dx = -1, 1 do
+			for dz = -1, 1 do
+				for y = 3, 15 do
+					api.set(dx, y, dz, "log")
 				end
 			end
 		end
-		Shapes.tree(api, 0, 2, 0, { height = 5, wide = true })
+		for _, d in { { 2, 0 }, { -2, 0 }, { 0, 2 }, { 0, -2 } } do
+			api.set(d[1], 3, d[2], "log")
+		end
+		for _, b in { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } } do
+			for k = 1, 4 do
+				api.set(b[1] * (1 + k), 12 + (k // 2), b[2] * (1 + k), "log")
+			end
+		end
+		Shapes.disc(api, 0, 15, 0, 6.5, "leaves")
+		Shapes.disc(api, 0, 16, 0, 7, "leaves")
+		Shapes.disc(api, 0, 17, 0, 5.5, "leaves")
+		Shapes.disc(api, 0, 18, 0, 3.5, "leaves")
+		-- 나무 위 전망대로 오르는 나선 계단
+		local steps = { { 2, -1 }, { 2, 0 }, { 2, 1 }, { 1, 2 }, { 0, 2 }, { -1, 2 }, { -2, 1 }, { -2, 0 }, { -2, -1 }, { -1, -2 } }
+		for i, p in steps do
+			api.set(p[1], 2 + i, p[2], "planks")
+		end
+		for dx = -3, 3 do
+			for dz = -3, 3 do
+				local ring = math.max(math.abs(dx), math.abs(dz))
+				if ring >= 2 then
+					api.set(dx, 12, dz, "planks")
+				end
+			end
+		end
+		Shapes.fenceLine(api, -3, -3, 3, -3, 13, "fence")
+		Shapes.fenceLine(api, 3, -2, 3, 3, 13, "fence")
+		Shapes.fenceLine(api, 2, 3, -3, 3, 13, "fence")
+		api.set(0, 4, -2, "lantern")
+		-- 작은 연못과 꽃밭
+		for dx = -1, 1 do
+			for dz = -1, 1 do
+				api.set(7 + dx, 2, -6 + dz, "water")
+				api.set(7 + dx, 1, -6 + dz, "clay_block")
+			end
+		end
+		Shapes.oak(api, -7, 2, 6, rng)
+		Shapes.birch(api, 7, 2, 6, rng)
 	end,
 	sky = function(api, rng)
-		for i = 1, 8 do
-			local angle = i * (math.pi / 4) + 0.3
-			Shapes.cloud(api, math.round(math.sin(angle) * 40), rng:int(10, 16), math.round(math.cos(angle) * 40), rng)
+		for i = 1, 10 do
+			local angle = i * (2 * math.pi / 10) + 0.2
+			local dist = rng:int(42, 52)
+			Shapes.cloud(api, math.round(math.sin(angle) * dist), rng:int(9, 16), math.round(math.cos(angle) * dist), rng)
 		end
 	end,
 }
 
+----------------------------------------------------------------------------
+-- 2. 화산 군도: 검은 현무암 섬, 부서진 사당, 용암 웅덩이, 가운데 화산
+----------------------------------------------------------------------------
 local volcano: Theme = {
 	top = "basalt",
-	fill = "basalt",
-	bottom = "obsidian",
-	accent = "magma",
+	fill = "dark_stone",
+	deep = "basalt",
+	flora = { "dead_bush" },
+	floraChance = 0.05,
 	centerChestRadius = 7,
-	decorate = function(api, x, y, z, rng)
-		Shapes.spike(api, x, y, z, rng:int(2, 4), "magma")
+	hut = function(api, at, ox, oz, rng)
+		local ax, az = at(-2, 2)
+		local bx, bz = at(2, 5)
+		Shapes.house(api, ax, 0, az, bx, bz, {
+			wall = "dark_bricks",
+			corner = "basalt",
+			floor = "dark_stone",
+			roof = "dark_bricks",
+			window = "stained_orange",
+			door = doorFacing(ox, oz),
+			height = 3,
+			flat = true,
+			trim = "magma",
+			interior = false,
+		})
+		local lx, lz = at(-1, 4)
+		api.set(lx, 1, lz, "torch")
+		-- 집 옆 작은 용암 웅덩이 (테두리 있음)
+		local px, pz = at(-4, 4)
+		api.set(px, 0, pz, "lava")
+		api.set(px, -1, pz, "magma")
+		local _ = rng
 	end,
-	center = function(api, _rng)
-		-- 가운데 화산 (꼭대기 분화구에 용암)
-		for layer = 0, 6 do
-			local r = 5 - layer * 0.7
+	tree = function(api, x, y, z, rng)
+		Shapes.spike(api, x, y, z, rng:int(3, 5), if rng:next() < 0.5 then "obsidian" else "magma")
+	end,
+	ruin = function(api, x, y, z, rng)
+		for _, c in { { -2, -2 }, { 2, -2 }, { -2, 2 }, { 2, 2 } } do
+			Shapes.ruinPillar(api, x + c[1], y, z + c[2], 4, "dark_bricks", rng)
+		end
+		api.set(x + 1, y + 1, z + 2, "torch")
+	end,
+	center = function(api, rng)
+		-- 화산: 층층이 좁아지는 원뿔, 꼭대기 분화구에 용암, 옆으로 흐르는 용암 줄기
+		for layer = 0, 9 do
+			local r = 6 - layer * 0.55
 			Shapes.disc(api, 0, 3 + layer, 0, r, function(dx, dz)
 				local d = math.sqrt(dx * dx + dz * dz)
-				if layer >= 5 and d < 1.2 then
+				if layer >= 7 and d < 1.6 then
 					return "lava"
 				end
-				return if (dx + dz + layer) % 3 == 0 then "magma" else "basalt"
+				if (dx * 3 + dz * 5 + layer) % 7 == 0 then
+					return "magma"
+				end
+				return if layer > 6 then "dark_stone" else "basalt"
 			end)
+		end
+		for _, d in { { 1, 0 }, { -1, 0 } } do
+			for k = 2, 5 do
+				local y = 12 - k * 2
+				api.set(d[1] * k, y, 0, "magma")
+			end
+		end
+		-- 둘레의 흑요석 기둥
+		for _, p in Shapes.ring(8, 9, 0.2) do
+			Shapes.ruinPillar(api, p.x, 2, p.z, 5, "obsidian", rng)
 		end
 	end,
 	sky = function(api, rng)
-		for i = 1, 6 do
-			local angle = i * (math.pi / 3)
-			local x, z = math.round(math.sin(angle) * 42), math.round(math.cos(angle) * 42)
-			Shapes.spike(api, x, rng:int(-10, -4), z, rng:int(8, 12), "obsidian")
+		for i = 1, 7 do
+			local angle = i * (2 * math.pi / 7)
+			local x, z = math.round(math.sin(angle) * 46), math.round(math.cos(angle) * 46)
+			Shapes.spike(api, x, rng:int(-14, -8), z, rng:int(10, 15), "obsidian")
 		end
 	end,
 }
 
+----------------------------------------------------------------------------
+-- 3. 버섯 숲: 버섯 집, 작은 거대버섯, 가운데 큰 버섯
+----------------------------------------------------------------------------
 local mushroom: Theme = {
-	top = "grass",
+	top = "mycelium",
 	fill = "dirt",
-	bottom = "stone",
-	accent = "mushroom_stem",
-	decorate = function(api, x, y, z, rng)
-		Shapes.mushroom(api, x, y, z, rng:int(2, 3), 2)
+	deep = "stone",
+	flora = { "small_mushroom", "fern", "tall_grass", "flower_purple" },
+	floraChance = 0.2,
+	centerChestRadius = 4,
+	hut = function(api, at, ox, oz, _rng)
+		local ax, az = at(-2, 2)
+		local bx, bz = at(2, 5)
+		Shapes.house(api, ax, 0, az, bx, bz, {
+			wall = "mushroom_stem",
+			corner = "mushroom_brown",
+			floor = "birch_planks",
+			roof = "mushroom_red",
+			window = "glass",
+			door = doorFacing(ox, oz),
+			height = 3,
+			interior = false,
+		})
+		local lx, lz = at(-1, 4)
+		api.set(lx, 1, lz, "shroomlight")
 	end,
-	center = function(api, _rng)
-		Shapes.mushroom(api, 0, 2, 0, 6, 5)
+	tree = function(api, x, y, z, rng)
+		Shapes.mushroom(api, x, y, z, rng:int(3, 4), 2, if rng:next() < 0.5 then "mushroom_red" else "mushroom_brown", rng)
+	end,
+	ruin = function(api, x, y, z, rng)
+		Shapes.mushroom(api, x - 2, y, z + 2, 2, 1, "mushroom_brown", rng)
+		Shapes.mushroom(api, x + 2, y, z - 2, 3, 2, "mushroom_red", rng)
+	end,
+	center = function(api, rng)
+		for dx = -1, 1 do
+			for dz = -1, 1 do
+				for y = 3, 10 do
+					api.set(dx, y, dz, "mushroom_stem")
+				end
+			end
+		end
+		Shapes.mushroom(api, 0, 2, 0, 9, 7, "mushroom_red", rng)
+		for _, p in Shapes.ring(6, 8, 0.3) do
+			Shapes.mushroom(api, p.x, 2, p.z, rng:int(2, 3), 1, "mushroom_brown", rng)
+		end
 	end,
 	sky = function(api, rng)
-		for i = 1, 4 do
-			local angle = i * (math.pi / 2) + math.pi / 4
-			local x, z = math.round(math.sin(angle) * 40), math.round(math.cos(angle) * 40)
-			Shapes.island(api, x, -2, z, 2, { top = "grass", fill = "dirt", bottom = "stone", depth = 2, rng = rng })
-			Shapes.mushroom(api, x, -2, z, rng:int(4, 6), 3)
+		for i = 1, 5 do
+			local angle = i * (2 * math.pi / 5) + 0.5
+			local x, z = math.round(math.sin(angle) * 48), math.round(math.cos(angle) * 48)
+			local y = rng:int(-4, 3)
+			Shapes.island(api, x, y, z, { rx = 3, rz = 3, top = "mycelium", fill = "dirt", deep = "stone", depth = 4, edge = 0.2, drips = 0.1, rng = rng })
+			Shapes.mushroom(api, x, y, z, rng:int(5, 7), 3, "mushroom_red", rng)
 		end
 	end,
 }
@@ -3910,21 +6472,21 @@ return {
 	{
 		id = "cloud",
 		name = "구름 정원",
-		description = "구름 사이에 떠 있는 숲 섬",
+		description = "오두막과 큰 나무 전망대가 있는 구름 위 숲",
 		seed = 4401,
 		build = build(cloud),
 	},
 	{
 		id = "volcano",
 		name = "화산 군도",
-		description = "가운데에 화산이 솟은 검은 섬",
+		description = "용암이 흐르는 화산과 부서진 사당",
 		seed = 5503,
 		build = build(volcano),
 	},
 	{
 		id = "mushroom",
 		name = "버섯 숲",
-		description = "거대한 버섯이 자라는 섬",
+		description = "버섯 집과 거대한 버섯이 자라는 섬",
 		seed = 6607,
 		build = build(mushroom),
 	},
@@ -3932,30 +6494,29 @@ return {
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="32">
+        <Item class="ModuleScript" referent="34">
           <Properties>
             <string name="Name">TntRunMaps</string>
-            <string name="Source"><![CDATA[-- TNT 런 맵 3종: 4층 바닥, 맨 아래는 용암.
+            <string name="Source"><![CDATA[-- TNT 런 맵 3종: 4층 바닥 + 둘레를 둘러싼 배경 건축물, 맨 아래는 용암.
+-- 배경은 몇 개의 큰 파트(api.big / api.part)로 만들어서 파트 수가 적습니다. 바닥에서 닿을 수 없는 거리에 있습니다.
 local Shapes = require(script.Parent.Shapes)
 
 local FLOORS = { 0, -6, -12, -18 }
 
-local function base(api)
+local function common(api)
 	for _, y in FLOORS do
 		api.marker("floor", y)
 	end
-	-- 장식: 바깥쪽 조명 탑과 용암 바다 (닿을 수 없는 거리)
-	api.big(-22, -27, -22, 22, -27, 22, "lava")
-	for _, p in Shapes.ring(4, 19, math.pi / 4) do
-		Shapes.pillar(api, p.x, -26, 3, p.z, "quartz")
-		api.set(p.x, 4, p.z, "lamp")
-	end
+	api.big(-30, -28, -30, 30, -28, 30, "lava")
 	for _, p in Shapes.ring(12, 6, 0) do
 		api.marker("spawn", { x = p.x, y = 1, z = p.z })
 	end
 end
 
-local function rainbow(api, _rng)
+----------------------------------------------------------------------------
+-- 1. 무지개 탑: 동그란 무지개 바닥, 석영 기둥과 색유리 고리
+----------------------------------------------------------------------------
+local function rainbow(api, rng)
 	local colors = { "color_red", "color_orange", "color_yellow", "color_lime", "color_cyan", "color_blue", "color_purple", "color_pink" }
 	for floorIndex, y in FLOORS do
 		Shapes.disc(api, 0, y, 0, 12, function(dx, dz)
@@ -3963,7 +6524,56 @@ local function rainbow(api, _rng)
 			return colors[(band + floorIndex) % #colors + 1]
 		end)
 	end
-	base(api)
+	common(api)
+	local glass = { "stained_red", "stained_orange", "stained_yellow", "stained_lime", "stained_cyan", "stained_blue", "stained_purple", "stained_pink" }
+	local count = 16
+	local radius = 18
+	for i = 0, count - 1 do
+		local a = i * (2 * math.pi / count)
+		local x, z = math.sin(a) * radius, math.cos(a) * radius
+		api.part(x, -9, z, 2, 36, 2, "quartz_pillar")
+		api.part(x, 9.5, z, 1, 1, 1, "lamp")
+		-- 기둥 사이 색유리 판 (위쪽 두 줄)
+		local b = (i + 0.5) * (2 * math.pi / count)
+		local mx, mz = math.sin(b) * radius, math.cos(b) * radius
+		local chord = 2 * radius * math.sin(math.pi / count) - 1.6
+		local rot = CFrame.Angles(0, b, 0)
+		api.part(mx, 6, mz, chord, 4, 0.25, glass[i % #glass + 1], { rotation = rot })
+		api.part(mx, -6, mz, chord, 4, 0.25, glass[(i + 4) % #glass + 1], { rotation = rot })
+		api.part(mx, 8.75, mz, chord + 1.6, 0.5, 1, "quartz", { rotation = rot })
+	end
+	-- 바깥 구름
+	for i = 1, 6 do
+		local a = i * math.pi / 3
+		Shapes.cloud(api, math.round(math.sin(a) * 34), rng:int(-4, 8), math.round(math.cos(a) * 34), rng)
+	end
+end
+
+----------------------------------------------------------------------------
+-- 2. 체스판: 흑백 체스판 바닥, 성 안 같은 석재 벽과 기둥, 깃발, 큰 체스 말
+----------------------------------------------------------------------------
+local function rook(api, x: number, y: number, z: number, color: string)
+	Shapes.box(api, x - 1, y, z - 1, x + 1, y, z + 1, color)
+	for i = 1, 4 do
+		api.set(x, y + i, z, color)
+	end
+	Shapes.box(api, x - 1, y + 5, z - 1, x + 1, y + 5, z + 1, color)
+	for _, c in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+		api.set(x + c[1], y + 6, z + c[2], color)
+	end
+end
+
+local function king(api, x: number, y: number, z: number, color: string)
+	Shapes.box(api, x - 1, y, z - 1, x + 1, y, z + 1, color)
+	for i = 1, 5 do
+		api.set(x, y + i, z, color)
+	end
+	Shapes.box(api, x - 1, y + 5, z - 1, x + 1, y + 5, z + 1, color)
+	api.set(x, y + 6, z, color)
+	api.set(x, y + 7, z, "gold_block")
+	api.set(x - 1, y + 7, z, "gold_block")
+	api.set(x + 1, y + 7, z, "gold_block")
+	api.set(x, y + 8, z, "gold_block")
 end
 
 local function checker(api, _rng)
@@ -3977,9 +6587,44 @@ local function checker(api, _rng)
 			end
 		end
 	end
-	base(api)
+	common(api)
+	local W = 17
+	-- 네 벽 (안쪽에서 보이는 큰 석재 벽)
+	api.big(-W, -8, -W, W, 8, -W, "stone_bricks")
+	api.big(-W, -8, W, W, 8, W, "stone_bricks")
+	api.big(-W, -8, -W + 1, -W, 8, W - 1, "stone_bricks")
+	api.big(W, -8, -W + 1, W, 8, W - 1, "stone_bricks")
+	-- 벽 아래쪽 이끼 낀 띠, 위쪽 장식 띠
+	api.big(-W, -9, -W, W, -9, -W, "mossy_stone_bricks")
+	api.big(-W, -9, W, W, -9, W, "mossy_stone_bricks")
+	api.big(-W, -9, -W + 1, -W, -9, W - 1, "mossy_stone_bricks")
+	api.big(W, -9, -W + 1, W, -9, W - 1, "mossy_stone_bricks")
+	-- 기둥 (벽 안쪽으로 살짝 튀어나옴) 과 랜턴
+	for _, t in { -12, -6, 0, 6, 12 } do
+		for _, side in { { t, -W + 1 }, { t, W - 1 }, { -W + 1, t }, { W - 1, t } } do
+			api.part(side[1], -9, side[2], 1, 36, 1, "polished_stone")
+			api.part(side[1], 9.2, side[2], 1.2, 0.4, 1.2, "polished_stone")
+		end
+	end
+	for _, t in { -9, -3, 3, 9 } do
+		for _, side in { { t, -W + 0.4, 0 }, { t, W - 0.4, 0 }, { -W + 0.4, t, 1 }, { W - 0.4, t, 1 } } do
+			local wool = if (t // 3) % 2 == 0 then "wool_red" else "wool_white"
+			local sx = if side[3] == 1 then 0.15 else 1.6
+			local sz = if side[3] == 1 then 1.6 else 0.15
+			api.part(side[1], 4, side[2], sx, 6, sz, wool)
+			api.part(side[1], 0.5, side[2], sx * 0.6 + 0.1, 0.6, sz * 0.6 + 0.1, "lantern", { collide = false })
+		end
+	end
+	-- 벽 위 네 귀퉁이에 큰 체스 말
+	rook(api, -W, 9, -W, "quartz")
+	rook(api, W, 9, W, "dark_stone")
+	king(api, W, 9, -W, "quartz")
+	king(api, -W, 9, W, "dark_stone")
 end
 
+----------------------------------------------------------------------------
+-- 3. 모래 폭포: TNT 위에 깔린 모래/자갈 바닥, 사방을 둘러싼 협곡 절벽과 모래 폭포
+----------------------------------------------------------------------------
 local function sands(api, rng)
 	local radii = { 13, 11, 13, 10 }
 	for floorIndex, y in FLOORS do
@@ -3990,29 +6635,68 @@ local function sands(api, rng)
 			end
 			return if rng:chance(0.3) then "gravel" else "sand"
 		end)
+		Shapes.disc(api, 0, y - 1, 0, radii[floorIndex], function(dx, dz)
+			if floorIndex > 1 and (dx * 7 + dz * 13 + floorIndex * 5) % 23 == 0 then
+				return nil
+			end
+			return "tnt"
+		end)
 	end
-	base(api)
+	common(api)
+	-- 협곡 절벽: 높이와 거리가 다른 큰 바위 조각들을 빙 둘러 쌓음
+	local layers = { "sandstone", "red_sandstone", "terracotta_orange", "sandstone", "terracotta_yellow", "red_sandstone" }
+	local count = 20
+	for i = 0, count - 1 do
+		local a = i * (2 * math.pi / count)
+		local r = 20 + rng:int(0, 3)
+		local x, z = math.sin(a) * r, math.cos(a) * r
+		local width = 2 * r * math.sin(math.pi / count) + 2
+		local top = rng:int(4, 12)
+		local y = -27
+		local k = 1
+		while y < top do
+			local h = math.min(top - y, rng:int(3, 6))
+			local inset = (k % 2) * 0.6
+			api.part(x, y + h / 2, z, width - inset, h, 4 - inset, layers[(i + k) % #layers + 1], { rotation = CFrame.Angles(0, a, 0) })
+			y += h
+			k += 1
+		end
+		-- 절벽 위 선인장과 덤불
+		local gx, gz = math.round(math.sin(a) * (r + 1)), math.round(math.cos(a) * (r + 1))
+		if rng:next() < 0.5 then
+			api.set(gx, top + 1, gz, "sand")
+			Shapes.cactus(api, gx, top + 1, gz, rng:int(2, 3))
+		else
+			api.set(gx, top + 1, gz, "sand")
+			api.set(gx, top + 2, gz, "dead_bush")
+		end
+		-- 가끔 절벽에서 흘러내리는 모래 폭포
+		if i % 5 == 2 then
+			local fx, fz = math.sin(a) * (r - 2.1), math.cos(a) * (r - 2.1)
+			api.part(fx, (top - 27) / 2, fz, 1.6, top + 27, 0.6, "sand", { rotation = CFrame.Angles(0, a, 0), collide = false })
+		end
+	end
 end
 
 return {
 	{
 		id = "rainbow",
 		name = "무지개 탑",
-		description = "층마다 색이 다른 동그란 무지개 바닥",
+		description = "석영 기둥과 색유리로 둘러싼 무지개 바닥",
 		seed = 7701,
 		build = rainbow,
 	},
 	{
 		id = "checker",
 		name = "체스판",
-		description = "흑백 체스판 무늬 네모 바닥",
+		description = "성 안 홀, 흑백 체스판 바닥과 거대한 체스 말",
 		seed = 8803,
 		build = checker,
 	},
 	{
 		id = "sands",
 		name = "모래 폭포",
-		description = "구멍이 숭숭 뚫린 모래와 자갈 바닥",
+		description = "TNT 위 모래 바닥과 모래가 흘러내리는 협곡",
 		seed = 9907,
 		build = sands,
 	},
@@ -4021,7 +6705,7 @@ return {
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">Matches</string>
           <string name="Source"><![CDATA[-- 경기 관리: 대기열 -> 대기실(맵 투표) -> 게임 -> 결과 -> 로비
@@ -4778,11 +7462,11 @@ return Matches
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="34">
+      <Item class="Folder" referent="36">
         <Properties>
           <string name="Name">Modes</string>
         </Properties>
-        <Item class="ModuleScript" referent="35">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">BedWars</string>
             <string name="Source"><![CDATA[-- 베드워즈: 4팀, 침대가 있으면 부활, 자원 생성기와 상점, 팀 강화, 시간 이벤트
@@ -5048,7 +7732,7 @@ function BedWars.start(match, markers)
 				local hx, hy, hz = cell(marker.bedHead)
 				world:set(fx, fy, fz, "bed_" .. def.id, false, { team = def.id })
 				local head = world:set(hx, hy, hz, "bed_" .. def.id, false, { team = def.id })
-				if head then
+				if head and head.part then
 					local pillow = Instance.new("Part")
 					pillow.Name = "Pillow"
 					pillow.Anchored = true
@@ -5564,7 +8248,7 @@ return BedWars
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="36">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">SkyWars</string>
             <string name="Source"><![CDATA[-- 스카이워즈: 유리관에서 시작, 상자에서 장비 수집, 마지막 한 명이 승리
@@ -5690,7 +8374,7 @@ function SkyWars.start(match, markers)
 			starter = false,
 		}
 		table.insert(data.chests, chest)
-		if record then
+		if record and record.part then
 			local prompt = Instance.new("ProximityPrompt")
 			prompt.ActionText = "열기"
 			prompt.ObjectText = chest.container.title
@@ -5698,7 +8382,7 @@ function SkyWars.start(match, markers)
 			prompt.HoldDuration = 0
 			prompt.MaxActivationDistance = 10
 			prompt.RequiresLineOfSight = false
-			prompt.Parent = record.part
+			prompt.Parent = record.part :: BasePart
 			prompt.Triggered:Connect(function(player)
 				local state = Session.get(player)
 				if state and state.match == match and state.location == "match" and state.alive and data.phase == "fight" then
@@ -5897,7 +8581,7 @@ return SkyWars
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">TntRun</string>
             <string name="Source"><![CDATA[-- TNT 런: 밟은 바닥이 잠시 뒤 사라집니다. 더블 점프 3번, 마지막까지 버틴 사람이 승리.
@@ -6046,7 +8730,11 @@ function TntRun.tick(match, dt: number)
 						local key = x .. "," .. y .. "," .. z
 						if not data.scheduled[key] then
 							data.scheduled[key] = { time = now + TR.RemoveDelay, x = x, y = y, z = z }
-							record.part.Color = record.part.Color:Lerp(Color3.fromRGB(255, 60, 40), 0.45)
+							local part = record.part
+							if part then
+								part.Color = part.Color:Lerp(Color3.fromRGB(255, 60, 40), 0.45)
+								part:SetAttribute("Warn", true)
+							end
 						end
 					end
 				end
@@ -6056,6 +8744,11 @@ function TntRun.tick(match, dt: number)
 	for key, entry in data.scheduled do
 		if now >= entry.time then
 			world:remove(entry.x, entry.y, entry.z)
+			-- 바닥 밑에 깔린 TNT 도 같이 사라짐
+			local below = world:get(entry.x, entry.y - 1, entry.z)
+			if below and below.id == "tnt" then
+				world:remove(entry.x, entry.y - 1, entry.z)
+			end
 			data.scheduled[key] = nil
 		end
 	end
@@ -6152,7 +8845,7 @@ return TntRun
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">Net</string>
           <string name="Source"><![CDATA[-- 서버 <-> 클라이언트 통신. RemoteEvent 두 개만 씁니다.
@@ -6248,7 +8941,7 @@ return Net
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">Npc</string>
           <string name="Source"><![CDATA[-- 블록으로 만든 NPC (상점 주인, 로비 미니게임 안내원)
@@ -6355,7 +9048,7 @@ return Npc
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">PlayerData</string>
           <string name="Source"><![CDATA[-- 승리/처치 기록 저장 (DataStore). 스튜디오에서 API 접근을 꺼 두었으면 저장 없이 그냥 진행합니다.
@@ -6486,7 +9179,7 @@ return PlayerData
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">Projectiles</string>
           <string name="Source"><![CDATA[-- 날아가는 물체 (화살, 눈덩이, 순간이동 진주, 화염구). 서버에서 직접 움직이며 레이캐스트로 맞았는지 확인합니다.
@@ -6648,7 +9341,7 @@ return Projectiles
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">Session</string>
           <string name="Source"><![CDATA[-- 플레이어별 상태(어디에 있는지, 가방, 팀, 마지막으로 때린 사람 등)와 캐릭터 생성/꾸미기
@@ -6981,10 +9674,13 @@ return Session
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">World</string>
-          <string name="Source"><![CDATA[-- 블록 월드: 격자 좌표(x, y, z)마다 블록 하나를 파트로 만들어 관리합니다.
+          <string name="Source"><![CDATA[-- 블록 월드: 격자 좌표(x, y, z)마다 블록 하나.
+-- 사방이 다른 불투명 블록에 둘러싸여 안 보이는 블록은 파트를 만들지 않고 기록만 해 둡니다.
+-- (옆 블록이 부서져 드러나면 그때 파트를 만듭니다.) 그래서 큰 맵도 파트 수가 적습니다.
+-- 각 파트에는 "Occ" 속성으로 가려진 면을 적어 두어, 클라이언트가 보이는 면에만 텍스처를 붙입니다.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage.Shared
@@ -6996,9 +9692,20 @@ local B = Config.BlockSize
 local World = {}
 World.__index = World
 
+-- 면 순서: +X(Right) 1, -X(Left) 2, +Y(Top) 4, -Y(Bottom) 8, +Z(Back) 16, -Z(Front) 32
+local DIRS = {
+	{ 1, 0, 0, 1 },
+	{ -1, 0, 0, 2 },
+	{ 0, 1, 0, 4 },
+	{ 0, -1, 0, 8 },
+	{ 0, 0, 1, 16 },
+	{ 0, 0, -1, 32 },
+}
+World.AllCovered = 63
+
 export type Record = {
 	id: string,
-	part: BasePart,
+	part: BasePart?,
 	x: number,
 	y: number,
 	z: number,
@@ -7011,9 +9718,12 @@ export type World = typeof(setmetatable(
 		origin: Vector3,
 		model: Model,
 		blocksFolder: Folder,
+		decorFolder: Folder,
 		extras: Folder,
 		cells: { [number]: Record },
 		count: number,
+		partCount: number,
+		bulk: boolean,
 	},
 	World
 ))
@@ -7021,6 +9731,7 @@ export type World = typeof(setmetatable(
 function World.key(x: number, y: number, z: number): number
 	return (x + 1024) + (y + 1024) * 2048 + (z + 1024) * 4194304
 end
+local key = World.key
 
 function World.new(origin: Vector3, name: string): World
 	local model = Instance.new("Model")
@@ -7033,6 +9744,10 @@ function World.new(origin: Vector3, name: string): World
 	blocksFolder.Name = "Blocks"
 	blocksFolder.Parent = model
 
+	local decorFolder = Instance.new("Folder")
+	decorFolder.Name = "Decor"
+	decorFolder.Parent = model
+
 	local extras = Instance.new("Folder")
 	extras.Name = "Extras"
 	extras.Parent = model
@@ -7041,9 +9756,12 @@ function World.new(origin: Vector3, name: string): World
 		origin = origin,
 		model = model,
 		blocksFolder = blocksFolder,
+		decorFolder = decorFolder,
 		extras = extras,
 		cells = {},
 		count = 0,
+		partCount = 0,
+		bulk = false,
 	}, World)
 end
 
@@ -7069,11 +9787,11 @@ function World.toCell(self: World, pos: Vector3): (number, number, number)
 end
 
 function World.get(self: World, x: number, y: number, z: number): Record?
-	return self.cells[World.key(x, y, z)]
+	return self.cells[key(x, y, z)]
 end
 
 function World.isSolid(self: World, x: number, y: number, z: number): boolean
-	local record = self.cells[World.key(x, y, z)]
+	local record = self.cells[key(x, y, z)]
 	if not record then
 		return false
 	end
@@ -7081,25 +9799,69 @@ function World.isSolid(self: World, x: number, y: number, z: number): boolean
 	return def ~= nil and def.canCollide ~= false
 end
 
+local function occludes(record: Record?): boolean
+	if not record then
+		return false
+	end
+	local def = Blocks.get(record.id)
+	return def ~= nil and def.occludes
+end
+
+-- 여섯 면 중 불투명한 이웃에 가려진 면 (비트 합)
+function World.mask(self: World, x: number, y: number, z: number): number
+	local cells = self.cells
+	local m = 0
+	for _, d in DIRS do
+		if occludes(cells[key(x + d[1], y + d[2], z + d[3])]) then
+			m += d[4]
+		end
+	end
+	return m
+end
+
+local function child(parent: BasePart, name: string, size: Vector3, cframe: CFrame, color: Color3, material: Enum.Material?)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Size = size
+	p.CFrame = cframe
+	p.Color = color
+	p.Material = material or Enum.Material.SmoothPlastic
+	p.TopSurface = Enum.SurfaceType.Smooth
+	p.BottomSurface = Enum.SurfaceType.Smooth
+	p.Parent = parent
+	return p
+end
+
+local SMALL = { plant = true, grass = true, carpet = true, torch = true, lantern = true }
+
 local function buildPart(def: Blocks.BlockDef, x: number, y: number, z: number, center: Vector3): BasePart
+	local shape = if def.shape then Blocks.Shapes[def.shape] else nil
 	local part = Instance.new("Part")
 	part.Name = def.id
 	part.Anchored = true
-	local size = def.size or Vector3.one
-	part.Size = size * B
-	local offset = Vector3.new(0, (size.Y - 1) * B / 2, 0)
-	part.CFrame = CFrame.new(center + offset)
+	part.Size = (if shape then shape.size else Vector3.one) * B
+	local h = (x * 7919 + y * 104729 + z * 1299709) % 360
+	local rotation = if def.shape == "grass" then CFrame.Angles(0, math.rad(h), 0) else CFrame.identity
+	part.CFrame = CFrame.new(center + (if shape then shape.offset else Vector3.zero) * B) * rotation
 	part.Color = Blocks.shade(def, x, y, z)
 	part.Material = def.material
 	part.Transparency = def.transparency or 0
 	part.CanCollide = def.canCollide ~= false
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
+	if def.shape and SMALL[def.shape] then
+		part.CastShadow = false
+	end
 	if def.light then
 		local light = Instance.new("PointLight")
 		light.Range = def.light
-		light.Brightness = 1.4
-		light.Color = def.color
+		light.Brightness = 1.3
+		light.Color = def.lightColor or def.color
 		light.Shadows = false
 		light.Parent = part
 	end
@@ -7116,29 +9878,67 @@ local function buildPart(def: Blocks.BlockDef, x: number, y: number, z: number, 
 	if def.kill then
 		part:AddTag("Kill")
 	end
-	if def.chest then
-		local lid = Instance.new("Part")
-		lid.Name = "Latch"
-		lid.Anchored = true
-		lid.CanCollide = false
-		lid.CanQuery = false
-		lid.Size = Vector3.new(0.5, 0.7, 0.2)
-		lid.Color = Color3.fromRGB(70, 70, 75)
-		lid.Material = Enum.Material.Metal
-		lid.CFrame = part.CFrame * CFrame.new(0, 0.3, -part.Size.Z / 2 - 0.05)
-		lid.Parent = part
-		local band = Instance.new("Part")
-		band.Name = "Band"
-		band.Anchored = true
-		band.CanCollide = false
-		band.CanQuery = false
-		band.Size = Vector3.new(part.Size.X + 0.05, 0.18, part.Size.Z + 0.05)
-		band.Color = def.color:Lerp(Color3.new(0, 0, 0), 0.35)
-		band.Material = Enum.Material.WoodPlanks
-		band.CFrame = part.CFrame * CFrame.new(0, 0.35, 0)
-		band.Parent = part
+
+	local cf = part.CFrame
+	local size = part.Size
+	if def.shape == "chest" then
+		child(part, "Latch", Vector3.new(0.45, 0.6, 0.12), cf * CFrame.new(0, 0.25, -size.Z / 2 - 0.05), Color3.fromRGB(70, 70, 76), Enum.Material.Metal)
+	elseif def.shape == "plant" then
+		local bloom = def.bloom or Color3.new(1, 1, 1)
+		if def.id == "small_mushroom" then
+			child(part, "Cap", Vector3.new(0.8, 0.3, 0.8), cf * CFrame.new(0, size.Y / 2 + 0.1, 0), bloom)
+		else
+			child(part, "Bloom", Vector3.new(0.55, 0.5, 0.55), cf * CFrame.new(0, size.Y / 2 + 0.15, 0) * CFrame.Angles(0, math.rad(h), 0), bloom)
+			child(part, "Leaf", Vector3.new(0.6, 0.08, 0.25), cf * CFrame.new(0.2, -0.1, 0) * CFrame.Angles(0, math.rad(h), math.rad(25)), def.color)
+		end
+	elseif def.shape == "grass" then
+		child(part, "Blade", size, cf * CFrame.Angles(0, math.rad(90), 0), part.Color)
+	elseif def.shape == "lantern" then
+		local dark = Color3.fromRGB(46, 42, 40)
+		child(part, "Cap", Vector3.new(size.X + 0.12, 0.16, size.Z + 0.12), cf * CFrame.new(0, size.Y / 2 + 0.06, 0), dark)
+		child(part, "Base", Vector3.new(size.X + 0.12, 0.12, size.Z + 0.12), cf * CFrame.new(0, -size.Y / 2 - 0.04, 0), dark)
+		child(part, "Handle", Vector3.new(0.1, 0.3, 0.1), cf * CFrame.new(0, size.Y / 2 + 0.28, 0), dark)
+	elseif def.shape == "torch" then
+		child(part, "Flame", Vector3.new(0.42, 0.42, 0.42), cf * CFrame.new(0, size.Y / 2 + 0.15, 0), Color3.fromRGB(255, 170, 60), Enum.Material.Neon)
 	end
 	return part
+end
+
+function World.spawnPart(self: World, record: Record, mask: number?)
+	local def = Blocks.get(record.id)
+	if not def or record.part then
+		return
+	end
+	local part = buildPart(def, record.x, record.y, record.z, self:cellCenter(record.x, record.y, record.z))
+	if def.shape == nil then
+		part:SetAttribute("Occ", mask or self:mask(record.x, record.y, record.z))
+	end
+	part.Parent = self.blocksFolder
+	record.part = part
+	self.partCount += 1
+end
+
+-- 이웃이 바뀐 블록: 가려진 면 갱신, 숨어 있었는데 드러났으면 파트 만들기
+function World.refresh(self: World, record: Record)
+	local m = self:mask(record.x, record.y, record.z)
+	local part = record.part
+	if part then
+		if part:GetAttribute("Occ") ~= nil then
+			part:SetAttribute("Occ", m)
+		end
+	elseif m ~= World.AllCovered then
+		self:spawnPart(record, m)
+	end
+end
+
+local function refreshNeighbors(self: World, x: number, y: number, z: number)
+	local cells = self.cells
+	for _, d in DIRS do
+		local n = cells[key(x + d[1], y + d[2], z + d[3])]
+		if n then
+			self:refresh(n)
+		end
+	end
 end
 
 function World.set(self: World, x: number, y: number, z: number, id: string, placed: boolean?, data: { [string]: any }?): Record?
@@ -7147,42 +9947,103 @@ function World.set(self: World, x: number, y: number, z: number, id: string, pla
 		warn("[블록 아레나] 알 수 없는 블록:", id)
 		return nil
 	end
-	local key = World.key(x, y, z)
-	local old = self.cells[key]
+	local k = key(x, y, z)
+	local old = self.cells[k]
 	if old then
-		old.part:Destroy()
-		self.count -= 1
+		if old.part then
+			old.part:Destroy()
+			self.partCount -= 1
+		end
+	else
+		self.count += 1
 	end
-	local part = buildPart(def, x, y, z, self:cellCenter(x, y, z))
-	part.Parent = self.blocksFolder
 	local record: Record = {
 		id = id,
-		part = part,
+		part = nil,
 		x = x,
 		y = y,
 		z = z,
 		placed = placed == true,
 		data = data,
 	}
-	self.cells[key] = record
-	self.count += 1
-	return record
-end
-
-function World.remove(self: World, x: number, y: number, z: number): Record?
-	local key = World.key(x, y, z)
-	local record = self.cells[key]
-	if record then
-		self.cells[key] = nil
-		self.count -= 1
-		record.part:Destroy()
+	self.cells[k] = record
+	if not self.bulk then
+		self:spawnPart(record)
+		refreshNeighbors(self, x, y, z)
 	end
 	return record
 end
 
--- 맵 생성 함수에 넘기는 간단한 그리기 도구
+function World.remove(self: World, x: number, y: number, z: number): Record?
+	local k = key(x, y, z)
+	local record = self.cells[k]
+	if record then
+		self.cells[k] = nil
+		self.count -= 1
+		if record.part then
+			record.part:Destroy()
+			record.part = nil
+			self.partCount -= 1
+		end
+		if not self.bulk then
+			refreshNeighbors(self, x, y, z)
+		end
+	end
+	return record
+end
+
+-- 맵을 다 그린 뒤 보이는 블록만 파트로 만듭니다.
+function World.materialize(self: World)
+	self.bulk = false
+	for _, record in self.cells do
+		if not record.part then
+			local m = self:mask(record.x, record.y, record.z)
+			if m ~= World.AllCovered then
+				self:spawnPart(record, m)
+			end
+		end
+	end
+end
+
+-- 격자에 등록하지 않는 장식 파트 (난간, 들보, 지붕 끝 같은 얇은 조각). 위치/크기는 블록 단위
+function World.decor(self: World, cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, id: string, opts: { [string]: any }?): BasePart?
+	local def = Blocks.get(id)
+	if not def then
+		warn("[블록 아레나] 알 수 없는 장식 블록:", id)
+		return nil
+	end
+	local o = opts or {}
+	local part = Instance.new("Part")
+	part.Name = "Decor_" .. id
+	part.Anchored = true
+	part.Size = Vector3.new(math.max(0.05, sx * B), math.max(0.05, sy * B), math.max(0.05, sz * B))
+	part.CFrame = CFrame.new(self:cellCenter(cx, cy, cz)) * (o.rotation or CFrame.identity)
+	part.Color = o.color or def.color
+	part.Material = def.material
+	part.Transparency = o.transparency or def.transparency or 0
+	part.CanCollide = if o.collide ~= nil then o.collide else def.canCollide ~= false
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part:SetAttribute("BlockId", id)
+	if def.kill then
+		part:AddTag("Kill")
+	end
+	if def.light then
+		local light = Instance.new("PointLight")
+		light.Range = def.light
+		light.Brightness = 1.3
+		light.Color = def.lightColor or def.color
+		light.Shadows = false
+		light.Parent = part
+	end
+	part.Parent = self.decorFolder
+	return part
+end
+
+-- 맵 생성 함수에 넘기는 그리기 도구. 그리는 동안은 파트를 만들지 않습니다(show 할 때 한꺼번에).
 function World.builder(self: World, markers: { [string]: { any } })
 	local world = self
+	world.bulk = true
 	local api = {}
 	function api.set(x: number, y: number, z: number, id: string)
 		world:set(x, y, z, id)
@@ -7207,23 +10068,23 @@ function World.builder(self: World, markers: { [string]: { any } })
 		markers[kind] = markers[kind] or {}
 		table.insert(markers[kind], data)
 	end
-	-- 격자에 등록하지 않는 큰 장식 파트 (용암 바다 같은 배경용, 부서지지 않음)
+	-- 여러 칸을 덮는 큰 파트 한 개 (벽, 기둥, 용암 바다 같은 배경). 부서지지 않고 텍스처는 칸마다 반복됨
 	function api.big(x1: number, y1: number, z1: number, x2: number, y2: number, z2: number, id: string)
-		local def = Blocks.get(id)
-		if not def then
-			return
-		end
-		local a = world:cellCenter(math.min(x1, x2), math.min(y1, y2), math.min(z1, z2))
-		local b = world:cellCenter(math.max(x1, x2), math.max(y1, y2), math.max(z1, z2))
-		local part = buildPart(def, x1, y1, z1, (a + b) / 2)
-		part.Size = (b - a) + Vector3.new(B, B, B)
-		part.Name = "Decor_" .. id
-		part.Parent = world.extras
+		local lx, ly, lz = math.min(x1, x2), math.min(y1, y2), math.min(z1, z2)
+		local hx, hy, hz = math.max(x1, x2), math.max(y1, y2), math.max(z1, z2)
+		world:decor((lx + hx) / 2, (ly + hy) / 2, (lz + hz) / 2, hx - lx + 1, hy - ly + 1, hz - lz + 1, id)
+	end
+	-- 얇은 장식 조각: 가운데 위치와 크기(블록 단위)
+	function api.part(cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, id: string, opts: { [string]: any }?)
+		world:decor(cx, cy, cz, sx, sy, sz, id, opts)
 	end
 	return api
 end
 
 function World.show(self: World, parent: Instance)
+	if self.bulk then
+		self:materialize()
+	end
 	self.model.Parent = parent
 end
 
@@ -7231,6 +10092,7 @@ function World.destroy(self: World)
 	self.model:Destroy()
 	table.clear(self.cells)
 	self.count = 0
+	self.partCount = 0
 end
 
 return World
@@ -7239,12 +10101,12 @@ return World
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="44">
+  <Item class="SoundService" referent="46">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="45">
+  <Item class="StarterPlayer" referent="47">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CameraMaxZoomDistance">12</float>
@@ -7255,11 +10117,11 @@ return World
       <bool name="EnableMouseLockOption">false</bool>
       <bool name="LoadCharacterAppearance">false</bool>
     </Properties>
-    <Item class="StarterCharacterScripts" referent="46">
+    <Item class="StarterCharacterScripts" referent="48">
       <Properties>
         <string name="Name">StarterCharacterScripts</string>
       </Properties>
-      <Item class="Script" referent="47">
+      <Item class="Script" referent="49">
         <Properties>
           <string name="Name">Health</string>
           <token name="RunContext">0</token>
@@ -7269,15 +10131,308 @@ return World
         </Properties>
       </Item>
     </Item>
-    <Item class="StarterPlayerScripts" referent="48">
+    <Item class="StarterPlayerScripts" referent="50">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="Folder" referent="49">
+      <Item class="Folder" referent="51">
         <Properties>
           <string name="Name">Client</string>
         </Properties>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="52">
+          <Properties>
+            <string name="Name">BlockTextures</string>
+            <string name="Source"><![CDATA[-- 블록에 픽셀 텍스처 붙이기 (클라이언트)
+--  1) TextureIds 에 올린 이미지 ID 가 있으면 그걸 쓰고
+--  2) 없으면 Textures 모듈이 그린 픽셀을 EditableImage 로 만들어 씁니다 (업로드 필요 없음)
+--  3) 둘 다 안 되면 지금처럼 색 블록으로 보입니다.
+-- 카메라 가까운 블록(약 130스터드)에만, 그리고 보이는 면에만 붙여서 가볍게 유지합니다.
+local AssetService = game:GetService("AssetService")
+local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared:WaitForChild("Config"))
+local Blocks = require(Shared:WaitForChild("Blocks"))
+local Textures = require(Shared:WaitForChild("Textures"))
+local TextureIds = require(Shared:WaitForChild("TextureIds"))
+
+local B = Config.BlockSize
+local SCALE = 4 -- 16픽셀을 64픽셀로 키워서 덜 흐리게
+local CHUNK = 8 * B
+local RADIUS = 130
+local BUDGET = 260 -- 한 프레임에 처리할 블록 수
+
+local BlockTextures = {}
+BlockTextures.mode = "none"
+
+type Source = { content: any?, id: string? }
+local sources: { [string]: Source } = {}
+
+type Chunk = { parts: { [BasePart]: boolean }, active: boolean, center: Vector3 }
+local chunks: { [string]: Chunk } = {}
+local partChunk: { [BasePart]: Chunk } = {}
+local textured: { [BasePart]: boolean } = {}
+local queue: { { BasePart | boolean } } = {}
+
+local FACES = {
+	{ Enum.NormalId.Right, 1, "side" },
+	{ Enum.NormalId.Left, 2, "side" },
+	{ Enum.NormalId.Top, 4, "top" },
+	{ Enum.NormalId.Bottom, 8, "bottom" },
+	{ Enum.NormalId.Back, 16, "side" },
+	{ Enum.NormalId.Front, 32, "front" },
+}
+
+local function makeImage(name: string): any
+	local pixels = Textures.get(name)
+	if not pixels then
+		return nil
+	end
+	local size = 16 * SCALE
+	local image = AssetService:CreateEditableImage({ Size = Vector2.new(size, size) })
+	if not image then
+		return nil
+	end
+	local buf = buffer.create(size * size * 4)
+	for y = 0, size - 1 do
+		local row = (y // SCALE) * 16
+		for x = 0, size - 1 do
+			local src = (row + x // SCALE) * 4
+			local dst = (y * size + x) * 4
+			buffer.writeu8(buf, dst, pixels[src + 1])
+			buffer.writeu8(buf, dst + 1, pixels[src + 2])
+			buffer.writeu8(buf, dst + 2, pixels[src + 3])
+			buffer.writeu8(buf, dst + 3, pixels[src + 4])
+		end
+	end
+	image:WritePixelsBuffer(Vector2.zero, Vector2.new(size, size), buf)
+	return Content.fromObject(image)
+end
+
+local function loadSources()
+	for name, id in TextureIds :: { [string]: string } do
+		sources[name] = { id = id }
+	end
+	local made = 0
+	local ok, err = pcall(function()
+		for _, name in Textures.names() do
+			if not sources[name] then
+				local content = makeImage(name)
+				if content then
+					sources[name] = { content = content }
+					made += 1
+				end
+			end
+		end
+	end)
+	if not ok then
+		warn(
+			"[블록 아레나] 텍스처를 만들 수 없어 색 블록으로 보입니다. 게임 설정 → 보안 → '메시/이미지 API 허용'을 켜거나 "
+				.. "textures 폴더의 PNG 를 올려 TextureIds 에 적어 주세요. 이유: "
+				.. tostring(err)
+		)
+	end
+	if made > 0 then
+		BlockTextures.mode = "generated"
+	elseif next(sources) then
+		BlockTextures.mode = "uploaded"
+	end
+end
+
+local function blockDef(part: BasePart): Blocks.BlockDef?
+	local id = part:GetAttribute("BlockId")
+	return Blocks.get(if type(id) == "string" then id else part.Name)
+end
+
+local function untexture(part: BasePart)
+	for _, child in part:GetChildren() do
+		if child.Name == "BT" then
+			child:Destroy()
+		end
+	end
+	textured[part] = nil
+end
+
+local function texture(part: BasePart)
+	if not part.Parent then
+		return
+	end
+	untexture(part)
+	local def = blockDef(part)
+	if not def or def.tex == false then
+		return
+	end
+	local mask = 0
+	if def.shape == nil then
+		local occ = part:GetAttribute("Occ")
+		mask = if type(occ) == "number" then occ else 0
+	end
+	for _, face in FACES do
+		local onlyTop = def.shape == "carpet"
+		if bit32.band(mask, face[2]) == 0 and (not onlyTop or face[3] == "top") then
+			local name = Blocks.faceTexture(def, face[3])
+			local source = if name then sources[name] else nil
+			if source then
+				local t = Instance.new("Texture")
+				t.Name = "BT"
+				t.Face = face[1]
+				t.StudsPerTileU = B
+				t.StudsPerTileV = B
+				if source.content then
+					t.TextureContent = source.content
+				elseif source.id then
+					t.Texture = source.id
+				end
+				t.Parent = part
+			end
+		end
+	end
+	textured[part] = true
+end
+
+local function chunkFor(position: Vector3): Chunk
+	local cx, cy, cz = position.X // CHUNK, position.Y // CHUNK, position.Z // CHUNK
+	local k = cx .. "," .. cy .. "," .. cz
+	local chunk = chunks[k]
+	if not chunk then
+		chunk = {
+			parts = {},
+			active = false,
+			center = Vector3.new((cx + 0.5) * CHUNK, (cy + 0.5) * CHUNK, (cz + 0.5) * CHUNK),
+		}
+		chunks[k] = chunk
+	end
+	return chunk
+end
+
+local function track(part: Instance)
+	if not part:IsA("BasePart") or partChunk[part] then
+		return
+	end
+	-- 장식 파트(벽, 기둥 같은 큰 조각)는 수가 적어서 거리와 상관없이 항상 텍스처를 붙임
+	if part.Parent and part.Parent.Name == "Decor" then
+		texture(part)
+		return
+	end
+	local chunk = chunkFor(part.Position)
+	chunk.parts[part] = true
+	partChunk[part] = chunk
+	if chunk.active then
+		table.insert(queue, { part, true })
+	end
+	part:GetAttributeChangedSignal("Occ"):Connect(function()
+		if textured[part] then
+			table.insert(queue, { part, true })
+		end
+	end)
+end
+
+local function untrack(part: Instance)
+	if not part:IsA("BasePart") then
+		return
+	end
+	local chunk = partChunk[part]
+	if chunk then
+		chunk.parts[part] = nil
+	end
+	partChunk[part] = nil
+	textured[part] = nil
+end
+
+local function watchFolder(folder: Instance)
+	for _, child in folder:GetChildren() do
+		track(child)
+	end
+	folder.ChildAdded:Connect(track)
+	folder.ChildRemoved:Connect(untrack)
+end
+
+local function watchWorld(model: Instance)
+	for _, name in { "Blocks", "Decor" } do
+		local folder = model:FindFirstChild(name)
+		if folder then
+			watchFolder(folder)
+		else
+			task.spawn(function()
+				local f = model:WaitForChild(name, 30)
+				if f then
+					watchFolder(f)
+				end
+			end)
+		end
+	end
+end
+
+local loaded = false
+
+-- 텍스처 이미지 준비 (핫바 아이콘도 이걸 씀). 여러 번 불러도 한 번만 실행
+function BlockTextures.load()
+	if not loaded then
+		loaded = true
+		loadSources()
+	end
+end
+
+function BlockTextures.source(name: string): Source?
+	return sources[name]
+end
+
+function BlockTextures.init()
+	BlockTextures.load()
+	if BlockTextures.mode == "none" then
+		return
+	end
+	for _, model in CollectionService:GetTagged("BlockWorld") do
+		watchWorld(model)
+	end
+	CollectionService:GetInstanceAddedSignal("BlockWorld"):Connect(watchWorld)
+
+	local timer = 0
+	RunService.Heartbeat:Connect(function(dt)
+		timer += dt
+		if timer >= 0.3 then
+			timer = 0
+			local camera = workspace.CurrentCamera
+			local focus = if camera then camera.CFrame.Position else Vector3.zero
+			for _, chunk in chunks do
+				local distance = (chunk.center - focus).Magnitude
+				if not chunk.active and distance < RADIUS then
+					chunk.active = true
+					for part in chunk.parts do
+						table.insert(queue, { part, true })
+					end
+				elseif chunk.active and distance > RADIUS + 48 then
+					chunk.active = false
+					for part in chunk.parts do
+						table.insert(queue, { part, false })
+					end
+				end
+			end
+		end
+		local done = 0
+		while done < BUDGET and #queue > 0 do
+			local item = table.remove(queue) :: { any }
+			local part = item[1] :: BasePart
+			local chunk = partChunk[part]
+			if part.Parent and chunk then
+				if item[2] and chunk.active then
+					texture(part)
+				elseif not item[2] and not chunk.active then
+					untexture(part)
+				end
+			end
+			done += 1
+		end
+	end)
+end
+
+return BlockTextures
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">Controls</string>
             <string name="Source"><![CDATA[-- 조작: 조준(블록/사람), 왼쪽 클릭 공격·부수기, 오른쪽 클릭 설치·사용, 숫자키 핫바, 단축키, 모바일 버튼
@@ -7714,7 +10869,7 @@ return Controls
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">Effects</string>
             <string name="Source"><![CDATA[-- 꾸밈 효과: 생성기 블록 회전, 효과음
@@ -7786,7 +10941,7 @@ return Effects
 ]]></string>
           </Properties>
         </Item>
-        <Item class="LocalScript" referent="52">
+        <Item class="LocalScript" referent="55">
           <Properties>
             <string name="Name">Main</string>
             <string name="Source"><![CDATA[-- 클라이언트 시작점: 화면을 만들고 서버 메시지를 화면에 연결합니다.
@@ -7800,6 +10955,7 @@ local Windows = require(script.Parent.UI.Windows)
 local Controls = require(script.Parent.Controls)
 local Movement = require(script.Parent.Movement)
 local Effects = require(script.Parent.Effects)
+local BlockTextures = require(script.Parent.BlockTextures)
 
 local player = Players.LocalPlayer
 
@@ -7817,11 +10973,13 @@ task.spawn(function()
 	end
 end)
 
+BlockTextures.load() -- 핫바 아이콘이 블록 텍스처를 쓰므로 화면보다 먼저
 Hud.init(player:WaitForChild("PlayerGui"))
 Windows.init(Hud.gui())
 Controls.init()
 Movement.init()
 Effects.init()
+task.spawn(BlockTextures.init)
 
 local HINTS = {
 	lobby = "F: NPC  ·  우클릭: 아이템 사용  ·  V: 시점  ·  1~9: 핫바",
@@ -7935,7 +11093,7 @@ Hud.setStatusVisible(false)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">Movement</string>
             <string name="Source"><![CDATA[-- 움직임: 달리기(Ctrl), 웅크리기(Shift, 가장자리에서 안 떨어짐), 더블 점프(TNT 런), 낙하 피해, 넉백
@@ -8112,7 +11270,7 @@ return Movement
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">Net</string>
             <string name="Source"><![CDATA[-- 클라이언트 통신: 서버 메시지를 종류별로 나눠 전달하고, 요청을 보냅니다.
@@ -8152,7 +11310,7 @@ return Net
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">State</string>
             <string name="Source"><![CDATA[-- 클라이언트가 알고 있는 현재 상태 (가방, 어디에 있는지, 투표 정보 등)
@@ -8216,11 +11374,11 @@ return State
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="56">
+        <Item class="Folder" referent="59">
           <Properties>
             <string name="Name">UI</string>
           </Properties>
-          <Item class="ModuleScript" referent="57">
+          <Item class="ModuleScript" referent="60">
             <Properties>
               <string name="Name">Hud</string>
               <string name="Source"><![CDATA[-- 게임 화면: 조준점, 핫바, 하트, 갑옷, 오른쪽 점수판, 가운데 큰 글씨, 채팅 알림, 액션바
@@ -8702,7 +11860,7 @@ return Hud
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="58">
+          <Item class="ModuleScript" referent="61">
             <Properties>
               <string name="Name">IconRender</string>
               <string name="Source"><![CDATA[-- 픽셀 아이콘 그리기: 같은 색이 이어지는 칸은 한 프레임으로 합쳐서 프레임 수를 줄입니다.
@@ -8711,6 +11869,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Icons = require(Shared:WaitForChild("Icons"))
 local Items = require(Shared:WaitForChild("Items"))
+local Blocks = require(Shared:WaitForChild("Blocks"))
+local BlockTextures = require(script.Parent.Parent.BlockTextures)
 
 local IconRender = {}
 
@@ -8756,10 +11916,45 @@ function IconRender.draw(name: string, color: Color3): Frame
 	return template:Clone()
 end
 
-function IconRender.item(id: string): Frame
+-- 블록 아이템은 실제 블록 텍스처를 또렷하게(Pixelated) 보여 줍니다.
+local function blockImage(blockId: string): GuiObject?
+	local block = Blocks.get(blockId)
+	if not block then
+		return nil
+	end
+	local name = Blocks.faceTexture(block, "side")
+	local source = if name then BlockTextures.source(name) else nil
+	if not source then
+		return nil
+	end
+	local image = Instance.new("ImageLabel")
+	image.Name = "Pixels"
+	image.BackgroundTransparency = 1
+	image.Size = UDim2.fromScale(1, 1)
+	image.ResampleMode = Enum.ResamplerMode.Pixelated
+	image.BackgroundColor3 = block.color
+	if source.content then
+		image.ImageContent = source.content
+	elseif source.id then
+		image.Image = source.id
+	end
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(20, 20, 20)
+	stroke.Thickness = 1
+	stroke.Parent = image
+	return image
+end
+
+function IconRender.item(id: string): GuiObject
 	local def = Items.get(id)
 	if not def then
 		return IconRender.draw("question", Color3.new(1, 1, 1))
+	end
+	if def.kind == "block" and def.block then
+		local image = blockImage(def.block)
+		if image then
+			return image
+		end
 	end
 	return IconRender.draw(def.icon, def.color)
 end
@@ -8795,7 +11990,7 @@ return IconRender
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="59">
+          <Item class="ModuleScript" referent="62">
             <Properties>
               <string name="Name">Theme</string>
               <string name="Source"><![CDATA[-- 마인크래프트 느낌의 화면 부품: 회색 입체 창, 움푹 들어간 칸, 그림자 글씨, 버튼
@@ -9023,7 +12218,7 @@ return Theme
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="60">
+          <Item class="ModuleScript" referent="63">
             <Properties>
               <string name="Name">Windows</string>
               <string name="Source"><![CDATA[-- 마인크래프트식 창: 가방(E), 상자, 상점, 팀 강화, 맵 투표, 게임 선택
@@ -9705,7 +12900,7 @@ return Windows
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="61">
+  <Item class="Workspace" referent="64">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">130</float>

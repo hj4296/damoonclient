@@ -329,6 +329,10 @@ local function fakeApi()
 	function api.big(_x1, _y1, _z1, _x2, _y2, _z2, id)
 		assert(Blocks.get(id), "없는 블록 " .. tostring(id))
 	end
+	function api.part(_x, _y, _z, sx, sy, sz, id, _opts)
+		assert(Blocks.get(id), "없는 장식 블록 " .. tostring(id))
+		assert(sx > 0 and sy > 0 and sz > 0, "장식 크기가 0 이하")
+	end
 	local count = function()
 		local c = 0
 		for _ in blocks do
@@ -373,8 +377,22 @@ for _, map in requireModule(Server.Maps.BedWarsMaps) do
 		end
 		for _, cell in { t.shop, t.upgrades } do
 			local x, y, z = xyz(cell)
-			check(solid(api, x, y - 1, z) and free(api, x, y, z) and free(api, x, y + 1, z), map.id .. " " .. t.team .. " NPC 자리")
+			check(solid(api, x, y - 1, z) and free(api, x, y, z) and free(api, x, y + 1, z) and free(api, x, y + 2, z), map.id .. " " .. t.team .. " NPC 자리")
 		end
+		-- 스폰에서 침대까지 막힌 블록이 없어야 함 (같은 줄)
+		local fx, _, fz = xyz(t.bedFoot)
+		local sx2, _, sz2 = xyz(t.spawn)
+		local stepX, stepZ = math.sign(fx - sx2), math.sign(fz - sz2)
+		local cx, cz = sx2, sz2
+		local clear = true
+		while cx ~= fx or cz ~= fz do
+			if not free(api, cx, 1, cz) or not free(api, cx, 2, cz) then
+				clear = false
+			end
+			cx += stepX
+			cz += stepZ
+		end
+		check(clear, map.id .. " " .. t.team .. " 스폰에서 침대까지 길이 열려 있음")
 	end
 	for _, list in { markers.diamond or {}, markers.emerald or {} } do
 		for _, cell in list do
@@ -427,6 +445,15 @@ end
 section("로비/대기실")
 do
 	local Lobby = requireModule(Server.Maps.Lobby)
+	do
+		local W = requireModule(Server.World)
+		local lobbyWorld = W.new(roblox.Vector3.new(0, 60, 0), "LobbyTest")
+		Lobby.build(lobbyWorld:builder({}), Util.rng(42))
+		lobbyWorld:show(workspace)
+		table.insert(summary, string.format("로비: 기록 %d개 중 실제 파트 %d개", lobbyWorld.count, lobbyWorld.partCount))
+		check(lobbyWorld.partCount < 16000, "로비 파트 수 " .. lobbyWorld.partCount)
+		lobbyWorld:destroy()
+	end
 	local api, _, markers, count = fakeApi()
 	Lobby.build(api, Util.rng(42))
 	table.insert(summary, string.format("로비: 블록 %d개", count()))
@@ -434,8 +461,36 @@ do
 	check(solid(api, s.x, s.y - 1, s.z) and free(api, s.x, s.y, s.z) and free(api, s.x, s.y + 1, s.z), "로비 스폰")
 	check(#markers.npc == 3, "NPC 3명")
 	for _, npc in markers.npc do
-		check(solid(api, npc.x, npc.y - 1, npc.z) and free(api, npc.x, npc.y, npc.z) and free(api, npc.x, npc.y + 1, npc.z), "NPC 자리 " .. npc.mode)
+		check(solid(api, npc.x, npc.y - 1, npc.z) and free(api, npc.x, npc.y, npc.z) and free(api, npc.x, npc.y + 1, npc.z) and free(api, npc.x, npc.y + 2, npc.z), "NPC 자리 " .. npc.mode)
 	end
+	check(#(markers.portal or {}) == 3, "포털 3개")
+	for _, p in markers.portal or {} do
+		local open = true
+		for dx = -1, 1 do
+			for dy = 0, p.h - 1 do
+				if not free(api, p.x + dx, p.y + dy, p.z) then
+					open = false
+				end
+			end
+		end
+		check(open and solid(api, p.x, p.y - 1, p.z), "포털 안쪽이 비어 있음 " .. p.mode)
+		-- 포털 앞에서 걸어 들어갈 수 있어야 함
+		check(free(api, p.x, p.y, p.z - 1) and free(api, p.x, p.y + 1, p.z - 1), "포털 앞 " .. p.mode)
+	end
+	-- 파쿠르: 앞 발판에서 다음 발판까지 많아야 한 칸 띄우고, 한 칸 위까지만
+	local jumps = markers.parkour[1]
+	check(#jumps >= 20, "파쿠르 발판 수")
+	for i = 2, #jumps do
+		local a, b = jumps[i - 1], jumps[i]
+		local gap = math.max(math.abs(a[1] - b[1]), math.abs(a[3] - b[3]))
+		check(gap <= 2 and gap >= 1, string.format("파쿠르 %d번 거리 %d", i, gap))
+		check(b[2] - a[2] <= 1, string.format("파쿠르 %d번 높이", i))
+		check(free(api, b[1], b[2] + 1, b[3]) and free(api, b[1], b[2] + 2, b[3]), string.format("파쿠르 %d번 머리 위", i))
+	end
+	local last = jumps[#jumps]
+	local finish = markers.parkourEnd[1]
+	check(math.max(math.abs(last[1] - finish.x), math.abs(last[3] - finish.z)) <= 7 and finish.y - last[2] <= 2, "파쿠르 끝이 마지막 발판 근처")
+	check(free(api, finish.x, finish.y, finish.z) and solid(api, finish.x, finish.y - 1, finish.z), "파쿠르 도착 지점")
 	local Rooms = requireModule(Server.Maps.Rooms)
 	for _, name in { "waiting", "spectator" } do
 		local rapi, _, rm = fakeApi()
@@ -443,6 +498,49 @@ do
 		local r = rm.spawn[1]
 		check(solid(rapi, r.x, r.y - 1, r.z) and free(rapi, r.x, r.y, r.z), name .. " 스폰")
 	end
+end
+
+section("텍스처")
+local Textures = requireModule(Shared.Textures)
+local names = Textures.names()
+check(#names >= 80, "텍스처 수 " .. #names)
+for _, name in names do
+	local px = Textures.get(name)
+	check(px ~= nil and #px == 1024, "텍스처 " .. name)
+	if px then
+		local okValues = true
+		for i = 1, 1024 do
+			local v = px[i]
+			if type(v) ~= "number" or v < 0 or v > 255 or v ~= math.floor(v) then
+				okValues = false
+			end
+		end
+		check(okValues, "텍스처 값 범위 " .. name)
+	end
+end
+
+section("숨은 블록 생략")
+do
+	local World = requireModule(Server.World)
+	local world = World.new(roblox.Vector3.new(0, 0, 0), "CullTest")
+	local api = world:builder({})
+	api.fill(0, 0, 0, 4, 4, 4, "stone")
+	check(world.partCount == 0, "그리는 동안은 파트 없음")
+	world:show(workspace)
+	check(world.count == 125, "기록 125개")
+	check(world.partCount == 98, "보이는 블록만 파트 (98개) -> " .. world.partCount)
+	check(world:get(2, 2, 2).part == nil, "가운데 블록은 파트 없음")
+	local top = world:get(2, 4, 2)
+	check(top.part ~= nil and top.part:GetAttribute("Occ") == 63 - 4, "윗면만 보이는 블록의 가려진 면 값")
+	world:remove(2, 4, 2)
+	check(world:get(2, 3, 2).part ~= nil, "부서지면 밑의 블록이 드러남")
+	check(world:get(2, 3, 2).part:GetAttribute("Occ") == 63 - 4, "드러난 블록의 가려진 면 값")
+	check(world:get(1, 4, 2).part:GetAttribute("Occ") == 63 - 4 - 1, "옆 블록 면 값 갱신")
+	world:set(2, 4, 2, "glass", true)
+	check(world:get(2, 3, 2).part:GetAttribute("Occ") == 63 - 4, "유리는 면을 가리지 않음")
+	world:set(2, 5, 2, "stone", true)
+	check(world:get(2, 5, 2).part:GetAttribute("Occ") == 8 - 8, "유리 위 돌")
+	world:destroy()
 end
 
 section("실제 인스턴스로 맵 만들기")
@@ -457,7 +555,9 @@ for _, group in { "BedWarsMaps", "SkyWarsMaps", "TntRunMaps" } do
 			map.build(world:builder(markers), Util.rng(map.seed))
 		end)
 		check(ok, map.id .. " 실제 생성: " .. tostring(err))
-		maxParts = math.max(maxParts, world.count)
+		world:show(workspace)
+		maxParts = math.max(maxParts, world.partCount)
+		table.insert(summary, string.format("  -> %s: 기록 %d개 중 실제 파트 %d개", map.id, world.count, world.partCount))
 		local x, y, z = 0, 40, 0
 		world:set(x, y, z, "wool_red", true)
 		local record = world:get(x, y, z)
@@ -471,7 +571,7 @@ for _, group in { "BedWarsMaps", "SkyWarsMaps", "TntRunMaps" } do
 	end
 end
 table.insert(summary, "가장 큰 맵 파트 수: " .. maxParts)
-check(maxParts < 12000, "파트 수가 적당함")
+check(maxParts < 15000, "파트 수가 적당함 (" .. maxParts .. ")")
 do
 	local world = World.new(roblox.Vector3.new(0, 60, 0), "NpcTest")
 	local ok, err = pcall(function()

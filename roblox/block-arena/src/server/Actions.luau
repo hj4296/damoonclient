@@ -75,6 +75,9 @@ end
 local function primeTnt(match, record, source: Player)
 	task.spawn(function()
 		local part = record.part
+		if not part then
+			return
+		end
 		for i = 1, 12 do
 			task.wait(0.25)
 			if match.world:get(record.x, record.y, record.z) ~= record or match.state ~= "playing" then

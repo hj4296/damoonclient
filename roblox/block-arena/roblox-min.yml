@@ -42,3 +42,9 @@ globals:
     any: true
   ColorSequence:
     any: true
+  Content:
+    any: true
+  buffer:
+    any: true
+  bit32:
+    any: true
