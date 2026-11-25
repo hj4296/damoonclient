@@ -10,7 +10,6 @@ import android.widget.TextView
 class ListenActivity : Activity() {
     private lateinit var label: TextView
     private lateinit var voice: VoiceInput
-    private var done = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,7 +23,6 @@ class ListenActivity : Activity() {
             onPartial = { label.text = "“$it”" },
             onResult = { text ->
                 label.text = "“$text”"
-                done = true
                 Assistant.handle(text, fromOverlay = true)
                 close()
             },
@@ -36,6 +34,8 @@ class ListenActivity : Activity() {
         )
 
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            // 항상 듣기가 꺼져 있었으면 (휴대폰을 다시 켰을 때 등) 지금 다시 켠다
+            if (Prefs.wakeEnabled(this) && !WakeService.running) WakeService.start(this)
             begin()
         } else {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 1)

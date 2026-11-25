@@ -29,7 +29,11 @@ class MainActivity : Activity() {
             private set
         private const val REQ_MIC = 1
         private const val REQ_FILES = 2
+        private const val REQ_WAKE = 3
     }
+
+    private lateinit var wakeCheck: CheckBox
+    private var ignoreWakeChange = false
 
     private lateinit var chat: LinearLayout
     private lateinit var chatScroll: ScrollView
@@ -109,6 +113,13 @@ class MainActivity : Activity() {
             ScreenService.instance?.setBubbleVisible(on)
         }
 
+        wakeCheck = findViewById(R.id.wake_check)
+        wakeCheck.setOnCheckedChangeListener { _, on ->
+            if (ignoreWakeChange) return@setOnCheckedChangeListener
+            Prefs.setWakeEnabled(this, on)
+            if (on) turnOnWake() else WakeService.stop(this)
+        }
+
         if (Assistant.messages.isEmpty()) {
             addBubble(Assistant.Message(false, "안녕하세요! 저는 쓰레기예요 🗑️\n아래 🎤 버튼을 누르고 말해 보세요.\n\n" + Assistant.HELP))
         } else {
@@ -121,6 +132,34 @@ class MainActivity : Activity() {
         super.onResume()
         visible = true
         refreshPermissions()
+        // 휴대폰을 다시 켰거나 꺼졌으면, 앱이 보이는 지금 다시 켠다
+        if (Prefs.wakeEnabled(this) && !WakeService.running && hasMic()) WakeService.start(this)
+        setWakeChecked(Prefs.wakeEnabled(this))
+    }
+
+    private fun setWakeChecked(on: Boolean) {
+        ignoreWakeChange = true
+        wakeCheck.isChecked = on
+        ignoreWakeChange = false
+    }
+
+    private fun turnOnWake() {
+        val need = mutableListOf<String>()
+        if (!hasMic()) need += Manifest.permission.RECORD_AUDIO
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) need += Manifest.permission.POST_NOTIFICATIONS
+        if (need.isNotEmpty()) {
+            requestPermissions(need.toTypedArray(), REQ_WAKE)
+            return
+        }
+        if (WakeService.start(this)) {
+            Toast.makeText(this, "이제 \"야 이 쓰레기야\"라고 불러 보세요!", Toast.LENGTH_LONG).show()
+        } else {
+            Prefs.setWakeEnabled(this, false)
+            setWakeChecked(false)
+            Toast.makeText(this, "항상 듣기를 켜지 못했어요. 마이크 권한을 확인해 주세요.", Toast.LENGTH_LONG).show()
+        }
     }
 
     override fun onPause() {
@@ -184,6 +223,15 @@ class MainActivity : Activity() {
         if (requestCode == REQ_MIC && listenAfterPermission) {
             listenAfterPermission = false
             if (hasMic()) startListening()
+        }
+        if (requestCode == REQ_WAKE) {
+            if (hasMic()) {
+                turnOnWake()
+            } else {
+                Prefs.setWakeEnabled(this, false)
+                setWakeChecked(false)
+                Toast.makeText(this, "마이크를 허용해야 부르는 소리를 들을 수 있어요.", Toast.LENGTH_LONG).show()
+            }
         }
     }
 

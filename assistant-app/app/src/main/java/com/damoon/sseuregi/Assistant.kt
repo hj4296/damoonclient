@@ -11,6 +11,7 @@ import com.damoon.sseuregi.brain.Command
 import com.damoon.sseuregi.brain.Command.Engine
 import com.damoon.sseuregi.brain.CommandParser
 import com.damoon.sseuregi.brain.TextUtil
+import com.damoon.sseuregi.brain.WakeWord
 import com.damoon.sseuregi.control.Ocr
 import com.damoon.sseuregi.control.ScreenService
 import com.damoon.sseuregi.tools.AppLauncher
@@ -79,6 +80,14 @@ object Assistant {
                 if (job === me) setBusy(false)
             }
         }
+    }
+
+    /** "야 이 쓰레기야"라고 부르기만 했을 때 */
+    fun wake(heard: String) {
+        post(Message(true, heard.trim()))
+        Speaker.stop()
+        job?.cancel()
+        say(WakeWord.REPLIES.random())
     }
 
     private fun setBusy(b: Boolean) {
@@ -416,6 +425,8 @@ object Assistant {
 
     val HELP = """
         🗑️ 쓰레기한테 이렇게 말해 보세요
+        • "야 이 쓰레기야" → 앱을 안 열어도 대답해요 ('항상 듣기'를 켜면)
+        • "야 이 쓰레기야, 유튜브 열어줘"처럼 한 번에 말해도 돼요
         • 궁금한 거 아무거나 → 구글에서 찾아서 읽어 줘요 (예: 고양이 수명 알려줘)
         • 유튜브에서 고양이 영상 틀어줘 / 네이버에서 오늘 날씨 검색해줘
         • 유튜브 열어줘 / 카톡 켜줘 / 설정 열어줘

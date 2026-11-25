@@ -108,6 +108,21 @@
             android:layout_height="wrap_content"
             android:text="다른 앱 위에 🗑️ 버튼 띄우기"
             android:textColor="@color/text" />
+
+        <CheckBox
+            android:id="@+id/wake_check"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🗣️ &quot;야 이 쓰레기야&quot;로 부르기 (항상 듣기)"
+            android:textColor="@color/text" />
+
+        <TextView
+            android:id="@+id/wake_hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="켜 두면 앱을 안 열어도 대답해요. 대신 배터리를 더 쓰고, 알림이 계속 떠 있어요. 휴대폰을 껐다 켜면 쓰레기 앱을 한 번 열어 주세요."
+            android:textColor="@color/gray"
+            android:textSize="13sp" />
     </LinearLayout>
 
     <ScrollView
