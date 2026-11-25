@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">쓰레기</string>
+    <string name="a11y_label">쓰레기 화면 조종</string>
+    <string name="a11y_description">쓰레기가 화면의 글자를 읽고, 말한 대로 대신 눌러 주는 기능이에요. 켜면 \"구글에서 찾아줘\", \"로그인 눌러줘\", \"화면 읽어줘\" 같은 말을 알아들어요. 화면 내용은 휴대폰 안에서만 쓰고 다른 곳으로 보내지 않아요.</string>
+</resources>
